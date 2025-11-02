@@ -1,5 +1,4 @@
 import React from 'react';
-import { PharmaLogoIcon } from './icons';
 
 export const Logo: React.FC<{ className?: string }> = ({ className }) => {
   // This check allows the logo to be either a gradient or a single color.
@@ -14,8 +13,6 @@ export const Logo: React.FC<{ className?: string }> = ({ className }) => {
   return (
     // The className from props is applied here, which can set height and color.
     <div className={`flex items-center justify-center font-bold ${className}`}>
-      {/* Icon always inherits color from the container div */}
-      <PharmaLogoIcon className="h-[50%] w-auto me-2" />
       {/* Font size is fixed, which should be okay. Text color is conditional. */}
       <span className={`text-3xl ${textClasses}`}>
         SaniVita

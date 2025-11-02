@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/mockData';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import DataImport from './DataImport';
 import Spinner from './Spinner';
+import UserEditModal from './UserEditModal';
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -45,6 +46,10 @@ const ManagerDashboard: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedRepsForExport, setSelectedRepsForExport] = useState<number[]>([]);
   const [selectedRepForDailyVisits, setSelectedRepForDailyVisits] = useState<number | 'all'>('all');
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
 
   // Settings tab local state
@@ -82,8 +87,10 @@ const ManagerDashboard: React.FC = () => {
       setOverdueAlerts(alertsData);
       setFilteredAlerts(alertsData);
       setSystemSettings(settingsData);
-      setLocalWeekends(settingsData.weekends);
-      setLocalHolidays(settingsData.holidays.sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
+      if (settingsData) {
+        setLocalWeekends(settingsData.weekends);
+        setLocalHolidays(settingsData.holidays.sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
+      }
       setAllPlans(plansData);
     } catch (error) {
       console.error("Failed to fetch initial data", error);
@@ -316,6 +323,36 @@ const ManagerDashboard: React.FC = () => {
           setSettingsMessage(t('settings_saved_error'));
           setTimeout(() => setSettingsMessage(''), 3000);
       }
+  };
+
+  const handleAddUserClick = () => {
+    setEditingUser(null);
+    setIsUserModalOpen(true);
+  };
+
+  const handleEditUserClick = (userToEdit: User) => {
+    setEditingUser(userToEdit);
+    setIsUserModalOpen(true);
+  };
+
+  const handleUserModalSuccess = () => {
+    setIsUserModalOpen(false);
+    setEditingUser(null);
+    fetchInitialData();
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingUser) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteUser(deletingUser.id);
+      setDeletingUser(null);
+      fetchInitialData();
+    } catch (error) {
+      console.error("Failed to delete user", error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
     const getPlanStatusBadge = (status: WeeklyPlan['status']) => {
@@ -649,13 +686,17 @@ const ManagerDashboard: React.FC = () => {
                     {t('reps_list')}
                 </h3>
                 <div className="flex items-center gap-3">
+                  <button onClick={handleAddUserClick} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-all shadow flex items-center gap-2">
+                    <PlusIcon className="w-5 h-5"/>
+                    <span>{t('add_rep')}</span>
+                  </button>
                   <button
                       onClick={() => { setSelectedRepsForExport([]); setIsExportModalOpen(true); }}
                       disabled={reps.length === 0}
                       className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition-all shadow flex items-center gap-2 disabled:bg-teal-300 disabled:cursor-not-allowed"
                   >
                       <DownloadIcon className="w-5 h-5"/>
-                      <span>{t('download_client_lists')}</span>
+                      <span className="hidden sm:inline">{t('download_client_lists')}</span>
                   </button>
                   <button
                       onClick={handleExportUsers}
@@ -663,7 +704,7 @@ const ManagerDashboard: React.FC = () => {
                       className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2 disabled:bg-green-300 disabled:cursor-not-allowed"
                   >
                       <DownloadIcon className="w-5 h-5"/>
-                      <span>{t('download_reps_list')}</span>
+                      <span className="hidden sm:inline">{t('download_reps_list')}</span>
                   </button>
                 </div>
               </div>
@@ -674,6 +715,7 @@ const ManagerDashboard: React.FC = () => {
                               <th scope="col" className="px-6 py-3">{t('full_name')}</th>
                               <th scope="col" className="px-6 py-3">{t('username')}</th>
                               <th scope="col" className="px-6 py-3">{t('role')}</th>
+                              <th scope="col" className="px-6 py-3">{t('actions')}</th>
                           </tr>
                       </thead>
                       <tbody>
@@ -682,6 +724,16 @@ const ManagerDashboard: React.FC = () => {
                                   <td className="px-6 py-4 font-medium text-slate-900">{user.name}</td>
                                   <td className="px-6 py-4">{user.username}</td>
                                   <td className="px-6 py-4">{t(user.role)}</td>
+                                  <td className="px-6 py-4">
+                                      <div className="flex items-center gap-4">
+                                          <button onClick={() => handleEditUserClick(user)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}>
+                                              <EditIcon className="w-5 h-5"/>
+                                          </button>
+                                          <button onClick={() => setDeletingUser(user)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}>
+                                              <TrashIcon className="w-5 h-5"/>
+                                          </button>
+                                      </div>
+                                  </td>
                               </tr>
                           ))}
                       </tbody>
@@ -901,6 +953,38 @@ const ManagerDashboard: React.FC = () => {
           </div>
         </Modal>
       )}
+
+       <UserEditModal 
+            isOpen={isUserModalOpen}
+            onClose={() => setIsUserModalOpen(false)}
+            onSuccess={handleUserModalSuccess}
+            userToEdit={editingUser}
+        />
+
+        {deletingUser && (
+            <Modal isOpen={!!deletingUser} onClose={() => setDeletingUser(null)} title={t('confirm_delete_title')}>
+                <div>
+                    <p className="text-slate-700">{t('confirm_delete_message', deletingUser.name)}</p>
+                    <div className="flex items-center justify-end space-x-2 space-x-reverse pt-6">
+                        <button
+                            type="button"
+                            onClick={() => setDeletingUser(null)}
+                            className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
+                        >
+                            {t('cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmDelete}
+                            disabled={isDeleting}
+                            className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors"
+                        >
+                            {isDeleting ? t('deleting') : t('confirm')}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+        )}
     </div>
   );
 };

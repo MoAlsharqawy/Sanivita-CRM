@@ -30,6 +30,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'good_morning': 'صباح الخير، {0}',
     'good_afternoon': 'مساء الخير، {0}',
     'good_evening': 'مساء الخير، {0}',
+    'actions': 'الإجراءات',
+    'edit': 'تعديل',
+    'delete': 'حذف',
+    'confirm': 'تأكيد',
+    'deleting': 'جاري الحذف...',
 
     // Enums
     'MANAGER': 'مدير',
@@ -156,6 +161,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'you_have_pending_plans': 'لديك {0} خطط بانتظار المراجعة.',
     'view_plans': 'مراجعة الخطط',
     'no_pending_plans': 'لا توجد خطط جديدة للمراجعة. عمل رائع!',
+    'add_rep': 'إضافة مندوب',
+    'confirm_delete_title': 'تأكيد الحذف',
+    'confirm_delete_message': 'هل أنت متأكد أنك تريد حذف المندوب {0}؟ لا يمكن التراجع عن هذا الإجراء.',
+
     
     // Visit Form
     'doctor_visit': 'زيارة طبيب',
@@ -187,7 +196,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'visit_history_last_two_months': 'سجل الزيارات (آخر شهرين)',
     'no_visits_in_last_two_months': 'لا توجد زيارات مسجلة لهذا العميل في آخر شهرين.',
 
-    // Change Password Modal
+    // Change Password / User Modal
     'change_password_for': 'تغيير كلمة مرور {0}',
     'new_password': 'كلمة المرور الجديدة',
     'confirm_new_password': 'تأكيد كلمة المرور الجديدة',
@@ -199,6 +208,12 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'فشل تحديث كلمة المرور. المستخدم غير موجود.',
     'error_unexpected': 'حدث خطأ غير متوقع.',
     'save_changes': 'حفظ التغييرات',
+    'edit_rep_info': 'تعديل بيانات المندوب',
+    'add_new_rep': 'إضافة مندوب جديد',
+    'leave_blank_to_keep': 'اتركه فارغاً للحفاظ على كلمة المرور الحالية',
+    'confirm_password': 'تأكيد كلمة المرور',
+    'error_all_fields_required': 'يرجى ملء جميع الحقول المطلوبة.',
+    'error_password_required': 'كلمة المرور مطلوبة للمستخدم الجديد.',
     
     // Weekly View
     'previous_week': 'الأسبوع السابق',
@@ -270,6 +285,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'good_morning': 'Good Morning, {0}',
     'good_afternoon': 'Good Afternoon, {0}',
     'good_evening': 'Good Evening, {0}',
+    'actions': 'Actions',
+    'edit': 'Edit',
+    'delete': 'Delete',
+    'confirm': 'Confirm',
+    'deleting': 'Deleting...',
 
     // Enums
     'MANAGER': 'Manager',
@@ -396,6 +416,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'you_have_pending_plans': 'You have {0} pending plans to review.',
     'view_plans': 'Review Plans',
     'no_pending_plans': 'No new plans to review. Great job!',
+    'add_rep': 'Add Representative',
+    'confirm_delete_title': 'Confirm Deletion',
+    'confirm_delete_message': 'Are you sure you want to delete the representative {0}? This action cannot be undone.',
 
     // Visit Form
     'doctor_visit': 'Doctor Visit',
@@ -427,7 +450,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'visit_history_last_two_months': 'Visit History (Last 2 Months)',
     'no_visits_in_last_two_months': 'No visits recorded for this client in the last two months.',
 
-    // Change Password Modal
+    // Change Password / User Modal
     'change_password_for': 'Change Password for {0}',
     'new_password': 'New Password',
     'confirm_new_password': 'Confirm New Password',
@@ -439,6 +462,12 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'Failed to update password. User not found.',
     'error_unexpected': 'An unexpected error occurred.',
     'save_changes': 'Save Changes',
+    'edit_rep_info': 'Edit Representative Info',
+    'add_new_rep': 'Add New Representative',
+    'leave_blank_to_keep': 'Leave blank to keep current password',
+    'confirm_password': 'Confirm Password',
+    'error_all_fields_required': 'Please fill all required fields.',
+    'error_password_required': 'Password is required for a new user.',
 
     // Weekly View
     'previous_week': 'Previous Week',

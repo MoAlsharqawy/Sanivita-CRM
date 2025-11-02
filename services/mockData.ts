@@ -1,7 +1,7 @@
 import { UserRole, User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
 
 // --- USERS ---
-const users: User[] = [
+let users: User[] = [
   { id: 1, name: 'أحمد محمود', username: 'manager', password: 'password', role: UserRole.Manager },
   { id: 2, name: 'علي حسن', username: 'rep1', password: 'password', role: UserRole.Rep },
   { id: 3, name: 'فاطمة الزهراء', username: 'rep2', password: 'password', role: UserRole.Rep },
@@ -91,6 +91,7 @@ let repWeeklyPlans: { [repId: number]: WeeklyPlan } = {
 // ID Generators
 let nextDoctorId = Math.max(...doctors.map(d => d.id), 0) + 1;
 let nextPharmacyId = Math.max(...pharmacies.map(p => p.id), 0) + 1;
+let nextUserId = Math.max(...users.map(u => u.id), 0) + 1;
 
 
 // --- API FUNCTIONS ---
@@ -120,6 +121,54 @@ export const api = {
   },
 
   getUsers: (): Promise<User[]> => Promise.resolve(users.map(({password, ...user}) => user)),
+
+  addUser: (userData: Omit<User, 'id' | 'role'> & { password: string }): Promise<User> => {
+      return new Promise((resolve) => {
+          setTimeout(() => {
+              const newUser: User = {
+                  ...userData,
+                  id: nextUserId++,
+                  role: UserRole.Rep, // Only reps can be added this way
+              };
+              users.push(newUser);
+              resolve({ ...newUser, password: '' });
+          }, 300);
+      });
+  },
+
+  updateUser: (userId: number, updates: Partial<Pick<User, 'name' | 'username' | 'password'>>): Promise<User | null> => {
+      return new Promise((resolve) => {
+          setTimeout(() => {
+              const userIndex = users.findIndex(u => u.id === userId);
+              if (userIndex !== -1) {
+                  const user = users[userIndex];
+                  if (updates.name) user.name = updates.name;
+                  if (updates.username) user.username = updates.username;
+                  if (updates.password) user.password = updates.password;
+
+                  users[userIndex] = user;
+                  resolve({ ...user, password: '' });
+              } else {
+                  resolve(null);
+              }
+          }, 300);
+      });
+  },
+
+  deleteUser: (userId: number): Promise<boolean> => {
+      return new Promise((resolve) => {
+          setTimeout(() => {
+              const initialLength = users.length;
+              users = users.filter(u => u.id !== userId);
+              if (repWeeklyPlans[userId]) {
+                  delete repWeeklyPlans[userId];
+              }
+              // In a real app, you'd need to handle re-assigning doctors/pharmacies
+              resolve(users.length < initialLength);
+          }, 300);
+      });
+  },
+
   getRegions: (): Promise<Region[]> => Promise.resolve(regions),
   getProducts: (): Promise<Product[]> => Promise.resolve(products),
 
