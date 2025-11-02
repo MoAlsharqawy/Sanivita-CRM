@@ -1,13 +1,13 @@
 export enum UserRole {
-  Manager = 'مدير',
-  Supervisor = 'مشرف',
-  Rep = 'مندوب',
+  Manager = 'MANAGER',
+  Supervisor = 'SUPERVISOR',
+  Rep = 'REP',
 }
 
 export enum Specialization {
-  Pediatrics = 'أطفال',
-  Pulmonology = 'صدر',
-  Pharmacy = 'صيدلية'
+  Pediatrics = 'PEDIATRICS',
+  Pulmonology = 'PULMONOLOGY',
+  Pharmacy = 'PHARMACY'
 }
 
 export interface User {
@@ -68,11 +68,11 @@ export type Visit = (DoctorVisit & { type: 'doctor' }) | (PharmacyVisit & { type
 
 export type VisitReport = {
     id: string;
-    type: 'زيارة طبيب' | 'زيارة صيدلية';
+    type: 'DOCTOR_VISIT' | 'PHARMACY_VISIT';
     repName: string;
     regionName: string;
     targetName: string;
-    targetSpecialization?: string;
+    targetSpecialization?: Specialization;
     productName?: string;
     visitType?: 'Coaching' | 'Single';
     notes: string;

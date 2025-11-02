@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { User, VisitReport, SystemSettings, WeeklyPlan, Region } from '../types';
+import { useLanguage } from '../hooks/useLanguage';
 import { ArrowRightIcon, ChevronRightIcon, ChevronLeftIcon, MapPinIcon } from './icons';
 
 interface WeeklyViewProps {
@@ -10,8 +11,6 @@ interface WeeklyViewProps {
   regions: Region[];
   onBack: () => void;
 }
-
-const WEEK_DAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
 // Helper to get dates for a week starting from Saturday
 const getWeekDates = (currentDate: Date): Date[] => {
@@ -36,7 +35,10 @@ const toYYYYMMDD = (date: Date): string => {
 };
 
 const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, regions, onBack }) => {
+  const { t } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
 
@@ -59,31 +61,31 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
 
   const weekStart = weekDates[0];
   const weekEnd = weekDates[6];
-  const weekRangeString = `${weekStart.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })} - ${weekEnd.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const weekRangeString = `${weekStart.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long' })} - ${weekEnd.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
 
   return (
     <div className="container mx-auto">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-blue-800">الخطة الأسبوعية</h2>
+        <h2 className="text-3xl font-bold text-blue-800">{t('weekly_plan')}</h2>
         <button
           onClick={onBack}
           className="flex items-center text-slate-600 hover:text-orange-600 focus:outline-none transition-colors"
-          aria-label="العودة إلى لوحة التحكم"
+          aria-label={t('back_to_dashboard')}
         >
-          <span className="hidden md:block">العودة للرئيسية</span>
+          <span className="hidden md:block">{t('back_to_main')}</span>
           <ArrowRightIcon className="h-6 w-6 ms-2" />
         </button>
       </div>
 
       {/* Week Navigator */}
       <div className="flex justify-between items-center bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8">
-        <button onClick={() => navigateWeek('prev')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label="الأسبوع السابق">
+        <button onClick={() => navigateWeek('prev')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label={t('previous_week')}>
             <ChevronRightIcon className="w-6 h-6" />
         </button>
         <h3 className="text-lg md:text-xl font-bold text-slate-700 text-center">{weekRangeString}</h3>
-        <button onClick={() => navigateWeek('next')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label="الأسبوع التالي">
+        <button onClick={() => navigateWeek('next')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label={t('next_week')}>
             <ChevronLeftIcon className="w-6 h-6" />
         </button>
       </div>
@@ -97,7 +99,7 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
           const isHoliday = settings?.holidays.includes(dateStr) ?? false;
           const isOffDay = isWeekend || isHoliday;
           const visitCount = visitsByDate.get(dateStr) || 0;
-          const dayName = WEEK_DAYS_AR[dayIndex];
+          const dayName = WEEK_DAYS[dayIndex];
           const isToday = toYYYYMMDD(new Date()) === dateStr;
           
           const regionId = plan ? plan[dayIndex] : null;
@@ -114,7 +116,7 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
               <div className="text-center w-full">
                 <p className={`font-bold text-lg ${isOffDay ? 'text-slate-300' : 'text-slate-800'}`}>{dayName}</p>
                 <p className={`text-sm mb-2 ${isOffDay ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {date.toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric' })}
+                  {date.toLocaleDateString(t('locale'), { day: 'numeric', month: 'numeric' })}
                 </p>
                 {region && !isOffDay && (
                   <div className="flex items-center justify-center text-xs font-semibold text-slate-700 bg-white/60 px-2 py-1 rounded-full">
@@ -123,18 +125,18 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
                   </div>
                 )}
                 {!region && !isOffDay && (
-                     <div className="text-xs text-slate-400 italic py-1">لا توجد خطة</div>
+                     <div className="text-xs text-slate-400 italic py-1">{t('no_plan_for_day')}</div>
                 )}
               </div>
               <div className="text-center mt-auto pt-2">
                 {isOffDay ? (
                     <span className="text-xs font-semibold bg-red-500/80 text-white px-3 py-1 rounded-full">
-                        {isHoliday ? 'عطلة رسمية' : 'عطلة'}
+                        {isHoliday ? t('official_holiday') : t('weekend_holiday')}
                     </span>
                 ) : (
                   <>
                     <p className={`text-4xl font-bold ${visitCount > 0 ? 'text-blue-700' : 'text-slate-400'}`}>{visitCount}</p>
-                    <p className="text-xs text-slate-500">زيارة</p>
+                    <p className="text-xs text-slate-500">{t('visit_count_label')}</p>
                   </>
                 )}
               </div>

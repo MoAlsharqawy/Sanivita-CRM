@@ -2,26 +2,16 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/mockData';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
-
-const WEEK_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-const WEEK_DAYS_ORDERED = [ // Start with Saturday
-    { name: 'السبت', index: 6 },
-    { name: 'الأحد', index: 0 },
-    { name: 'الاثنين', index: 1 },
-    { name: 'الثلاثاء', index: 2 },
-    { name: 'الأربعاء', index: 3 },
-    { name: 'الخميس', index: 4 },
-    { name: 'الجمعة', index: 5 },
-];
-
-type ManagerTab = 'reports' | 'users' | 'approvals' | 'settings' | 'weeklyPlans';
-
+import { useLanguage } from '../hooks/useLanguage';
+import DataImport from './DataImport';
+import Spinner from './Spinner';
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [allReports, setAllReports] = useState<VisitReport[]>([]);
   const [filteredReports, setFilteredReports] = useState<VisitReport[]>([]);
   const [reps, setReps] = useState<User[]>([]);
@@ -34,6 +24,21 @@ const ManagerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [allPlans, setAllPlans] = useState<{ [repId: number]: WeeklyPlan }>({});
   const [reviewMessage, setReviewMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
+  const WEEK_DAYS_ORDERED = useMemo(() => [
+    { name: t('saturday'), index: 6 },
+    { name: t('sunday'), index: 0 },
+    { name: t('monday'), index: 1 },
+    { name: t('tuesday'), index: 2 },
+    { name: t('wednesday'), index: 3 },
+    { name: t('thursday'), index: 4 },
+    { name: t('friday'), index: 5 },
+  ], [t]);
+
+
+  type ManagerTab = 'reports' | 'users' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport';
+
 
   // Tab and Modal states
   const [activeTab, setActiveTab] = useState<ManagerTab>('reports');
@@ -169,8 +174,8 @@ const ManagerDashboard: React.FC = () => {
         ? todaysVisits
         : todaysVisits.filter(visit => visit.repName === selectedRepName);
 
-    const doctorVisits = filteredByRep.filter(v => v.type === 'زيارة طبيب').length;
-    const pharmacyVisits = filteredByRep.filter(v => v.type === 'زيارة صيدلية').length;
+    const doctorVisits = filteredByRep.filter(v => v.type === 'DOCTOR_VISIT').length;
+    const pharmacyVisits = filteredByRep.filter(v => v.type === 'PHARMACY_VISIT').length;
 
     return { doctorVisits, pharmacyVisits };
   }, [allReports, selectedRepForDailyVisits, reps]);
@@ -209,10 +214,10 @@ const ManagerDashboard: React.FC = () => {
         .filter((entry): entry is [string, WeeklyPlan] => (entry[1] as WeeklyPlan).status === 'pending')
         .map(([repId, plan]) => ({
             repId: parseInt(repId),
-            repName: reps.find(r => r.id === parseInt(repId))?.name || 'غير معروف',
+            repName: reps.find(r => r.id === parseInt(repId))?.name || t('unknown'),
             ...plan
         }));
-  }, [allPlans, reps]);
+  }, [allPlans, reps, t]);
 
   const handleReviewPlan = async (repId: number, status: 'approved' | 'rejected') => {
       try {
@@ -224,12 +229,12 @@ const ManagerDashboard: React.FC = () => {
           }));
 
           const repName = reps.find(r => r.id === repId)?.name || '';
-          const messageText = `تم ${status === 'approved' ? 'قبول' : 'رفض'} خطة ${repName}.`;
-          setReviewMessage({ text: messageText, type: 'success' });
+          const messageKey = status === 'approved' ? 'plan_approved_success' : 'plan_rejected_success';
+          setReviewMessage({ text: t(messageKey, repName), type: 'success' });
 
       } catch (error) {
           console.error(`Failed to ${status} plan for rep ${repId}`, error);
-          setReviewMessage({ text: 'حدث خطأ أثناء مراجعة الخطة.', type: 'error' });
+          setReviewMessage({ text: t('plan_review_error'), type: 'error' });
       } finally {
           setTimeout(() => setReviewMessage(null), 3000);
       }
@@ -243,7 +248,7 @@ const ManagerDashboard: React.FC = () => {
   }
 
   const handleExportUsers = () => {
-    exportUsersToExcel(reps, 'representatives_list');
+    exportUsersToExcel(reps, 'representatives_list', t);
   };
 
   const handleRepSelectionChange = (repId: number) => {
@@ -271,7 +276,8 @@ const ManagerDashboard: React.FC = () => {
       selectedPharmacies,
       regions,
       reps,
-      'reps_client_lists'
+      'reps_client_lists',
+      t
     );
     
     setIsExportModalOpen(false);
@@ -303,36 +309,40 @@ const ManagerDashboard: React.FC = () => {
       try {
           await api.updateSystemSettings(newSettings);
           setSystemSettings(newSettings);
-          setSettingsMessage('تم حفظ الإعدادات بنجاح!');
+          setSettingsMessage(t('settings_saved_success'));
           setTimeout(() => setSettingsMessage(''), 3000);
       } catch (error) {
           console.error("Failed to save settings", error);
-          setSettingsMessage('حدث خطأ أثناء حفظ الإعدادات.');
+          setSettingsMessage(t('settings_saved_error'));
           setTimeout(() => setSettingsMessage(''), 3000);
       }
   };
 
     const getPlanStatusBadge = (status: WeeklyPlan['status']) => {
         const statusMap = {
-            draft: { text: 'مسودة', color: 'bg-blue-100 text-blue-800' },
-            pending: { text: 'قيد المراجعة', color: 'bg-yellow-100 text-yellow-800' },
-            approved: { text: 'معتمدة', color: 'bg-green-100 text-green-800' },
-            rejected: { text: 'مرفوضة', color: 'bg-red-100 text-red-800' },
+            draft: { textKey: 'plan_status_draft', color: 'bg-blue-100 text-blue-800' },
+            pending: { textKey: 'plan_status_pending', color: 'bg-yellow-100 text-yellow-800' },
+            approved: { textKey: 'plan_status_approved', color: 'bg-green-100 text-green-800' },
+            rejected: { textKey: 'plan_status_rejected', color: 'bg-red-100 text-red-800' },
         };
         if (!statusMap[status]) return null;
-        const { text, color } = statusMap[status];
-        return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{text}</span>;
+        const { textKey, color } = statusMap[status];
+        return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{t(textKey)}</span>;
     };
 
 
   if (loading) {
-    return <div className="text-center p-8">جاري تحميل البيانات...</div>;
+    return <Spinner />;
   }
+  
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString(t('locale'), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const pendingPlansCount = pendingPlans.length;
 
   return (
     <div className="container mx-auto">
       <h2 className="text-3xl font-bold mb-6 text-blue-800">
-        {user?.role === UserRole.Manager ? 'لوحة تحكم المدير' : 'لوحة تحكم المشرف'}
+        {t(user?.role === UserRole.Manager ? 'manager_dashboard_title' : 'supervisor_dashboard_title')}
       </h2>
 
       {/* Tabs */}
@@ -344,7 +354,7 @@ const ManagerDashboard: React.FC = () => {
                       className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'reports' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                   >
                       <ChartBarIcon className="w-5 h-5 me-2" />
-                      التقارير
+                      {t('reports')}
                   </button>
               </li>
               <li className="me-2">
@@ -353,7 +363,16 @@ const ManagerDashboard: React.FC = () => {
                       className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'users' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                   >
                       <UsersIcon className="w-5 h-5 me-2" />
-                      إدارة المستخدمين
+                      {t('user_management')}
+                  </button>
+              </li>
+              <li className="me-2">
+                  <button 
+                      onClick={() => setActiveTab('dataImport')}
+                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'dataImport' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                  >
+                      <UploadIcon className="w-5 h-5 me-2" />
+                      {t('data_import')}
                   </button>
               </li>
                <li className="me-2">
@@ -362,7 +381,7 @@ const ManagerDashboard: React.FC = () => {
                       className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'approvals' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                   >
                       <MapPinIcon className="w-5 h-5 me-2" />
-                      اعتماد الخطط {pendingPlans.length > 0 && <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ms-2">{pendingPlans.length}</span>}
+                      {t('plan_approvals')} {pendingPlans.length > 0 && <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ms-2">{pendingPlans.length}</span>}
                   </button>
               </li>
               <li className="me-2">
@@ -371,7 +390,7 @@ const ManagerDashboard: React.FC = () => {
                       className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'weeklyPlans' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                   >
                       <CalendarIcon className="w-5 h-5 me-2" />
-                      الخطط الأسبوعية
+                      {t('view_weekly_plans')}
                   </button>
               </li>
               {user?.role === UserRole.Manager && (
@@ -381,7 +400,7 @@ const ManagerDashboard: React.FC = () => {
                         className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'settings' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                     >
                         <CogIcon className="w-5 h-5 me-2" />
-                        إعدادات النظام
+                        {t('system_settings')}
                     </button>
                 </li>
               )}
@@ -390,16 +409,36 @@ const ManagerDashboard: React.FC = () => {
 
       {activeTab === 'reports' && (
         <>
+          {/* Welcome Widget */}
+          <div className="animate-fade-in-up bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-6 rounded-2xl shadow-lg border border-white/50 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div>
+                  <h3 className="text-2xl font-bold">{t('welcome_manager', user?.name || '')}</h3>
+                  <p className="opacity-90">{t('today_is', formattedDate)}</p>
+              </div>
+              {pendingPlansCount > 0 ? (
+                  <div className="text-center bg-white/10 p-3 rounded-lg">
+                      <p className="font-semibold">{t('you_have_pending_plans', pendingPlansCount)}</p>
+                      <button
+                          onClick={() => setActiveTab('approvals')}
+                          className="mt-2 bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+                      >
+                          {t('view_plans')}
+                      </button>
+                  </div>
+              ) : (
+                  <p className="font-semibold bg-white/10 p-3 rounded-lg">{t('no_pending_plans')}</p>
+              )}
+          </div>
+
           {/* Daily Visits Card */}
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8">
-                <h3 className="text-xl font-semibold mb-4 text-blue-700">الزيارات اليومية</h3>
-                {/* Fix: Changed CSS property from '-ms-overflow-style' to camelCase 'msOverflowStyle' for React style compatibility */}
-                <div className="flex border-b border-slate-300/50 mb-4 overflow-x-auto pb-1 no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
+                <h3 className="text-xl font-semibold mb-4 text-blue-700">{t('daily_visits')}</h3>
+                <div className="flex border-b border-slate-300/50 mb-4 overflow-x-auto pb-1 no-scrollbar">
                     <button
                         onClick={() => setSelectedRepForDailyVisits('all')}
                         className={`px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${selectedRepForDailyVisits === 'all' ? 'bg-white/50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:bg-slate-200/50 border-b-2 border-transparent'}`}
                     >
-                        الكل
+                        {t('all')}
                     </button>
                     {reps.map(rep => (
                         <button
@@ -416,7 +455,7 @@ const ManagerDashboard: React.FC = () => {
                         <p className="text-5xl font-bold text-blue-800">{dailyVisitCounts.doctorVisits}</p>
                         <p className="text-md font-semibold text-slate-700 flex items-center justify-center gap-1 mt-1">
                           <DoctorIcon className="w-5 h-5 text-blue-600"/>
-                          <span>أطباء</span>
+                          <span>{t('doctors')}</span>
                         </p>
                     </div>
                     <div className="h-16 w-px bg-slate-300"></div> {/* Divider */}
@@ -424,7 +463,7 @@ const ManagerDashboard: React.FC = () => {
                         <p className="text-5xl font-bold text-orange-800">{dailyVisitCounts.pharmacyVisits}</p>
                         <p className="text-md font-semibold text-slate-700 flex items-center justify-center gap-1 mt-1">
                           <PharmacyIcon className="w-5 h-5 text-orange-600"/>
-                          <span>صيدليات</span>
+                          <span>{t('pharmacies')}</span>
                         </p>
                     </div>
                 </div>
@@ -432,39 +471,39 @@ const ManagerDashboard: React.FC = () => {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
                 <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4">
                     <CalendarIcon className="w-8 h-8" />
                 </div>
                 <div>
-                    <p className="text-slate-600 text-sm font-medium">{selectedRep === 'all' ? 'إجمالي زيارات الشهر' : `زيارات الشهر لـ ${selectedRep}`}</p>
+                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_monthly_visits' : 'monthly_visits_for', selectedRep)}</p>
                     <p className="text-4xl font-bold text-blue-800">{displayedStats.visitsThisMonth}</p>
                 </div>
             </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '400ms' }}>
                 <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4">
                     <DoctorIcon className="w-8 h-8" />
                 </div>
                 <div>
-                    <p className="text-slate-600 text-sm font-medium">{selectedRep === 'all' ? 'إجمالي الأطباء' : `أطباء ${selectedRep}`}</p>
+                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_doctors' : 'doctors_of', selectedRep)}</p>
                     <p className="text-4xl font-bold text-green-800">{displayedStats.doctorCount}</p>
                 </div>
             </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '500ms' }}>
                 <div className="bg-orange-500/20 text-orange-700 p-4 rounded-full me-4">
                     <PharmacyIcon className="w-8 h-8" />
                 </div>
                 <div>
-                    <p className="text-slate-600 text-sm font-medium">{selectedRep === 'all' ? 'إجمالي الصيدليات' : `صيدليات ${selectedRep}`}</p>
+                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_pharmacies' : 'pharmacies_of', selectedRep)}</p>
                     <p className="text-4xl font-bold text-orange-800">{displayedStats.pharmacyCount}</p>
                 </div>
             </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '600ms' }}>
                 <div className="bg-red-500/20 text-red-700 p-4 rounded-full me-4">
                     <WarningIcon className="w-8 h-8" />
                 </div>
                 <div>
-                    <p className="text-slate-600 text-sm font-medium">الزيارات المتأخرة</p>
+                    <p className="text-slate-600 text-sm font-medium">{t('overdue_visits')}</p>
                     <p className="text-4xl font-bold text-red-800">{filteredAlerts.length}</p>
                 </div>
             </div>
@@ -472,46 +511,46 @@ const ManagerDashboard: React.FC = () => {
 
           {/* Filters Section */}
           <div className="bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8">
-            <h3 className="text-lg font-semibold mb-4 flex items-center text-blue-700"><FilterIcon className="w-5 h-5 me-2"/>خيارات الفلترة</h3>
+            <h3 className="text-lg font-semibold mb-4 flex items-center text-blue-700"><FilterIcon className="w-5 h-5 me-2"/>{t('filter_options')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <select value={selectedRep} onChange={e => setSelectedRep(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500">
-                <option value="all">كل المندوبين</option>
+                <option value="all">{t('all_reps')}</option>
                 {reps.map(rep => <option key={rep.id} value={rep.name}>{rep.name}</option>)}
               </select>
               <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500">
-                <option value="all">كل المناطق</option>
+                <option value="all">{t('all_regions')}</option>
                 {regions.map(region => <option key={region.id} value={region.name}>{region.name}</option>)}
               </select>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder="من تاريخ" />
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder="إلى تاريخ" />
-              <button onClick={handleResetFilters} className="w-full bg-slate-500 text-white p-2 rounded-md hover:bg-slate-600 transition-colors">إعادة تعيين</button>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('from_date')} />
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('to_date')} />
+              <button onClick={handleResetFilters} className="w-full bg-slate-500 text-white p-2 rounded-md hover:bg-slate-600 transition-colors">{t('reset')}</button>
             </div>
           </div>
 
           {/* Alerts Table */}
           {filteredAlerts.length > 0 && (
             <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden mb-8">
-              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50"><WarningIcon className="w-6 h-6 me-3"/>تنبيهات الزيارات المتأخرة</h3>
+              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50"><WarningIcon className="w-6 h-6 me-3"/>{t('overdue_visits_alerts_table')}</h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right text-gray-500">
+                <table className="w-full text-sm text-start text-gray-500">
                   <thead className="text-xs text-red-800 uppercase bg-red-50/50">
                     <tr>
-                      <th scope="col" className="px-6 py-3">العميل</th>
-                      <th scope="col" className="px-6 py-3">النوع</th>
-                      <th scope="col" className="px-6 py-3">المندوب المسؤول</th>
-                      <th scope="col" className="px-6 py-3">المنطقة</th>
-                      <th scope="col" className="px-6 py-3">آخر زيارة</th>
+                      <th scope="col" className="px-6 py-3">{t('client')}</th>
+                      <th scope="col" className="px-6 py-3">{t('visit_type')}</th>
+                      <th scope="col" className="px-6 py-3">{t('responsible_rep')}</th>
+                      <th scope="col" className="px-6 py-3">{t('region')}</th>
+                      <th scope="col" className="px-6 py-3">{t('last_visit')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredAlerts.map(alert => (
                       <tr key={alert.id} className="bg-red-50/20 border-b border-red-100/30 hover:bg-red-100/40">
                         <td className="px-6 py-4 font-medium text-slate-900">{alert.name}</td>
-                        <td className="px-6 py-4">{alert.type === 'doctor' ? 'طبيب' : 'صيدلية'}</td>
+                        <td className="px-6 py-4">{t(alert.type === 'doctor' ? 'client_type_doctor' : 'client_type_pharmacy')}</td>
                         <td className="px-6 py-4">{alert.repName}</td>
                         <td className="px-6 py-4">{alert.regionName}</td>
                         <td className="px-6 py-4 font-semibold text-red-600">
-                          {alert.daysSinceLastVisit === null ? 'لم يزر من قبل' : `منذ ${alert.daysSinceLastVisit} يوم`}
+                          {alert.daysSinceLastVisit === null ? t('never_visited') : t('days_ago', alert.daysSinceLastVisit)}
                         </td>
                       </tr>
                     ))}
@@ -523,11 +562,11 @@ const ManagerDashboard: React.FC = () => {
           
           {/* Export Buttons */}
           <div className="flex flex-col sm:flex-row justify-end items-center mb-4 gap-3">
-                <span className="text-slate-700 font-medium">تصدير {filteredReports.length} تقرير:</span>
-                <button onClick={() => exportToExcel(filteredReports, 'reports')} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                <span className="text-slate-700 font-medium">{t('export_reports', filteredReports.length)}</span>
+                <button onClick={() => exportToExcel(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
                     <DownloadIcon className="w-5 h-5 me-2"/> Excel
                 </button>
-                <button onClick={() => exportToPdf(filteredReports, 'reports')} className="w-full sm:w-auto flex items-center justify-center bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition-colors">
+                <button onClick={() => exportToPdf(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition-colors">
                     <DownloadIcon className="w-5 h-5 me-2"/> PDF
                 </button>
             </div>
@@ -535,37 +574,37 @@ const ManagerDashboard: React.FC = () => {
           {/* Reports Table */}
           <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-right text-gray-500">
+              <table className="w-full text-sm text-start text-gray-500">
                 <thead className="text-xs text-blue-800 uppercase bg-white/50">
                   <tr>
-                    <th scope="col" className="px-6 py-3">التاريخ</th>
-                    <th scope="col" className="px-6 py-3">نوع الزيارة</th>
-                    <th scope="col" className="px-6 py-3">المندوب</th>
-                    <th scope="col" className="px-6 py-3">المنطقة</th>
-                    <th scope="col" className="px-6 py-3">العميل</th>
-                    <th scope="col" className="px-6 py-3">التخصص</th>
-                    <th scope="col" className="px-6 py-3">المنتجات</th>
-                    <th scope="col" className="px-6 py-3">نوع الزيارة (طبيب)</th>
-                    <th scope="col" className="px-6 py-3">الملاحظات</th>
+                    <th scope="col" className="px-6 py-3">{t('date')}</th>
+                    <th scope="col" className="px-6 py-3">{t('visit_type')}</th>
+                    <th scope="col" className="px-6 py-3">{t('rep')}</th>
+                    <th scope="col" className="px-6 py-3">{t('region')}</th>
+                    <th scope="col" className="px-6 py-3">{t('client')}</th>
+                    <th scope="col" className="px-6 py-3">{t('target_specialization')}</th>
+                    <th scope="col" className="px-6 py-3">{t('product')}</th>
+                    <th scope="col" className="px-6 py-3">{t('doctor_visit_type')}</th>
+                    <th scope="col" className="px-6 py-3">{t('notes')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReports.map(report => (
-                    <tr key={report.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
-                      <td className="px-6 py-4 whitespace-nowrap">{new Date(report.date).toLocaleDateString('ar-EG')}</td>
-                      <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${report.type === 'زيارة طبيب' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>{report.type}</span></td>
+                  {filteredReports.map((report, index) => (
+                    <tr key={report.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40 animate-fade-in-up" style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}>
+                      <td className="px-6 py-4 whitespace-nowrap">{new Date(report.date).toLocaleDateString(t('locale'))}</td>
+                      <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${report.type === 'DOCTOR_VISIT' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>{t(report.type)}</span></td>
                       <td className="px-6 py-4 font-medium text-slate-900">{report.repName}</td>
                       <td className="px-6 py-4">{report.regionName}</td>
                       <td className="px-6 py-4">{report.targetName}</td>
-                      <td className="px-6 py-4">{report.targetSpecialization || '-'}</td>
+                      <td className="px-6 py-4">{report.targetSpecialization ? t(report.targetSpecialization) : '-'}</td>
                       <td className="px-6 py-4">{report.productName || '-'}</td>
-                      <td className="px-6 py-4">{report.visitType ? (report.visitType === 'Coaching' ? 'كوتشينج' : 'سينجل') : '-'}</td>
+                      <td className="px-6 py-4">{report.visitType ? t(report.visitType) : '-'}</td>
                       <td className="px-6 py-4 max-w-xs truncate" title={report.notes}>{report.notes}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {filteredReports.length === 0 && <p className="text-center p-8 text-slate-600">لا توجد تقارير تطابق خيارات البحث.</p>}
+              {filteredReports.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_matching_reports')}</p>}
             </div>
           </div>
         </>
@@ -575,30 +614,30 @@ const ManagerDashboard: React.FC = () => {
         <>
           {/* User Management Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up">
                 <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4">
                     <CalendarIcon className="w-8 h-8" />
                 </div>
                 <div>
-                    <p className="text-slate-600 text-sm font-medium">إجمالي الزيارات المسجلة</p>
+                    <p className="text-slate-600 text-sm font-medium">{t('total_visits_recorded')}</p>
                     <p className="text-4xl font-bold text-blue-800">{userManagementStats.totalVisits}</p>
                 </div>
             </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '150ms' }}>
                 <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4">
                     <UsersIcon className="w-8 h-8" />
                 </div>
                 <div>
-                    <p className="text-slate-600 text-sm font-medium">إجمالي العملاء الفريدين</p>
+                    <p className="text-slate-600 text-sm font-medium">{t('total_unique_clients')}</p>
                     <p className="text-4xl font-bold text-green-800">{userManagementStats.totalUniqueClients}</p>
                 </div>
             </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
                 <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4">
                     <ChartBarIcon className="w-8 h-8" />
                 </div>
                 <div>
-                    <p className="text-slate-600 text-sm font-medium">متوسط الزيارات / شهر</p>
+                    <p className="text-slate-600 text-sm font-medium">{t('avg_visits_per_month')}</p>
                     <p className="text-4xl font-bold text-purple-800">{userManagementStats.averageVisitsPerMonth}</p>
                 </div>
             </div>
@@ -607,7 +646,7 @@ const ManagerDashboard: React.FC = () => {
               <div className="flex flex-wrap justify-between items-center p-4 bg-white/50 border-b border-white/30 gap-4">
                 <h3 className="text-xl font-semibold flex items-center text-blue-800">
                     <UsersIcon className="w-6 h-6 me-3"/>
-                    قائمة المندوبين
+                    {t('reps_list')}
                 </h3>
                 <div className="flex items-center gap-3">
                   <button
@@ -616,7 +655,7 @@ const ManagerDashboard: React.FC = () => {
                       className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition-all shadow flex items-center gap-2 disabled:bg-teal-300 disabled:cursor-not-allowed"
                   >
                       <DownloadIcon className="w-5 h-5"/>
-                      <span>تحميل قوائم العملاء</span>
+                      <span>{t('download_client_lists')}</span>
                   </button>
                   <button
                       onClick={handleExportUsers}
@@ -624,17 +663,17 @@ const ManagerDashboard: React.FC = () => {
                       className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2 disabled:bg-green-300 disabled:cursor-not-allowed"
                   >
                       <DownloadIcon className="w-5 h-5"/>
-                      <span>تحميل قائمة المندوبين</span>
+                      <span>{t('download_reps_list')}</span>
                   </button>
                 </div>
               </div>
               <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-right text-gray-500">
+                  <table className="w-full text-sm text-start text-gray-500">
                       <thead className="text-xs text-blue-800 uppercase bg-white/50">
                           <tr>
-                              <th scope="col" className="px-6 py-3">الاسم الكامل</th>
-                              <th scope="col" className="px-6 py-3">اسم المستخدم</th>
-                              <th scope="col" className="px-6 py-3">الدور</th>
+                              <th scope="col" className="px-6 py-3">{t('full_name')}</th>
+                              <th scope="col" className="px-6 py-3">{t('username')}</th>
+                              <th scope="col" className="px-6 py-3">{t('role')}</th>
                           </tr>
                       </thead>
                       <tbody>
@@ -642,20 +681,24 @@ const ManagerDashboard: React.FC = () => {
                               <tr key={user.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
                                   <td className="px-6 py-4 font-medium text-slate-900">{user.name}</td>
                                   <td className="px-6 py-4">{user.username}</td>
-                                  <td className="px-6 py-4">{user.role}</td>
+                                  <td className="px-6 py-4">{t(user.role)}</td>
                               </tr>
                           ))}
                       </tbody>
                   </table>
-                  {reps.length === 0 && <p className="text-center p-8 text-slate-600">لا يوجد مندوبين لعرضهم.</p>}
+                  {reps.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_data')}</p>}
               </div>
           </div>
         </>
       )}
 
+      {activeTab === 'dataImport' && (
+        <DataImport />
+      )}
+
        {activeTab === 'approvals' && (
         <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6 relative">
-            <h3 className="text-xl font-semibold mb-4 text-blue-800">خطط المندوبين قيد المراجعة</h3>
+            <h3 className="text-xl font-semibold mb-4 text-blue-800">{t('pending_rep_plans')}</h3>
 
             {reviewMessage && (
                 <div className={`p-4 mb-4 text-sm rounded-lg ${reviewMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`} role="alert">
@@ -671,7 +714,7 @@ const ManagerDashboard: React.FC = () => {
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
                                 {WEEK_DAYS_ORDERED.map(day => {
                                     const regionId = item.plan[day.index];
-                                    const regionName = regionId ? regions.find(r => r.id === regionId)?.name : 'راحة';
+                                    const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day');
                                     return (
                                         <div key={day.index} className="text-center p-2 bg-slate-100 rounded">
                                             <p className="font-semibold text-sm text-slate-700">{day.name}</p>
@@ -683,32 +726,32 @@ const ManagerDashboard: React.FC = () => {
                             <div className="flex justify-end items-center gap-3">
                                 <button onClick={() => handleReviewPlan(item.repId, 'rejected')} className="flex items-center gap-2 text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors">
                                     <XIcon className="w-4 h-4" />
-                                    رفض
+                                    {t('reject')}
                                 </button>
                                 <button onClick={() => handleReviewPlan(item.repId, 'approved')} className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors">
                                     <CheckIcon className="w-4 h-4" />
-                                    قبول
+                                    {t('approve')}
                                 </button>
                             </div>
                         </div>
                     ))}
                 </div>
             ) : (
-                <p className="text-center text-slate-600 py-8">لا توجد خطط جديدة للمراجعة.</p>
+                <p className="text-center text-slate-600 py-8">{t('no_new_plans_to_review')}</p>
             )}
         </div>
       )}
 
       {activeTab === 'weeklyPlans' && (
         <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-            <h3 className="text-xl font-semibold mb-6 text-blue-800">نظرة عامة على الخطط الأسبوعية</h3>
+            <h3 className="text-xl font-semibold mb-6 text-blue-800">{t('weekly_plans_overview')}</h3>
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right border-separate border-spacing-0">
+                <table className="w-full text-sm text-start border-separate border-spacing-0">
                     <thead className="text-xs text-blue-800 uppercase bg-white/50">
                         <tr>
-                            <th scope="col" className="sticky right-0 bg-white/50 px-6 py-3 rounded-tr-lg z-10">المندوب</th>
+                            <th scope="col" className="sticky start-0 bg-white/50 px-6 py-3 rounded-se-lg z-10">{t('rep')}</th>
                             {WEEK_DAYS_ORDERED.map(day => <th key={day.index} scope="col" className="px-4 py-3 text-center">{day.name}</th>)}
-                             <th scope="col" className="rounded-tl-lg"></th>
+                             <th scope="col" className="rounded-ss-lg"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -718,13 +761,13 @@ const ManagerDashboard: React.FC = () => {
 
                             return (
                                 <tr key={rep.id} className="group bg-white/20 border-b border-white/30 hover:bg-white/40">
-                                    <td className="sticky right-0 px-6 py-4 font-medium text-slate-900 whitespace-nowrap bg-white/20 group-hover:bg-white/40">
+                                    <td className="sticky start-0 px-6 py-4 font-medium text-slate-900 whitespace-nowrap bg-white/20 group-hover:bg-white/40">
                                         <div className="font-semibold">{rep.name}</div>
                                         <div className="mt-1">{getPlanStatusBadge(plan.status)}</div>
                                     </td>
                                     {WEEK_DAYS_ORDERED.map(day => {
                                         const regionId = plan.plan[day.index];
-                                        const regionName = regionId ? regions.find(r => r.id === regionId)?.name : 'راحة';
+                                        const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day');
                                         return (
                                             <td key={day.index} className={`px-4 py-4 text-center whitespace-nowrap ${regionId ? 'text-blue-600 font-semibold' : 'text-slate-500'}`} title={regionName}>
                                                 {regionName}
@@ -743,7 +786,7 @@ const ManagerDashboard: React.FC = () => {
       {activeTab === 'settings' && (
         <div className="space-y-8">
             <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-                <h3 className="text-xl font-semibold mb-4 text-blue-800">إعدادات أيام العطلة الأسبوعية</h3>
+                <h3 className="text-xl font-semibold mb-4 text-blue-800">{t('weekend_settings')}</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
                     {WEEK_DAYS.map((day, index) => (
                         <label key={index} className="flex items-center space-x-2 space-x-reverse cursor-pointer p-3 bg-white/30 rounded-lg">
@@ -759,7 +802,7 @@ const ManagerDashboard: React.FC = () => {
                 </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-                <h3 className="text-xl font-semibold mb-4 text-blue-800">إعدادات المناسبات والعطلات الرسمية</h3>
+                <h3 className="text-xl font-semibold mb-4 text-blue-800">{t('holidays_settings')}</h3>
                 <div className="flex flex-col sm:flex-row items-center gap-3 mb-4">
                     <input 
                         type="date"
@@ -768,7 +811,7 @@ const ManagerDashboard: React.FC = () => {
                         className="w-full sm:w-auto flex-grow p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500"
                     />
                     <button onClick={handleAddHoliday} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
-                        <CalendarPlusIcon className="w-5 h-5 me-2"/> إضافة عطلة
+                        <CalendarPlusIcon className="w-5 h-5 me-2"/> {t('add_holiday')}
                     </button>
                 </div>
                 <div className="max-h-60 overflow-y-auto pr-2 space-y-2">
@@ -779,7 +822,7 @@ const ManagerDashboard: React.FC = () => {
                                 <TrashIcon className="w-5 h-5"/>
                             </button>
                         </div>
-                    )) : <p className="text-center text-slate-500 p-4">لا توجد عطلات مضافة.</p>}
+                    )) : <p className="text-center text-slate-500 p-4">{t('no_holidays_added')}</p>}
                 </div>
             </div>
 
@@ -791,7 +834,7 @@ const ManagerDashboard: React.FC = () => {
                     onClick={handleSaveSettings} 
                     className="bg-orange-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
-                    حفظ الإعدادات
+                    {t('save_settings')}
                 </button>
             </div>
         </div>
@@ -801,10 +844,10 @@ const ManagerDashboard: React.FC = () => {
         <Modal 
           isOpen={isExportModalOpen} 
           onClose={() => setIsExportModalOpen(false)} 
-          title="تحميل قوائم عملاء المندوبين"
+          title={t('download_rep_client_lists')}
         >
           <div className="space-y-4">
-            <p className="text-sm text-slate-700">حدد المندوبين الذين ترغب في تحميل قوائم عملائهم.</p>
+            <p className="text-sm text-slate-700">{t('select_reps_to_download')}</p>
             
             <div className="border border-slate-300/50 rounded-lg">
                 <div className="flex items-center p-3 bg-slate-100/50 rounded-t-lg border-b border-slate-300/50">
@@ -816,7 +859,7 @@ const ManagerDashboard: React.FC = () => {
                         className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3"
                     />
                     <label htmlFor="selectAllReps" className="text-sm font-medium text-slate-800 cursor-pointer">
-                        تحديد الكل / إلغاء تحديد الكل
+                        {t('select_all')}
                     </label>
                 </div>
                 <div className="max-h-60 overflow-y-auto p-3 space-y-2">
@@ -844,7 +887,7 @@ const ManagerDashboard: React.FC = () => {
                 onClick={() => setIsExportModalOpen(false)}
                 className="text-slate-700 bg-transparent hover:bg-slate-200/50 focus:ring-4 focus:outline-none focus:ring-slate-300 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 hover:text-slate-900 focus:z-10 transition-colors"
               >
-                إلغاء
+                {t('cancel')}
               </button>
               <button
                 type="button"
@@ -852,7 +895,7 @@ const ManagerDashboard: React.FC = () => {
                 disabled={selectedRepsForExport.length === 0}
                 className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
               >
-                تحميل ({selectedRepsForExport.length})
+                {t('download_count', selectedRepsForExport.length)}
               </button>
             </div>
           </div>

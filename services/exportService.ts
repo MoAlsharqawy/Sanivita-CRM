@@ -1,105 +1,104 @@
-import { VisitReport, Doctor, Pharmacy, Region, User } from "../types";
+import { VisitReport, Doctor, Pharmacy, Region, User, Specialization } from "../types";
+import { TranslationFunction } from "../hooks/useLanguage";
 
 // These globals are defined by the scripts loaded in index.html
 declare const XLSX: any;
 declare const jspdf: any;
 
-export const exportToExcel = (data: VisitReport[], fileName: string) => {
+export const exportToExcel = (data: VisitReport[], fileName: string, t: TranslationFunction) => {
   const worksheet = XLSX.utils.json_to_sheet(data.map(item => ({
-    'التاريخ': new Date(item.date).toLocaleString('ar-EG'),
-    'نوع الزيارة': item.type,
-    'اسم المندوب': item.repName,
-    'المنطقة': item.regionName,
-    'العميل': item.targetName,
-    'المنتج': item.productName || '-',
-    'الملاحظات': item.notes,
+    [t('date')]: new Date(item.date).toLocaleString(t('locale')),
+    [t('visit_type')]: t(item.type),
+    [t('rep_name')]: item.repName,
+    [t('region')]: item.regionName,
+    [t('client')]: item.targetName,
+    [t('product')]: item.productName || '-',
+    [t('notes')]: item.notes,
   })));
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'تقارير الزيارات');
+  XLSX.utils.book_append_sheet(workbook, worksheet, t('visit_reports'));
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
-export const exportClientsToExcel = (doctors: Doctor[], pharmacies: Pharmacy[], regions: Region[], fileName: string) => {
+export const exportClientsToExcel = (doctors: Doctor[], pharmacies: Pharmacy[], regions: Region[], fileName: string, t: TranslationFunction) => {
   const regionMap = new Map(regions.map(r => [r.id, r.name]));
 
   const doctorsData = doctors.map(d => ({
-    'الاسم': d.name,
-    'المنطقة': regionMap.get(d.regionId) || 'غير معروف',
-    'التخصص': d.specialization,
+    [t('name')]: d.name,
+    [t('region')]: regionMap.get(d.regionId) || t('unknown'),
+    [t('specialization')]: t(d.specialization),
   }));
   const doctorsWorksheet = XLSX.utils.json_to_sheet(doctorsData);
 
   const pharmaciesData = pharmacies.map(p => ({
-    'الاسم': p.name,
-    'المنطقة': regionMap.get(p.regionId) || 'غير معروف',
+    [t('name')]: p.name,
+    [t('region')]: regionMap.get(p.regionId) || t('unknown'),
   }));
   const pharmaciesWorksheet = XLSX.utils.json_to_sheet(pharmaciesData);
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, doctorsWorksheet, 'الأطباء');
-  XLSX.utils.book_append_sheet(workbook, pharmaciesWorksheet, 'الصيدليات');
+  XLSX.utils.book_append_sheet(workbook, doctorsWorksheet, t('doctors'));
+  XLSX.utils.book_append_sheet(workbook, pharmaciesWorksheet, t('pharmacies'));
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
-export const exportMultipleRepClientsToExcel = (doctors: Doctor[], pharmacies: Pharmacy[], regions: Region[], users: User[], fileName: string) => {
+export const exportMultipleRepClientsToExcel = (doctors: Doctor[], pharmacies: Pharmacy[], regions: Region[], users: User[], fileName: string, t: TranslationFunction) => {
   const regionMap = new Map(regions.map(r => [r.id, r.name]));
   const userMap = new Map(users.map(u => [u.id, u.name]));
 
   const doctorsData = doctors.map(d => ({
-    'الاسم': d.name,
-    'المنطقة': regionMap.get(d.regionId) || 'غير معروف',
-    'التخصص': d.specialization,
-    'المندوب المسؤول': userMap.get(d.repId) || 'غير معروف',
+    [t('name')]: d.name,
+    [t('region')]: regionMap.get(d.regionId) || t('unknown'),
+    [t('specialization')]: t(d.specialization),
+    [t('responsible_rep')]: userMap.get(d.repId) || t('unknown'),
   }));
-  const doctorsWorksheet = XLSX.utils.json_to_sheet(doctorsData, { header: ['الاسم', 'التخصص', 'المنطقة', 'المندوب المسؤول'] });
+  const doctorsWorksheet = XLSX.utils.json_to_sheet(doctorsData, { header: [t('name'), t('specialization'), t('region'), t('responsible_rep')] });
 
   const pharmaciesData = pharmacies.map(p => ({
-    'الاسم': p.name,
-    'المنطقة': regionMap.get(p.regionId) || 'غير معروف',
-    'المندوب المسؤول': userMap.get(p.repId) || 'غير معروف',
+    [t('name')]: p.name,
+    [t('region')]: regionMap.get(p.regionId) || t('unknown'),
+    [t('responsible_rep')]: userMap.get(p.repId) || t('unknown'),
   }));
-  const pharmaciesWorksheet = XLSX.utils.json_to_sheet(pharmaciesData, { header: ['الاسم', 'المنطقة', 'المندوب المسؤول'] });
+  const pharmaciesWorksheet = XLSX.utils.json_to_sheet(pharmaciesData, { header: [t('name'), t('region'), t('responsible_rep')] });
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, doctorsWorksheet, 'الأطباء');
-  XLSX.utils.book_append_sheet(workbook, pharmaciesWorksheet, 'الصيدليات');
+  XLSX.utils.book_append_sheet(workbook, doctorsWorksheet, t('doctors'));
+  XLSX.utils.book_append_sheet(workbook, pharmaciesWorksheet, t('pharmacies'));
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
 
-export const exportUsersToExcel = (users: User[], fileName: string) => {
+export const exportUsersToExcel = (users: User[], fileName: string, t: TranslationFunction) => {
   const usersData = users.map(u => ({
-    'الاسم الكامل': u.name,
-    'اسم المستخدم': u.username,
-    'الدور': u.role,
+    [t('full_name')]: u.name,
+    [t('username')]: u.username,
+    [t('role')]: t(u.role),
   }));
   const worksheet = XLSX.utils.json_to_sheet(usersData);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'المستخدمون');
+  XLSX.utils.book_append_sheet(workbook, worksheet, t('users'));
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
-export const exportToPdf = (data: VisitReport[], fileName:string) => {
+export const exportToPdf = (data: VisitReport[], fileName:string, t: TranslationFunction) => {
   const { jsPDF } = jspdf;
   const doc = new jsPDF();
   
-  // Add Arabic font
-  // Note: jsPDF has limited Arabic support out-of-the-box. This is a basic setup.
-  // For production, you would embed a proper Arabic font (like Amiri).
+  // Add Arabic font for PDF export
   doc.addFont('https://fonts.gstatic.com/s/amiri/v25/J7acnpd8CGxBHpU2hLVF.ttf', 'Amiri', 'normal');
   doc.setFont('Amiri');
 
 
   doc.autoTable({
-    head: [['الملاحظات', 'المنتج', 'العميل', 'المنطقة', 'اسم المندوب', 'نوع الزيارة', 'التاريخ']],
+    head: [[t('notes'), t('product'), t('client'), t('region'), t('rep_name'), t('visit_type'), t('date')]],
     body: data.map(item => [
       item.notes,
       item.productName || '-',
       item.targetName,
       item.regionName,
       item.repName,
-      item.type,
-      new Date(item.date).toLocaleDateString('ar-EG'),
+      t(item.type),
+      new Date(item.date).toLocaleDateString(t('locale')),
     ]).reverse(), // Reverse to display correctly in RTL table
     styles: {
         font: 'Amiri',
@@ -111,7 +110,7 @@ export const exportToPdf = (data: VisitReport[], fileName:string) => {
     },
     didDrawPage: (data: any) => {
         doc.setFontSize(20);
-        doc.text('تقرير الزيارات', data.settings.margin.left, 15);
+        doc.text(t('visit_reports'), data.settings.margin.left, 15);
     }
   });
 

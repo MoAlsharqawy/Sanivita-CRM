@@ -1,14 +1,14 @@
-
-
-
 import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth'
-import { LogoutIcon, EditIcon } from './icons'
-import ChangePasswordModal from './ChangePasswordModal'
+import { useAuth } from '../hooks/useAuth';
+import { useLanguage } from '../hooks/useLanguage';
+import { LogoutIcon, EditIcon, LanguageIcon } from './icons';
+import ChangePasswordModal from './ChangePasswordModal';
+import { Logo } from './Logo';
 
 export const Header: React.FC = () => {
-  const { user, logout } = useAuth()
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const { user, logout } = useAuth();
+  const { lang, toggleLang, t } = useLanguage();
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   return (
     <>
@@ -18,37 +18,40 @@ export const Header: React.FC = () => {
             {/* Right Side (User Info) */}
             <div className="flex-1 flex justify-start items-center">
               <span className="text-slate-700 font-medium ms-2">
-                مرحباً, {user?.name}
+                {t('hello', user?.name || '')}
               </span>
               <button
                 onClick={() => setIsPasswordModalOpen(true)}
                 className="p-2 text-slate-600 hover:text-orange-600 focus:outline-none transition-colors rounded-full hover:bg-slate-200/50"
-                aria-label="تغيير كلمة المرور"
+                aria-label={t('change_password')}
               >
                 <EditIcon className="h-5 w-5" />
               </button>
               <button
                 onClick={logout}
                 className="flex items-center text-slate-600 hover:text-orange-600 focus:outline-none transition-colors ms-2"
-                aria-label="تسجيل الخروج"
+                aria-label={t('logout')}
               >
                 <LogoutIcon className="h-6 w-6" />
-                <span className="ms-1 hidden md:block">خروج</span>
+                <span className="ms-1 hidden md:block">{t('logout')}</span>
               </button>
             </div>
 
-            {/* Center (Company Name) */}
+            {/* Center (Logo) */}
             <div className="flex-1 flex justify-center">
-              <div className="text-4xl font-extrabold tracking-wider bg-gradient-to-r from-blue-700 to-cyan-500 text-transparent bg-clip-text">
-                SPI
-              </div>
+              <Logo className="h-12" />
             </div>
 
-            {/* Left Side (App Name) */}
-            <div className="flex-1 flex justify-end">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-800 to-orange-500 text-transparent bg-clip-text">
-                Mizan CRM
-              </h1>
+            {/* Left Side (App Name & Lang) */}
+            <div className="flex-1 flex justify-end items-center">
+              <button
+                onClick={toggleLang}
+                className="flex items-center text-slate-600 hover:text-orange-600 focus:outline-none transition-colors me-4 font-semibold"
+                aria-label="Change Language"
+              >
+                <LanguageIcon className="h-6 w-6" />
+                <span className="mx-1">{lang === 'ar' ? 'English' : 'العربية'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -62,5 +65,5 @@ export const Header: React.FC = () => {
         />
       )}
     </>
-  )
-}
+  );
+};

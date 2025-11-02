@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Doctor, Pharmacy, User, Product, Region } from '../types';
 import { api } from '../services/mockData';
+import { useLanguage } from '../hooks/useLanguage';
 
 interface VisitFormProps {
   user: User;
@@ -14,6 +15,7 @@ interface VisitFormProps {
 }
 
 const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmacies, regions, initialRegionId, onSuccess, onCancel }) => {
+  const { t } = useLanguage();
   const [visitTargetType, setVisitTargetType] = useState<'doctor' | 'pharmacy'>('doctor');
   const [regionId, setRegionId] = useState<string>(initialRegionId ? String(initialRegionId) : '');
   const [targetId, setTargetId] = useState<string>('');
@@ -97,17 +99,17 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     const errors: string[] = [];
 
     if (!targetId) {
-        errors.push('يرجى اختيار العميل من القائمة.');
+        errors.push(t('error_select_client'));
     }
     if (!notes.trim()) {
-        errors.push('يرجى كتابة الملاحظات.');
+        errors.push(t('error_add_notes'));
     }
     if (visitTargetType === 'doctor') {
         if(selectedProductIds.length === 0) {
-            errors.push('يرجى اختيار منتج واحد على الأقل.');
+            errors.push(t('error_select_product'));
         }
         if(!visitType) {
-            errors.push('يرجى تحديد نوع الزيارة (سينجل أو كوتشينج).');
+            errors.push(t('error_select_visit_type'));
         }
     }
 
@@ -139,7 +141,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
       }
       onSuccess();
     } catch (err) {
-      setError('حدث خطأ أثناء حفظ الزيارة.');
+      setError(t('error_saving_visit'));
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +152,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
       
       {/* Visit Type Tabs */}
       <div>
-        <label className="block mb-2 text-sm font-medium text-slate-800">نوع الزيارة</label>
+        <label className="block mb-2 text-sm font-medium text-slate-800">{t('visit_type')}</label>
         <div role="tablist" className="grid grid-cols-2 gap-1 rounded-lg p-1 bg-slate-200/60">
           <button
             type="button"
@@ -163,7 +165,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
                     : 'text-slate-700 hover:bg-white/50 focus:ring-blue-500'
             }`}
           >
-            زيارة طبيب
+            {t('doctor_visit')}
           </button>
           <button
             type="button"
@@ -176,23 +178,23 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
                     : 'text-slate-700 hover:bg-white/50 focus:ring-orange-500'
             }`}
           >
-            زيارة صيدلية
+            {t('pharmacy_visit')}
           </button>
         </div>
       </div>
       
       {/* Region Selector */}
       <div>
-        <label htmlFor="region" className="block mb-2 text-sm font-medium text-slate-800">المنطقة</label>
+        <label htmlFor="region" className="block mb-2 text-sm font-medium text-slate-800">{t('region')}</label>
         <select id="region" value={regionId} onChange={handleRegionChange} required className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-2.5">
-          <option value="" disabled>اختر منطقة</option>
+          <option value="" disabled>{t('choose_region')}</option>
           {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
       </div>
       
       {/* Target (Doctor/Pharmacy) Autocomplete */}
       <div className="relative">
-        <label htmlFor="target" className="block mb-2 text-sm font-medium text-slate-800">{visitTargetType === 'doctor' ? 'الطبيب' : 'الصيدلية'}</label>
+        <label htmlFor="target" className="block mb-2 text-sm font-medium text-slate-800">{t(visitTargetType === 'doctor' ? 'doctor' : 'pharmacy')}</label>
         <input
           id="target"
           type="text"
@@ -203,7 +205,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
           required
           disabled={!regionId}
           className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-2.5 disabled:bg-slate-200/50"
-          placeholder={`ابحث عن ${visitTargetType === 'doctor' ? 'طبيب' : 'صيدلية'}...`}
+          placeholder={t(visitTargetType === 'doctor' ? 'search_for_doctor' : 'search_for_pharmacy')}
           autoComplete="off"
         />
         {autocompleteSuggestions.length > 0 && (
@@ -229,7 +231,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
         <>
             {/* Products Selector */}
             <div>
-              <label className="block mb-2 text-sm font-medium text-slate-800">المنتجات (اختر حتى 3)</label>
+              <label className="block mb-2 text-sm font-medium text-slate-800">{t('products_select_limit')}</label>
               <div className="grid grid-cols-2 gap-2 p-3 bg-white/30 rounded-lg">
                 {products.map(p => (
                   <label key={p.id} className="flex items-center space-x-2 space-x-reverse cursor-pointer">
@@ -247,15 +249,15 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
 
             {/* Coaching/Single Selector */}
             <div>
-                <label className="block mb-2 text-sm font-medium text-slate-800">نوع الزيارة</label>
+                <label className="block mb-2 text-sm font-medium text-slate-800">{t('coaching_single_select')}</label>
                 <div className="flex items-center space-x-4 space-x-reverse">
                     <label className="flex items-center cursor-pointer">
                         <input type="radio" name="visitType" value="Single" checked={visitType === 'Single'} onChange={() => setVisitType('Single')} className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 focus:ring-orange-500"/>
-                        <span className="ms-2 text-sm font-medium text-gray-900">سينجل</span>
+                        <span className="ms-2 text-sm font-medium text-gray-900">{t('Single')}</span>
                     </label>
                      <label className="flex items-center cursor-pointer">
                         <input type="radio" name="visitType" value="Coaching" checked={visitType === 'Coaching'} onChange={() => setVisitType('Coaching')} className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 focus:ring-orange-500"/>
-                        <span className="ms-2 text-sm font-medium text-gray-900">كوتشينج</span>
+                        <span className="ms-2 text-sm font-medium text-gray-900">{t('Coaching')}</span>
                     </label>
                 </div>
             </div>
@@ -263,7 +265,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
       )}
       <div>
         <label htmlFor="notes" className="block mb-2 text-sm font-medium text-slate-800">
-          {visitTargetType === 'doctor' ? 'تعليق الطبيب' : 'ملاحظات الزيارة'}
+          {t(visitTargetType === 'doctor' ? 'doctor_comment' : 'visit_notes')}
         </label>
         <textarea
           id="notes"
@@ -271,7 +273,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           className="block p-2.5 w-full text-sm text-slate-900 bg-white/50 rounded-lg border border-slate-300/50 focus:ring-orange-500 focus:border-orange-500"
-          placeholder="اكتب ملاحظاتك هنا..."
+          placeholder={t('write_notes_here')}
           required
         ></textarea>
       </div>
@@ -284,14 +286,14 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
           onClick={onCancel}
           className="text-slate-700 bg-transparent hover:bg-slate-200/50 focus:ring-4 focus:outline-none focus:ring-slate-300 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 hover:text-slate-900 focus:z-10 transition-colors"
         >
-          إلغاء
+          {t('cancel')}
         </button>
         <button
           type="submit"
           disabled={submitting}
           className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 transition-colors"
         >
-          {submitting ? 'جاري الحفظ...' : 'حفظ'}
+          {submitting ? t('saving') : t('save')}
         </button>
       </div>
     </form>

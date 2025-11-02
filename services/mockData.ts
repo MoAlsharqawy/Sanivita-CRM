@@ -21,7 +21,7 @@ const regions: Region[] = [
 ];
 
 // --- DOCTORS ---
-const doctors: Doctor[] = [
+let doctors: Doctor[] = [
   { id: 1, name: 'د. إبراهيم نصر', regionId: 1, repId: 2, specialization: Specialization.Pediatrics },
   { id: 2, name: 'د. عائشة قاسم', regionId: 1, repId: 2, specialization: Specialization.Pulmonology },
   { id: 3, name: 'د. يوسف حمدان', regionId: 2, repId: 3, specialization: Specialization.Pediatrics },
@@ -35,7 +35,7 @@ const doctors: Doctor[] = [
 ];
 
 // --- PHARMACIES ---
-const pharmacies: Pharmacy[] = [
+let pharmacies: Pharmacy[] = [
   { id: 1, name: 'صيدلية الشفاء', regionId: 1, repId: 2, specialization: Specialization.Pharmacy },
   { id: 2, name: 'صيدلية الدواء', regionId: 1, repId: 2, specialization: Specialization.Pharmacy },
   { id: 3, name: 'صيدلية الأمل', regionId: 2, repId: 3, specialization: Specialization.Pharmacy },
@@ -87,6 +87,10 @@ let repWeeklyPlans: { [repId: number]: WeeklyPlan } = {
         status: 'rejected'
     }
 };
+
+// ID Generators
+let nextDoctorId = Math.max(...doctors.map(d => d.id), 0) + 1;
+let nextPharmacyId = Math.max(...pharmacies.map(p => p.id), 0) + 1;
 
 
 // --- API FUNCTIONS ---
@@ -217,7 +221,7 @@ export const api = {
         const doctor = doctors.find(d => d.id === v.doctorId);
         reports.push({
           id: `d-${v.id}`,
-          type: 'زيارة طبيب',
+          type: 'DOCTOR_VISIT',
           repName: users.find(u => u.id === v.repId)?.name || 'غير معروف',
           regionName: regions.find(r => r.id === v.regionId)?.name || 'غير معروف',
           targetName: doctor?.name || 'غير معروف',
@@ -235,7 +239,7 @@ export const api = {
         const pharmacy = pharmacies.find(p => p.id === v.pharmacyId);
         reports.push({
           id: `p-${v.id}`,
-          type: 'زيارة صيدلية',
+          type: 'PHARMACY_VISIT',
           repName: users.find(u => u.id === v.repId)?.name || 'غير معروف',
           regionName: regions.find(r => r.id === v.regionId)?.name || 'غير معروف',
           targetName: pharmacy?.name || 'غير معروف',
@@ -255,7 +259,7 @@ export const api = {
       const doctor = doctors.find(d => d.id === v.doctorId);
       reports.push({
         id: `d-${v.id}`,
-        type: 'زيارة طبيب',
+        type: 'DOCTOR_VISIT',
         repName: users.find(u => u.id === v.repId)?.name || 'غير معروف',
         regionName: regions.find(r => r.id === v.regionId)?.name || 'غير معروف',
         targetName: doctor?.name || 'غير معروف',
@@ -271,7 +275,7 @@ export const api = {
       const pharmacy = pharmacies.find(p => p.id === v.pharmacyId);
       reports.push({
         id: `p-${v.id}`,
-        type: 'زيارة صيدلية',
+        type: 'PHARMACY_VISIT',
         repName: users.find(u => u.id === v.repId)?.name || 'غير معروف',
         regionName: regions.find(r => r.id === v.regionId)?.name || 'غير معروف',
         targetName: pharmacy?.name || 'غير معروف',
@@ -331,5 +335,90 @@ export const api = {
 
         resolve(alerts);
     });
+  },
+
+  addDoctorsBatch: (data: any[]): Promise<{success: number, failed: number, errors: string[]}> => {
+    return new Promise(resolve => {
+        const result = { success: 0, failed: 0, errors: [] as string[] };
+        data.forEach((row, index) => {
+            const { Name, Region, Specialization: Spec, 'Rep Username': repUsername } = row;
+            // Validation
+            if (!Name || !Region || !Spec || !repUsername) {
+                result.failed++;
+                result.errors.push(`Row ${index + 2}: Missing required fields.`);
+                return;
+            }
+            const region = regions.find(r => r.name.trim().toLowerCase() === String(Region).trim().toLowerCase());
+            const rep = users.find(u => u.username.trim().toLowerCase() === String(repUsername).trim().toLowerCase() && u.role === UserRole.Rep);
+            // Fix: Use 'as const' to ensure `validSpec` is correctly typed as a union of allowed specializations.
+            const specValues = [Specialization.Pediatrics, Specialization.Pulmonology] as const;
+            const validSpec = specValues.find(s => s.toLowerCase() === String(Spec).trim().toLowerCase());
+
+            if (!region) {
+                result.failed++;
+                result.errors.push(`Row ${index + 2}: Region "${Region}" not found.`);
+                return;
+            }
+            if (!rep) {
+                result.failed++;
+                result.errors.push(`Row ${index + 2}: Rep with username "${repUsername}" not found.`);
+                return;
+            }
+            if (!validSpec) {
+                result.failed++;
+                result.errors.push(`Row ${index + 2}: Invalid specialization "${Spec}". Must be one of: ${specValues.join(', ')}.`);
+                return;
+            }
+            
+            const newDoctor: Doctor = {
+                id: nextDoctorId++,
+                name: Name,
+                regionId: region.id,
+                repId: rep.id,
+                specialization: validSpec,
+            };
+            doctors.push(newDoctor);
+            result.success++;
+        });
+        resolve(result);
+    });
+  },
+
+  addPharmaciesBatch: (data: any[]): Promise<{success: number, failed: number, errors: string[]}> => {
+      return new Promise(resolve => {
+          const result = { success: 0, failed: 0, errors: [] as string[] };
+          data.forEach((row, index) => {
+              const { Name, Region, 'Rep Username': repUsername } = row;
+              if (!Name || !Region || !repUsername) {
+                  result.failed++;
+                  result.errors.push(`Row ${index + 2}: Missing required fields.`);
+                  return;
+              }
+              const region = regions.find(r => r.name.trim().toLowerCase() === String(Region).trim().toLowerCase());
+              const rep = users.find(u => u.username.trim().toLowerCase() === String(repUsername).trim().toLowerCase() && u.role === UserRole.Rep);
+
+              if (!region) {
+                  result.failed++;
+                  result.errors.push(`Row ${index + 2}: Region "${Region}" not found.`);
+                  return;
+              }
+              if (!rep) {
+                  result.failed++;
+                  result.errors.push(`Row ${index + 2}: Rep with username "${repUsername}" not found.`);
+                  return;
+              }
+
+              const newPharmacy: Pharmacy = {
+                  id: nextPharmacyId++,
+                  name: Name,
+                  regionId: region.id,
+                  repId: rep.id,
+                  specialization: Specialization.Pharmacy,
+              };
+              pharmacies.push(newPharmacy);
+              result.success++;
+          });
+          resolve(result);
+      });
   },
 };
