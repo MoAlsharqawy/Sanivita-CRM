@@ -168,6 +168,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total_visits_this_month': 'إجمالي زيارات هذا الشهر',
     'unique_clients_this_month': 'العملاء الفريدون هذا الشهر',
     'average_visits_per_month_historical': 'متوسط الزيارات الشهري',
+    'analytics_overview': 'نظرة عامة على التحليلات',
+    'visits_by_rep': 'الزيارات حسب المندوب',
+    'visit_distribution': 'توزيع الزيارات',
+    'no_data_for_charts': 'لا توجد بيانات كافية لعرض الرسوم البيانية.',
+    'visit_count_label': 'زيارة',
 
     // Supabase Connect Screen
     'connect_db_title': 'الاتصال بقاعدة البيانات',
@@ -234,7 +239,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Weekly View
     'previous_week': 'الأسبوع السابق',
     'next_week': 'الأسبوع التالي',
-    'visit_count_label': 'زيارة',
     'official_holiday': 'عطلة رسمية',
     'weekend_holiday': 'عطلة',
     'no_plan_for_day': 'لا توجد خطة',
@@ -438,6 +442,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total_visits_this_month': 'Total Visits This Month',
     'unique_clients_this_month': 'Unique Clients This Month',
     'average_visits_per_month_historical': 'Historical Avg. Visits/Month',
+    'analytics_overview': 'Analytics Overview',
+    'visits_by_rep': 'Visits by Rep',
+    'visit_distribution': 'Visit Distribution',
+    'no_data_for_charts': 'Not enough data to display charts.',
+    'visit_count_label': 'Visit',
     
     // Supabase Connect Screen
     'connect_db_title': 'Connect to Your Database',
@@ -504,7 +513,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Weekly View
     'previous_week': 'Previous Week',
     'next_week': 'Next Week',
-    'visit_count_label': 'Visit',
     'official_holiday': 'Official Holiday',
     'weekend_holiday': 'Weekend',
     'no_plan_for_day': 'No Plan',

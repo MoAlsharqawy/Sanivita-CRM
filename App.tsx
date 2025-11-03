@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth, AuthProvider } from './hooks/useAuth';
 import Login from './components/Login';

@@ -9,6 +9,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import DataImport from './DataImport';
 import Spinner from './Spinner';
 import UserEditModal from './UserEditModal';
+import AnalyticsCharts from './AnalyticsCharts';
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -614,6 +615,9 @@ const ManagerDashboard: React.FC = () => {
                 </div>
             </div>
           </div>
+
+          {/* Analytics Charts */}
+          <AnalyticsCharts reports={filteredReports} />
 
           {/* Filters Section */}
           <div className="bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8">
