@@ -1,4 +1,3 @@
-
 import { getSupabaseClient, initializeSupabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole } from '../types';
 
@@ -223,6 +222,7 @@ export const api = {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
+    // FIX: Corrected a typo from `d.rep_id` to `p.rep_id` to match the map variable.
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
   },
   
@@ -238,12 +238,10 @@ export const api = {
         p_product_ids: visit.productIds,
     }).single();
     if (error) handleSupabaseError(error, 'addDoctorVisit');
-    // FIX: The `data` from a generic RPC call is typed as `unknown` and can be null.
-    // We check for its existence and cast it to `any` to resolve type errors.
     if (!data) {
-        handleSupabaseError({ message: 'RPC call "add_doctor_visit_with_products" returned no data.' }, 'addDoctorVisit');
-        // This throw satisfies TypeScript's return path analysis, as handleSupabaseError doesn't have a `never` return type.
-        throw new Error('RPC call "add_doctor_visit_with_products" returned no data.');
+        const errorMessage = 'RPC call "add_doctor_visit_with_products" returned no data.';
+        handleSupabaseError({ message: errorMessage }, 'addDoctorVisit');
+        throw new Error(errorMessage);
     }
 
     const visitData = data as any;

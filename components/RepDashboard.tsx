@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
@@ -29,7 +29,8 @@ const RepDashboard: React.FC = () => {
   const [showClientLists, setShowClientLists] = useState(false);
   const [initialRegionForVisit, setInitialRegionForVisit] = useState<number | null>(null);
 
-  // Refs for drag and drop functionality
+  // State for drag and drop visual feedback
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const draggedItemIndex = useRef<number | null>(null);
   const dragOverItemIndex = useRef<number | null>(null);
 
@@ -98,13 +99,9 @@ const RepDashboard: React.FC = () => {
 
 
   // Drag and Drop Handlers
-  const handleDragStart = (e: React.DragEvent<HTMLLIElement>, index: number) => {
+  const handleDragStart = (index: number) => {
     draggedItemIndex.current = index;
-    setTimeout(() => {
-        if(e.target instanceof HTMLElement) {
-            e.target.classList.add('opacity-50');
-        }
-    }, 0);
+    setDraggedIndex(index);
   };
 
   const handleDragEnter = (index: number) => {
@@ -125,10 +122,8 @@ const RepDashboard: React.FC = () => {
     setRecentVisits(newVisits);
   };
 
-  const handleDragEnd = (e: React.DragEvent<HTMLLIElement>) => {
-    if (e.target instanceof HTMLElement) {
-        e.target.classList.remove('opacity-50');
-    }
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
     draggedItemIndex.current = null;
     dragOverItemIndex.current = null;
   };
@@ -137,7 +132,7 @@ const RepDashboard: React.FC = () => {
     e.preventDefault();
   };
   
-  const getMonthlyVisitCounts = () => {
+  const monthlyCounts = useMemo(() => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
@@ -156,9 +151,9 @@ const RepDashboard: React.FC = () => {
     });
 
     return { doctorVisits, pharmacyVisits };
-  };
+  }, [recentVisits]);
 
-  const getDailyVisitCounts = () => {
+  const dailyCounts = useMemo(() => {
     const todayStr = new Date().toDateString();
     
     let doctorVisits = 0;
@@ -176,7 +171,7 @@ const RepDashboard: React.FC = () => {
     });
 
     return { doctorVisits, pharmacyVisits };
-  };
+  }, [recentVisits]);
 
   const getPlanStatusBadge = () => {
       if (!plan) return null;
@@ -228,8 +223,6 @@ const RepDashboard: React.FC = () => {
     />;
   }
   
-  const monthlyCounts = getMonthlyVisitCounts();
-  const dailyCounts = getDailyVisitCounts();
   const totalDailyCount = dailyCounts.doctorVisits + dailyCounts.pharmacyVisits;
   const dailyTarget = 12; // An arbitrary target for visual effect
   const dailyProgress = Math.min((totalDailyCount / dailyTarget) * 100, 100);
@@ -433,10 +426,10 @@ const RepDashboard: React.FC = () => {
                 {recentVisits.map((visit, index) => (
                   <li 
                     key={visit.id} 
-                    className="p-4 bg-white/30 rounded-lg hover:bg-white/50 transition-all duration-300 cursor-move animate-fade-in-up"
+                    className={`p-4 bg-white/30 rounded-lg hover:bg-white/50 transition-all duration-300 cursor-move animate-fade-in-up ${draggedIndex === index ? 'opacity-50' : ''}`}
                     style={{ animationDelay: `${Math.min(index * 100, 1000)}ms` }}
                     draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragStart={() => handleDragStart(index)}
                     onDragEnter={() => handleDragEnter(index)}
                     onDragEnd={handleDragEnd}
                   >

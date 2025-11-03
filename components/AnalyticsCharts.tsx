@@ -16,9 +16,11 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ reports }) => {
 
   useEffect(() => {
     // Destroy previous charts before redrawing
-    // FIX: Explicitly type chart as `any` to call `destroy`. The value from
-    // the ref is inferred as `unknown` under strict type checking.
-    Object.values(chartInstances.current).forEach((chart: any) => chart.destroy());
+    Object.values(chartInstances.current).forEach((chart: any) => {
+        if (chart && typeof chart.destroy === 'function') {
+            chart.destroy();
+        }
+    });
     chartInstances.current = {};
 
     if (reports.length === 0) {
