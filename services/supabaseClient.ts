@@ -24,6 +24,22 @@ export const getSupabaseClient = (): SupabaseClient => {
         return supabaseInstance;
     }
 
+    // Prioritize environment variables for deployment (e.g., on Vercel)
+    const envUrl = process.env.SUPABASE_URL;
+    const envKey = process.env.SUPABASE_ANON_KEY;
+
+    if (envUrl && envKey) {
+        try {
+            const client = createClient(envUrl, envKey);
+            supabaseInstance = client;
+            return supabaseInstance;
+        } catch (e) {
+            console.error("Error creating Supabase client from environment variables", e);
+            throw new Error("Invalid Supabase credentials in environment variables.");
+        }
+    }
+
+    // Fallback to localStorage for local development
     const url = localStorage.getItem('supabaseUrl');
     const key = localStorage.getItem('supabaseAnonKey');
 
@@ -39,11 +55,14 @@ export const getSupabaseClient = (): SupabaseClient => {
         }
     }
 
-    throw new Error("Supabase client not initialized. Call initializeSupabase or ensure credentials are in localStorage.");
+    throw new Error("Supabase client not initialized. Set environment variables or use the connection screen.");
 };
 
 export const hasSupabaseCredentials = (): boolean => {
-    return !!localStorage.getItem('supabaseUrl') && !!localStorage.getItem('supabaseAnonKey');
+    // Check for environment variables first
+    return (!!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY) ||
+           // Then check localStorage
+           (!!localStorage.getItem('supabaseUrl') && !!localStorage.getItem('supabaseAnonKey'));
 };
 
 export const clearSupabaseCredentials = () => {
