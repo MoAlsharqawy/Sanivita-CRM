@@ -1,4 +1,5 @@
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -57,6 +58,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'signin_to_account': 'سجل الدخول إلى حسابك',
     'incorrect_credentials': 'اسم المستخدم أو كلمة المرور غير صحيحة.',
     'login_error': 'حدث خطأ أثناء تسجيل الدخول.',
+    'profile_not_found': 'تم تسجيل الدخول بنجاح ولكن لم يتم العثور على ملف تعريف المستخدم. يرجى الاتصال بالمسؤول.',
     'email_address': 'اسم المستخدم',
     'password': 'كلمة المرور',
     'remember_me': 'تذكرني',
@@ -331,6 +333,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'signin_to_account': 'Sign in to your account',
     'incorrect_credentials': 'Incorrect username or password.',
     'login_error': 'An error occurred during login.',
+    'profile_not_found': 'Login successful, but user profile was not found. Please contact an administrator.',
     'email_address': 'Username',
     'password': 'Password',
     'remember_me': 'Remember me',

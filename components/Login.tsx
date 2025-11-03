@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -20,12 +21,12 @@ const Login: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      const user = await login(username, password);
-      if (!user) {
-        setError(t('incorrect_credentials'));
-      }
-    } catch (err) {
-      setError(t('login_error'));
+      // login now throws on any error, so we don't need to check the return value.
+      // The onAuthStateChange listener handles success.
+      await login(username, password);
+    } catch (err: any) {
+      // The error message from api.ts is our translation key
+      setError(t(err.message || 'login_error'));
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
@@ -7,7 +8,7 @@ import { getSupabaseClient, clearSupabaseCredentials } from '../services/supabas
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<User | null>;
+  login: (username: string, password: string) => Promise<User>;
   logout: () => void;
 }
 

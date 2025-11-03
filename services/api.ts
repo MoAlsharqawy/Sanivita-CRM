@@ -33,7 +33,7 @@ export const api = {
 
   // --- AUTH & USER PROFILE ---
 
-  login: async (username: string, password: string): Promise<User | null> => {
+  login: async (username: string, password: string): Promise<User> => {
     const supabase = getSupabaseClient();
     // Supabase auth uses email, but we can use the username field as if it were an email
     const { data: { user: authUser }, error } = await supabase.auth.signInWithPassword({
@@ -43,11 +43,16 @@ export const api = {
 
     if (error || !authUser) {
       console.error('Login error:', error?.message);
-      return null;
+      throw new Error('incorrect_credentials');
     }
     
     // After successful auth, fetch the user profile from our public.profiles table
-    return await api.getUserProfile(authUser.id);
+    const profile = await api.getUserProfile(authUser.id);
+    if (!profile) {
+      // getUserProfile already logged the user out. Now we tell the UI why the login failed.
+      throw new Error('profile_not_found');
+    }
+    return profile;
   },
 
   logout: async (): Promise<void> => {
@@ -65,9 +70,13 @@ export const api = {
       .single();
     
     if (error) {
-        // If a user exists in auth but not in profiles, it's a data consistency issue.
-        // For robustness, you might want to log them out or create a default profile.
-        console.error("Failed to get user profile after login. Logging out.", error);
+        console.error("Database error fetching user profile:", error);
+        await api.logout();
+        return null;
+    }
+
+    if (!data) { // Explicitly handle profile not found
+        console.error(`Profile not found for user ID ${userId}. The user exists in authentication but not in the profiles table. Logging out.`);
         await api.logout();
         return null;
     }
