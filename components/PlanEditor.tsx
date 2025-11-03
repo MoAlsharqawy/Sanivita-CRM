@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { User, Region, WeeklyPlan } from '../types';
-import { api } from '../services/mockData';
+import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
 import { SaveIcon, ArrowRightIcon, MapPinIcon } from './icons';
 

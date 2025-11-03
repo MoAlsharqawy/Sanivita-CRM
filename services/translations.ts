@@ -164,6 +164,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'add_rep': 'إضافة مندوب',
     'confirm_delete_title': 'تأكيد الحذف',
     'confirm_delete_message': 'هل أنت متأكد أنك تريد حذف المندوب {0}؟ لا يمكن التراجع عن هذا الإجراء.',
+    'total_visits_this_month': 'إجمالي زيارات هذا الشهر',
+    'unique_clients_this_month': 'العملاء الفريدون هذا الشهر',
+    'average_visits_per_month_historical': 'متوسط الزيارات الشهري',
 
     
     // Visit Form
@@ -214,6 +217,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'confirm_password': 'تأكيد كلمة المرور',
     'error_all_fields_required': 'يرجى ملء جميع الحقول المطلوبة.',
     'error_password_required': 'كلمة المرور مطلوبة للمستخدم الجديد.',
+    'username_cannot_be_changed': 'لا يمكن تغيير اسم المستخدم بعد الإنشاء.',
     
     // Weekly View
     'previous_week': 'الأسبوع السابق',
@@ -419,6 +423,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'add_rep': 'Add Representative',
     'confirm_delete_title': 'Confirm Deletion',
     'confirm_delete_message': 'Are you sure you want to delete the representative {0}? This action cannot be undone.',
+    'total_visits_this_month': 'Total Visits This Month',
+    'unique_clients_this_month': 'Unique Clients This Month',
+    'average_visits_per_month_historical': 'Historical Avg. Visits/Month',
 
     // Visit Form
     'doctor_visit': 'Doctor Visit',
@@ -468,6 +475,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'confirm_password': 'Confirm Password',
     'error_all_fields_required': 'Please fill all required fields.',
     'error_password_required': 'Password is required for a new user.',
+    'username_cannot_be_changed': 'Username cannot be changed after creation.',
 
     // Weekly View
     'previous_week': 'Previous Week',

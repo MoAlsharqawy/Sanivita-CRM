@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Doctor, Pharmacy, User, Product, Region } from '../types';
-import { api } from '../services/mockData';
+import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
 
 interface VisitFormProps {

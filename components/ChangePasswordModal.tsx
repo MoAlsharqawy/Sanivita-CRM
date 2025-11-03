@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { api } from '../services/mockData';
+import { api } from '../services/api';
 import Modal from './Modal';
 import { LockIcon } from './icons';
 import { useLanguage } from '../hooks/useLanguage';
@@ -37,7 +37,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
     setError('');
     setSubmitting(true);
     try {
-      const success = await api.changeUserPassword(user.id, newPassword);
+      const success = await api.changeUserPassword(newPassword);
       if (success) {
         onSuccess();
       } else {

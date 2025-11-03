@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { api } from '../services/mockData';
+import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -23,7 +23,7 @@ const ManagerDashboard: React.FC = () => {
   const [filteredAlerts, setFilteredAlerts] = useState<ClientAlert[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [allPlans, setAllPlans] = useState<{ [repId: number]: WeeklyPlan }>({});
+  const [allPlans, setAllPlans] = useState<{ [repId: string]: WeeklyPlan }>({});
   const [reviewMessage, setReviewMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
@@ -44,8 +44,8 @@ const ManagerDashboard: React.FC = () => {
   // Tab and Modal states
   const [activeTab, setActiveTab] = useState<ManagerTab>('reports');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [selectedRepsForExport, setSelectedRepsForExport] = useState<number[]>([]);
-  const [selectedRepForDailyVisits, setSelectedRepForDailyVisits] = useState<number | 'all'>('all');
+  const [selectedRepsForExport, setSelectedRepsForExport] = useState<string[]>([]);
+  const [selectedRepForDailyVisits, setSelectedRepForDailyVisits] = useState<string | 'all'>('all');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
@@ -173,13 +173,13 @@ const ManagerDashboard: React.FC = () => {
         new Date(report.date).toDateString() === todayStr
     );
     
-    const selectedRepName = selectedRepForDailyVisits !== 'all' 
-        ? reps.find(r => r.id === selectedRepForDailyVisits)?.name 
+    const selectedRepObject = selectedRepForDailyVisits !== 'all' 
+        ? reps.find(r => r.id === selectedRepForDailyVisits)
         : null;
 
     const filteredByRep = selectedRepForDailyVisits === 'all'
         ? todaysVisits
-        : todaysVisits.filter(visit => visit.repName === selectedRepName);
+        : todaysVisits.filter(visit => visit.repName === selectedRepObject?.name);
 
     const doctorVisits = filteredByRep.filter(v => v.type === 'DOCTOR_VISIT').length;
     const pharmacyVisits = filteredByRep.filter(v => v.type === 'PHARMACY_VISIT').length;
@@ -187,6 +187,45 @@ const ManagerDashboard: React.FC = () => {
     return { doctorVisits, pharmacyVisits };
   }, [allReports, selectedRepForDailyVisits, reps]);
 
+
+  const monthlySummaryStats = useMemo(() => {
+    const relevantReports = selectedRep === 'all'
+        ? allReports
+        : allReports.filter(r => r.repName === selectedRep);
+    
+    if (relevantReports.length === 0) {
+        return {
+            totalVisitsThisMonth: 0,
+            uniqueClientsThisMonth: 0,
+            averageVisitsPerMonth: 0,
+        };
+    }
+
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const monthlyReports = relevantReports.filter(visit => {
+        const visitDate = new Date(visit.date);
+        return visitDate >= startOfMonth && visitDate <= today;
+    });
+
+    const totalVisitsThisMonth = monthlyReports.length;
+    const uniqueClientsThisMonth = new Set(monthlyReports.map(r => r.targetName)).size;
+    
+    const visitDates = relevantReports.map(r => new Date(r.date));
+    const earliestDate = new Date(Math.min(...visitDates.map(d => d.getTime())));
+    const latestDate = new Date(Math.max(...visitDates.map(d => d.getTime())));
+
+    const monthDifference = (latestDate.getFullYear() - earliestDate.getFullYear()) * 12 + (latestDate.getMonth() - earliestDate.getMonth()) + 1;
+    
+    const averageVisitsPerMonth = relevantReports.length / (monthDifference || 1);
+
+    return {
+        totalVisitsThisMonth,
+        uniqueClientsThisMonth,
+        averageVisitsPerMonth: parseFloat(averageVisitsPerMonth.toFixed(1)),
+    };
+  }, [allReports, selectedRep]);
 
   const userManagementStats = useMemo(() => {
     if (allReports.length === 0) {
@@ -215,18 +254,17 @@ const ManagerDashboard: React.FC = () => {
     };
   }, [allReports]);
   
-  // Fix: Add a type guard to correctly infer the type of `plan` after filtering.
   const pendingPlans = useMemo(() => {
     return Object.entries(allPlans)
         .filter((entry): entry is [string, WeeklyPlan] => (entry[1] as WeeklyPlan).status === 'pending')
         .map(([repId, plan]) => ({
-            repId: parseInt(repId),
-            repName: reps.find(r => r.id === parseInt(repId))?.name || t('unknown'),
+            repId: repId,
+            repName: reps.find(r => r.id === repId)?.name || t('unknown'),
             ...plan
         }));
   }, [allPlans, reps, t]);
 
-  const handleReviewPlan = async (repId: number, status: 'approved' | 'rejected') => {
+  const handleReviewPlan = async (repId: string, status: 'approved' | 'rejected') => {
       try {
           await api.reviewRepPlan(repId, status);
            // Optimistic update
@@ -258,7 +296,7 @@ const ManagerDashboard: React.FC = () => {
     exportUsersToExcel(reps, 'representatives_list', t);
   };
 
-  const handleRepSelectionChange = (repId: number) => {
+  const handleRepSelectionChange = (repId: string) => {
     setSelectedRepsForExport(prev => 
       prev.includes(repId) ? prev.filter(id => id !== repId) : [...prev, repId]
     );
@@ -465,6 +503,37 @@ const ManagerDashboard: React.FC = () => {
               ) : (
                   <p className="font-semibold bg-white/10 p-3 rounded-lg">{t('no_pending_plans')}</p>
               )}
+          </div>
+
+          {/* Monthly Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+              <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4">
+                <ChartBarIcon className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-slate-600 text-sm font-medium">{t('total_visits_this_month')}</p>
+                <p className="text-4xl font-bold text-purple-800">{monthlySummaryStats.totalVisitsThisMonth}</p>
+              </div>
+            </div>
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+              <div className="bg-teal-500/20 text-teal-700 p-4 rounded-full me-4">
+                <UserGroupIcon className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-slate-600 text-sm font-medium">{t('unique_clients_this_month')}</p>
+                <p className="text-4xl font-bold text-teal-800">{monthlySummaryStats.uniqueClientsThisMonth}</p>
+              </div>
+            </div>
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+              <div className="bg-sky-500/20 text-sky-700 p-4 rounded-full me-4">
+                <GraphIcon className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-slate-600 text-sm font-medium">{t('average_visits_per_month_historical')}</p>
+                <p className="text-4xl font-bold text-sky-800">{monthlySummaryStats.averageVisitsPerMonth}</p>
+              </div>
+            </div>
           </div>
 
           {/* Daily Visits Card */}

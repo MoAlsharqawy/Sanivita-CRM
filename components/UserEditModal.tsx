@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { api } from '../services/mockData';
+import { api } from '../services/api';
 import Modal from './Modal';
 import { useLanguage } from '../hooks/useLanguage';
 
@@ -62,13 +62,10 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
     setSubmitting(true);
     try {
         if (isEditMode && userToEdit) {
-            const updates: Partial<Pick<User, 'name' | 'username' | 'password'>> = {
+            const updates: Partial<Pick<User, 'name' | 'username'>> = {
                 name,
-                username,
+                username: userToEdit.username, // Username is not editable, so we pass the original
             };
-            if (password) {
-                updates.password = password;
-            }
             await api.updateUser(userToEdit.id, updates);
         } else {
             await api.addUser({ name, username, password });
@@ -95,16 +92,30 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
         </div>
         <div>
           <label htmlFor="username" className="block text-sm font-medium text-slate-800">{t('username')}</label>
-          <input type="text" id="username" value={username} onChange={e => setUsername(e.target.value)} required className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" />
+          <input 
+            type="text" 
+            id="username" 
+            value={username} 
+            onChange={e => setUsername(e.target.value)} 
+            required 
+            disabled={isEditMode}
+            className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-slate-200/50 disabled:text-slate-500" 
+          />
+           {isEditMode && <p className="text-xs text-slate-500 mt-1">{t('username_cannot_be_changed')}</p>}
         </div>
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-800">{t('new_password')}</label>
-          <input type="password" id="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={isEditMode ? t('leave_blank_to_keep') : ''} className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" />
-        </div>
-        <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-800">{t('confirm_password')}</label>
-          <input type="password" id="confirmPassword" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" />
-        </div>
+
+        {!isEditMode && (
+          <>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-800">{t('new_password')}</label>
+              <input type="password" id="password" value={password} onChange={e => setPassword(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" />
+            </div>
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-800">{t('confirm_password')}</label>
+              <input type="password" id="confirmPassword" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" />
+            </div>
+          </>
+        )}
         
         {error && <p className="text-red-500 text-sm text-center bg-red-100 p-2 rounded-lg">{error}</p>}
         

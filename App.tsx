@@ -6,10 +6,20 @@ import RepDashboard from './components/RepDashboard';
 import { UserRole } from './types';
 import { Header } from './components/Header';
 import { useLanguage } from './hooks/useLanguage';
+import Spinner from './components/Spinner';
 
 const App: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { dir } = useLanguage();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#3a3358] flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
 
   if (!user) {
     // Apply a dark background for the login page

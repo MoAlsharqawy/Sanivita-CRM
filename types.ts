@@ -11,7 +11,7 @@ export enum Specialization {
 }
 
 export interface User {
-  id: number;
+  id: string; // Changed from number for UUID
   name: string;
   username: string;
   password?: string; // Should not be passed to frontend in a real app
@@ -27,7 +27,7 @@ export interface Doctor {
   id: number;
   name: string;
   regionId: number;
-  repId: number;
+  repId: string; // Changed from number for UUID
   specialization: Specialization.Pediatrics | Specialization.Pulmonology;
 }
 
@@ -35,7 +35,7 @@ export interface Pharmacy {
   id: number;
   name: string;
   regionId: number;
-  repId: number;
+  repId: string; // Changed from number for UUID
   specialization: Specialization.Pharmacy;
 }
 
@@ -47,7 +47,7 @@ export interface Product {
 export interface DoctorVisit {
   id: number;
   doctorId: number;
-  repId: number;
+  repId: string; // Changed from number for UUID
   productIds: number[];
   regionId: number;
   visitType: 'Coaching' | 'Single';
@@ -58,7 +58,7 @@ export interface DoctorVisit {
 export interface PharmacyVisit {
   id: number;
   pharmacyId: number;
-  repId: number;
+  repId: string; // Changed from number for UUID
   regionId: number;
   visitNotes: string;
   date: string;
@@ -83,7 +83,7 @@ export interface ClientAlert {
   id: string; // e.g., 'doctor-1'
   name: string;
   type: 'doctor' | 'pharmacy';
-  repId: number;
+  repId: string; // Changed from number for UUID
   repName: string;
   regionName: string;
   daysSinceLastVisit: number | null; // null if never visited

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Doctor, Pharmacy, VisitReport, User } from '../types';
-import { api } from '../services/mockData';
+import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
 import { SearchIcon, DoctorIcon, PharmacyIcon, ArrowRightIcon } from './icons';
 

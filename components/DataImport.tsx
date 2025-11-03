@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
-import { api } from '../services/mockData';
+import { api } from '../services/api';
 import { UploadIcon, DownloadIcon, CheckIcon, XIcon, DoctorIcon, PharmacyIcon } from './icons';
 
 // XLSX is global from index.html
