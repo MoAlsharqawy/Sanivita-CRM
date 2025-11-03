@@ -1,3 +1,4 @@
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -168,6 +169,17 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'unique_clients_this_month': 'العملاء الفريدون هذا الشهر',
     'average_visits_per_month_historical': 'متوسط الزيارات الشهري',
 
+    // Supabase Connect Screen
+    'connect_db_title': 'الاتصال بقاعدة البيانات',
+    'connect_db_subtitle': 'أدخل تفاصيل مشروع Supabase الخاص بك للبدء.',
+    'supabase_url': 'رابط مشروع Supabase',
+    'supabase_anon_key': 'مفتاح Supabase العام (Anon)',
+    'connect_db_instructions': 'يمكنك العثور عليها في إعدادات مشروع Supabase > API.',
+    'connect': 'اتصال',
+    'connecting': 'جاري الاتصال...',
+    'connect_error_credentials': 'فشل الاتصال: يرجى التحقق من رابط Supabase أو المفتاح العام.',
+    'connect_error_url': 'فشل الاتصال: يرجى التحقق من تنسيق رابط Supabase.',
+    'connect_error_all_fields': 'يرجى تقديم كل من رابط Supabase والمفتاح العام.',
     
     // Visit Form
     'doctor_visit': 'زيارة طبيب',
@@ -426,6 +438,18 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total_visits_this_month': 'Total Visits This Month',
     'unique_clients_this_month': 'Unique Clients This Month',
     'average_visits_per_month_historical': 'Historical Avg. Visits/Month',
+    
+    // Supabase Connect Screen
+    'connect_db_title': 'Connect to Your Database',
+    'connect_db_subtitle': 'Enter your Supabase project details to get started.',
+    'supabase_url': 'Supabase Project URL',
+    'supabase_anon_key': 'Supabase Anon Key',
+    'connect_db_instructions': 'Find these in your Supabase project under Settings > API.',
+    'connect': 'Connect',
+    'connecting': 'Connecting...',
+    'connect_error_credentials': 'Connection failed: Please check your Supabase URL or Anon Key.',
+    'connect_error_url': 'Connection failed: Please check the Supabase URL format.',
+    'connect_error_all_fields': 'Please provide both Supabase URL and Anon Key.',
 
     // Visit Form
     'doctor_visit': 'Doctor Visit',

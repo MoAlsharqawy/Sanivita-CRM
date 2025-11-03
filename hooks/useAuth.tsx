@@ -1,7 +1,8 @@
+
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { supabase } from '../services/supabaseClient';
+import { getSupabaseClient, clearSupabaseCredentials } from '../services/supabaseClient';
 
 interface AuthContextType {
   user: User | null;
@@ -18,16 +19,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const profile = await api.getUserProfile(session.user.id);
-        setUser(profile);
+      try {
+        const supabase = getSupabaseClient();
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) throw error; // Throw to be caught by catch block
+
+        if (session?.user) {
+          const profile = await api.getUserProfile(session.user.id);
+          setUser(profile);
+        }
+      } catch (e) {
+        console.error("Error checking user session, likely invalid credentials.", e);
+        clearSupabaseCredentials(); // Clear bad credentials
+        window.location.reload(); // Reload to show connect screen
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     
     checkUser();
 
+    const supabase = getSupabaseClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const profile = await api.getUserProfile(session.user.id);
@@ -41,6 +54,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       subscription?.unsubscribe();
     };
   }, []);
+
 
   const login = async (username: string, password: string) => {
     // The onAuthStateChange listener will handle setting the user state
