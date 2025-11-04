@@ -55,7 +55,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Login
     'welcome_back': 'مرحباً بعودتك',
     'signin_to_account': 'سجل الدخول إلى حسابك',
-    'incorrect_credentials': 'فشل تسجيل الدخول. حتى مع البيانات الصحيحة، يحدث هذا الخطأ غالباً لسبب واحد: المستخدم موجود في `Authentication` (كما في لقطة الشاشة) ولكن لا يوجد له سجل مطابق في جدول `profiles` بقاعدة البيانات. **إلى المسؤول:** يرجى الذهاب إلى `Table Editor` -> `profiles` والتأكد من وجود صف للمستخدم بنفس الـ `UID`.',
+    'incorrect_credentials': 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى أو استخدام رابط "هل نسيت كلمة المرور؟".',
     'login_error': 'حدث خطأ أثناء تسجيل الدخول.',
     'profile_not_found': 'تم تسجيل الدخول بنجاح ولكن لم يتم العثور على ملف تعريف المستخدم. يرجى الاتصال بالمسؤول.',
     'email_not_confirmed': 'يرجى تأكيد عنوان بريدك الإلكتروني قبل تسجيل الدخول. تحقق من إعدادات المستخدم في Supabase.',
@@ -64,6 +64,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'remember_me': 'تذكرني',
     'sign_in': 'تسجيل الدخول',
     'signing_in': 'جاري تسجيل الدخول...',
+    'forgot_password': 'هل نسيت كلمة المرور؟',
+    'send_reset_link': 'إرسال رابط إعادة التعيين',
+    'reset_link_sent': 'إذا كان اسم المستخدم موجودًا، فسيتم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني المرتبط به.',
+    'back_to_login': 'العودة لتسجيل الدخول',
+    'error_enter_username': 'يرجى إدخال اسم المستخدم (البريد الإلكتروني).',
+    'reset_password_request_title': 'إعادة تعيين كلمة المرور',
+    'reset_password_request_subtitle': 'أدخل اسم المستخدم (البريد الإلكتروني) وسنرسل لك رابطًا لإعادة تعيين كلمة مرورك.',
+
 
     // Rep Dashboard
     'rep_dashboard_title': 'لوحة تحكم المندوب',
@@ -334,7 +342,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Login
     'welcome_back': 'Welcome Back',
     'signin_to_account': 'Sign in to your account',
-    'incorrect_credentials': 'Login failed. Even with correct credentials, this error usually happens for one reason: The user exists in `Authentication` (like in your screenshot) but is missing a matching record in the database `profiles` table. **To the Administrator:** Please go to `Table Editor` -> `profiles` and ensure a row exists for this user with a matching `UID`.',
+    'incorrect_credentials': 'Incorrect username or password. Please try again or use the "Forgot password?" link.',
     'login_error': 'An error occurred during login.',
     'profile_not_found': 'Login successful, but user profile was not found. Please contact an administrator.',
     'email_not_confirmed': 'Please confirm your email address before signing in. Check the user settings in Supabase.',
@@ -343,6 +351,13 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'remember_me': 'Remember me',
     'sign_in': 'Sign In',
     'signing_in': 'Signing In...',
+    'forgot_password': 'Forgot password?',
+    'send_reset_link': 'Send Reset Link',
+    'reset_link_sent': 'If the username exists, a password reset link will be sent to the associated email.',
+    'back_to_login': 'Back to Login',
+    'error_enter_username': 'Please enter your username (email).',
+    'reset_password_request_title': 'Reset Password',
+    'reset_password_request_subtitle': 'Enter your username (email) and we\'ll send you a link to reset your password.',
 
     // Rep Dashboard
     'rep_dashboard_title': 'Representative Dashboard',

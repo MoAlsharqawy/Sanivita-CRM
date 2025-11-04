@@ -1,3 +1,4 @@
+
 import { getSupabaseClient, initializeSupabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole } from '../types';
 
@@ -181,6 +182,20 @@ export const api = {
       //   return false;
       // }
       return false; // Returning false as it's a mock of a failed attempt
+  },
+  
+  sendPasswordResetEmail: async (username: string): Promise<void> => {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(username, {
+      redirectTo: window.location.origin,
+    });
+
+    if (error) {
+      // Don't expose details for security reasons (e.g., user not found)
+      console.error('Password reset request error:', error.message);
+    }
+    // We don't throw here, the UI will always show a generic success message
+    // to prevent leaking information about which emails are registered.
   },
 
 

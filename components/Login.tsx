@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { EyeIcon, EyeOffIcon } from './icons';
 import { Logo } from './Logo';
+import { api } from '../services/api';
 
 
 const Login: React.FC = () => {
@@ -15,6 +16,10 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { t } = useLanguage();
+
+  const [authView, setAuthView] = useState<'login' | 'reset'>('login');
+  const [resetMessage, setResetMessage] = useState('');
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +36,93 @@ const Login: React.FC = () => {
       setLoading(false);
     }
   };
+  
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setResetMessage('');
+    if (!username.trim()) {
+      setError(t('error_enter_username'));
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.sendPasswordResetEmail(username);
+      setResetMessage(t('reset_link_sent'));
+    } catch (err) {
+      setError(t('error_unexpected'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchToReset = () => {
+      setError('');
+      setResetMessage('');
+      setPassword('');
+      setAuthView('reset');
+  };
+
+  const switchToLogin = () => {
+      setError('');
+      setResetMessage('');
+      setAuthView('login');
+  };
+
+  if (authView === 'reset') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-slate-800/50 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up">
+          <Logo className="h-20 mx-auto text-cyan-400"/>
+
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold text-white">{t('reset_password_request_title')}</h1>
+            <p className="text-white/70">{t('reset_password_request_subtitle')}</p>
+          </div>
+          
+          {error && <p className="text-red-400 bg-red-900/50 text-sm text-center p-3 rounded-lg">{error}</p>}
+          {resetMessage && <p className="text-green-400 bg-green-900/50 text-sm text-center p-3 rounded-lg">{resetMessage}</p>}
+
+          {!resetMessage && (
+            <form className="space-y-6" onSubmit={handlePasswordReset}>
+              <div>
+                <input
+                  type="text"
+                  id="username-reset"
+                  name="username-reset"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-700/50 rounded-lg border border-slate-500/50 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition"
+                  placeholder={t('email_address')}
+                  autoComplete="username"
+                  required
+                />
+              </div>
+              <div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 px-4 font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg hover:opacity-90 active:opacity-80 transition-opacity disabled:opacity-50"
+                >
+                  {loading ? t('loading') : t('send_reset_link')}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="text-center">
+             <button 
+                type="button" 
+                onClick={switchToLogin} 
+                className="font-medium text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                {t('back_to_login')}
+              </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -93,8 +185,8 @@ const Login: React.FC = () => {
             </button>
           </div>
 
-          {/* Remember Me */}
-          <div className="flex items-center text-sm">
+          {/* Remember Me & Forgot Password */}
+          <div className="flex items-center justify-between text-sm">
             <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
               <input
                 type="checkbox"
@@ -104,6 +196,13 @@ const Login: React.FC = () => {
               />
               {t('remember_me')}
             </label>
+            <button 
+              type="button" 
+              onClick={switchToReset}
+              className="font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              {t('forgot_password')}
+            </button>
           </div>
 
           {/* Sign In Button */}
