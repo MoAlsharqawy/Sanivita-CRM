@@ -42,6 +42,9 @@ export const api = {
 
     if (error || !authUser) {
       console.error('Login error:', error?.message);
+      if (error && (error.message.includes('Email not confirmed') || error.message.includes('email not confirmed'))) {
+          throw new Error('email_not_confirmed');
+      }
       throw new Error('incorrect_credentials');
     }
     
