@@ -1,5 +1,4 @@
 
-
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -56,7 +55,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Login
     'welcome_back': 'مرحباً بعودتك',
     'signin_to_account': 'سجل الدخول إلى حسابك',
-    'incorrect_credentials': 'اسم المستخدم أو كلمة المرور غير صحيحة.',
+    'incorrect_credentials': 'فشل تسجيل الدخول. حتى مع البيانات الصحيحة، يحدث هذا الخطأ غالباً لسبب واحد: المستخدم موجود في `Authentication` (كما في لقطة الشاشة) ولكن لا يوجد له سجل مطابق في جدول `profiles` بقاعدة البيانات. **إلى المسؤول:** يرجى الذهاب إلى `Table Editor` -> `profiles` والتأكد من وجود صف للمستخدم بنفس الـ `UID`.',
     'login_error': 'حدث خطأ أثناء تسجيل الدخول.',
     'profile_not_found': 'تم تسجيل الدخول بنجاح ولكن لم يتم العثور على ملف تعريف المستخدم. يرجى الاتصال بالمسؤول.',
     'email_not_confirmed': 'يرجى تأكيد عنوان بريدك الإلكتروني قبل تسجيل الدخول. تحقق من إعدادات المستخدم في Supabase.',
@@ -228,7 +227,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_fill_both_fields': 'يرجى ملء كلا الحقلين.',
     'error_passwords_no_match': 'كلمتا المرور غير متطابقتين.',
     'error_password_too_short': 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.',
-    'error_password_update_failed': 'فشل تحديث كلمة المرور. المستخدم غير موجود.',
+    'error_password_update_failed': 'فشل تحديث كلمة المرور. قد تكون صلاحية الجلسة أو الرابط قد انتهت.',
     'error_unexpected': 'حدث خطأ غير متوقع.',
     'save_changes': 'حفظ التغييرات',
     'edit_rep_info': 'تعديل بيانات المندوب',
@@ -238,7 +237,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_all_fields_required': 'يرجى ملء جميع الحقول المطلوبة.',
     'error_password_required': 'كلمة المرور مطلوبة للمستخدم الجديد.',
     'username_cannot_be_changed': 'لا يمكن تغيير اسم المستخدم بعد الإنشاء.',
-    
+    'reset_password_title': 'إعادة تعيين كلمة المرور',
+    'reset_password_subtitle': 'أدخل كلمة المرور الجديدة لحسابك.',
+    'password_reset_success': 'تم تغيير كلمة المرور بنجاح! سيتم الآن إعادة توجيهك لتسجيل الدخول.',
+
     // Weekly View
     'previous_week': 'الأسبوع السابق',
     'next_week': 'الأسبوع التالي',
@@ -332,7 +334,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Login
     'welcome_back': 'Welcome Back',
     'signin_to_account': 'Sign in to your account',
-    'incorrect_credentials': 'Incorrect username or password.',
+    'incorrect_credentials': 'Login failed. Even with correct credentials, this error usually happens for one reason: The user exists in `Authentication` (like in your screenshot) but is missing a matching record in the database `profiles` table. **To the Administrator:** Please go to `Table Editor` -> `profiles` and ensure a row exists for this user with a matching `UID`.',
     'login_error': 'An error occurred during login.',
     'profile_not_found': 'Login successful, but user profile was not found. Please contact an administrator.',
     'email_not_confirmed': 'Please confirm your email address before signing in. Check the user settings in Supabase.',
@@ -504,7 +506,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_fill_both_fields': 'Please fill both fields.',
     'error_passwords_no_match': 'Passwords do not match.',
     'error_password_too_short': 'Password must be at least 6 characters.',
-    'error_password_update_failed': 'Failed to update password. User not found.',
+    'error_password_update_failed': 'Failed to update password. Your session or link may have expired.',
     'error_unexpected': 'An unexpected error occurred.',
     'save_changes': 'Save Changes',
     'edit_rep_info': 'Edit Representative Info',
@@ -514,6 +516,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_all_fields_required': 'Please fill all required fields.',
     'error_password_required': 'Password is required for a new user.',
     'username_cannot_be_changed': 'Username cannot be changed after creation.',
+    'reset_password_title': 'Reset Your Password',
+    'reset_password_subtitle': 'Enter the new password for your account.',
+    'password_reset_success': 'Password changed successfully! Redirecting you to login...',
 
     // Weekly View
     'previous_week': 'Previous Week',

@@ -86,11 +86,11 @@ export const api = {
     return data ? { ...data, password: '' } as User : null;
   },
 
-  changeUserPassword: async (newPassword: string): Promise<boolean> => {
+  updateUserPassword: async (newPassword: string): Promise<boolean> => {
     const supabase = getSupabaseClient();
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
-        handleSupabaseError(error, 'changeUserPassword');
+        handleSupabaseError(error, 'updateUserPassword');
         return false;
     }
     return true;

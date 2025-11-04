@@ -37,7 +37,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
     setError('');
     setSubmitting(true);
     try {
-      const success = await api.changeUserPassword(newPassword);
+      const success = await api.updateUserPassword(newPassword);
       if (success) {
         onSuccess();
       } else {

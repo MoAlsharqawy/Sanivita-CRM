@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth, AuthProvider } from './hooks/useAuth';
 import Login from './components/Login';
 import ManagerDashboard from './components/ManagerDashboard';
@@ -8,7 +8,8 @@ import { Header } from './components/Header';
 import { useLanguage } from './hooks/useLanguage';
 import Spinner from './components/Spinner';
 import SupabaseConnect from './components/SupabaseConnect';
-import { hasSupabaseCredentials } from './services/supabaseClient';
+import { hasSupabaseCredentials, getSupabaseClient } from './services/supabaseClient';
+import ResetPassword from './components/ResetPassword';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -44,6 +45,36 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   const [isDbConnected, setIsDbConnected] = useState(hasSupabaseCredentials());
   const { dir } = useLanguage();
+  const [authMode, setAuthMode] = useState<'default' | 'reset_password'>('default');
+
+  useEffect(() => {
+    // Only set up the listener if the database is already connected,
+    // otherwise the Supabase client might not be initialized properly.
+    if (isDbConnected) {
+        const supabase = getSupabaseClient();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                setAuthMode('reset_password');
+            }
+        });
+
+        return () => {
+            subscription?.unsubscribe();
+        };
+    }
+  }, [isDbConnected]);
+
+  if (authMode === 'reset_password') {
+      return (
+          <div className="min-h-screen bg-[#3a3358] text-slate-100" dir={dir}>
+              <ResetPassword onSuccess={() => {
+                  window.location.hash = '';
+                  // A full reload ensures all states are reset and the user is presented with the login screen.
+                  window.location.reload(); 
+              }} />
+          </div>
+      );
+  }
 
   if (!isDbConnected) {
     return (
