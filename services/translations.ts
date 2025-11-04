@@ -236,7 +236,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_passwords_no_match': 'كلمتا المرور غير متطابقتين.',
     'error_password_too_short': 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.',
     'error_password_update_failed': 'فشل تحديث كلمة المرور. قد تكون صلاحية الجلسة أو الرابط قد انتهت.',
-    'error_unexpected': 'حدث خطأ غير متوقع.',
+    'error_unexpected': 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
     'save_changes': 'حفظ التغييرات',
     'edit_rep_info': 'تعديل بيانات المندوب',
     'add_new_rep': 'إضافة مندوب جديد',
@@ -248,6 +248,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'reset_password_title': 'إعادة تعيين كلمة المرور',
     'reset_password_subtitle': 'أدخل كلمة المرور الجديدة لحسابك.',
     'password_reset_success': 'تم تغيير كلمة المرور بنجاح! سيتم الآن إعادة توجيهك لتسجيل الدخول.',
+    'user_already_exists': 'اسم المستخدم (البريد الإلكتروني) مسجل بالفعل.',
+    'error_permission_denied': 'خطأ في الصلاحيات. تأكد من أن لديك الإذن لإضافة مستخدمين جدد ومن أن إعدادات قاعدة البيانات تسمح بذلك.',
+    'error_reauthentication_needed': 'لأسباب أمنية، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى قبل تغيير كلمة المرور.',
 
     // Weekly View
     'previous_week': 'الأسبوع السابق',
@@ -522,7 +525,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_passwords_no_match': 'Passwords do not match.',
     'error_password_too_short': 'Password must be at least 6 characters.',
     'error_password_update_failed': 'Failed to update password. Your session or link may have expired.',
-    'error_unexpected': 'An unexpected error occurred.',
+    'error_unexpected': 'An unexpected error occurred. Please try again.',
     'save_changes': 'Save Changes',
     'edit_rep_info': 'Edit Representative Info',
     'add_new_rep': 'Add New Representative',
@@ -534,6 +537,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'reset_password_title': 'Reset Your Password',
     'reset_password_subtitle': 'Enter the new password for your account.',
     'password_reset_success': 'Password changed successfully! Redirecting you to login...',
+    'user_already_exists': 'Username (email) is already registered.',
+    'error_permission_denied': 'Permission error. Ensure you have privileges to add new users and that database settings allow it.',
+    'error_reauthentication_needed': 'For security, please log out and log back in before changing your password.',
+
 
     // Weekly View
     'previous_week': 'Previous Week',

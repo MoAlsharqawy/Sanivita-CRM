@@ -41,10 +41,16 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
       if (success) {
         onSuccess();
       } else {
+        // This case might be rare now since the API throws on error
         setError(t('error_password_update_failed'));
       }
-    } catch (err) {
-      setError(t('error_unexpected'));
+    } catch (err: any) {
+      const errorMessage = err.message || '';
+      if (errorMessage.toLowerCase().includes('requires a recent login')) {
+        setError(t('error_reauthentication_needed'));
+      } else {
+        setError(t('error_unexpected'));
+      }
     } finally {
       setSubmitting(false);
     }

@@ -71,8 +71,15 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
             await api.addUser({ name, username, password });
         }
         onSuccess();
-    } catch (err) {
-      setError(t('error_unexpected'));
+    } catch (err: any) {
+      const errorMessage = err.message || '';
+      if (errorMessage.toLowerCase().includes('user already registered')) {
+          setError(t('user_already_exists'));
+      } else if (errorMessage.toLowerCase().includes('violates row-level security policy')) {
+          setError(t('error_permission_denied'));
+      } else {
+          setError(t('error_unexpected'));
+      }
       console.error(err);
     } finally {
       setSubmitting(false);
