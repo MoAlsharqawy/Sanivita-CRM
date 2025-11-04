@@ -8,11 +8,11 @@
     "start": "next start",
     "lint": "next lint"
   },
+{
   "dependencies": {
-    "next": "14.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.294.0"
+    "@google/generative-ai": "^0.2.1"
+  }
+}
   },
   "devDependencies": {
     "eslint": "^8.56.0",
