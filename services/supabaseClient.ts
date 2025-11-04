@@ -36,7 +36,7 @@ export const getSupabaseClient = (): SupabaseClient => {
             return supabaseInstance;
         } catch (e) {
             console.error("Error creating Supabase client from environment variables", e);
-            throw new Error("Invalid Supabase credentials in environment variables.");
+            // Don't throw, fall through to try localStorage
         }
     }
 
@@ -51,12 +51,18 @@ export const getSupabaseClient = (): SupabaseClient => {
         } catch(e) {
             console.error("Error creating Supabase client from localStorage", e);
             clearSupabaseCredentials();
-            // This will force the app to show the connect screen on next load/reload.
-            throw new Error("Invalid Supabase credentials in storage.");
+            // Don't throw, as it crashes the app. Fall through to create a dummy client.
         }
     }
 
-    throw new Error("Supabase client not initialized. Set environment variables or use the connection screen.");
+    // If we're here, no valid credentials were found or they were malformed.
+    // The original code threw an error, crashing the app.
+    // Instead, we will create and return a temporary dummy client.
+    // Any API call using this client will fail. This failure is caught by the
+    // logic in useAuth.tsx, which clears credentials and reloads, forcing
+    // the user to the connection screen. This prevents the app from crashing.
+    console.warn("No valid Supabase credentials found. Creating a temporary dummy client.");
+    return createClient('http://127.0.0.1:54321', 'dummy-anon-key');
 };
 
 export const hasSupabaseCredentials = (): boolean => {
