@@ -1,6 +1,8 @@
-
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+const APP_PREFIX = 'sanivita-crm-';
+const URL_KEY = `${APP_PREFIX}supabaseUrl`;
+const ANON_KEY_KEY = `${APP_PREFIX}supabaseAnonKey`;
 
 let supabaseInstance: SupabaseClient | null = null;
 
@@ -10,8 +12,8 @@ export const initializeSupabase = (url: string, key: string): SupabaseClient => 
         supabaseInstance = null;
         const client = createClient(url, key);
         supabaseInstance = client;
-        localStorage.setItem('supabaseUrl', url);
-        localStorage.setItem('supabaseAnonKey', key);
+        localStorage.setItem(URL_KEY, url);
+        localStorage.setItem(ANON_KEY_KEY, key);
         return client;
     } catch (e) {
         console.error("Error initializing Supabase", e);
@@ -41,8 +43,8 @@ export const getSupabaseClient = (): SupabaseClient => {
     }
 
     // Fallback to localStorage for local development
-    const url = localStorage.getItem('supabaseUrl');
-    const key = localStorage.getItem('supabaseAnonKey');
+    const url = localStorage.getItem(URL_KEY);
+    const key = localStorage.getItem(ANON_KEY_KEY);
 
     if (url && key) {
         try {
@@ -69,11 +71,11 @@ export const hasSupabaseCredentials = (): boolean => {
     // Check for environment variables first
     return (!!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY) ||
            // Then check localStorage
-           (!!localStorage.getItem('supabaseUrl') && !!localStorage.getItem('supabaseAnonKey'));
+           (!!localStorage.getItem(URL_KEY) && !!localStorage.getItem(ANON_KEY_KEY));
 };
 
 export const clearSupabaseCredentials = () => {
-    localStorage.removeItem('supabaseUrl');
-    localStorage.removeItem('supabaseAnonKey');
+    localStorage.removeItem(URL_KEY);
+    localStorage.removeItem(ANON_KEY_KEY);
     supabaseInstance = null;
 };

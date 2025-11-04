@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import { Logo } from './Logo';
@@ -103,6 +102,13 @@ const SupabaseConnect: React.FC<SupabaseConnectProps> = ({ onSuccess }) => {
                         </button>
                     </div>
                 </form>
+
+                <div className="text-center text-xs text-white/50 pt-4 border-t border-white/25 mt-6">
+                    <p>هذا التطبيق مستضاف على:</p>
+                    <a href="https://sanivita-crm.vercel.app" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+                        sanivita-crm.vercel.app
+                    </a>
+                </div>
             </div>
         </div>
     );
