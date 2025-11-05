@@ -1,5 +1,3 @@
-
-
 import { getSupabaseClient, initializeSupabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole } from '../types';
 
@@ -411,7 +409,12 @@ export const api = {
     });
 
     if (newDoctors.length > 0) {
-        const { error } = await supabase.from('doctors').insert(newDoctors.map(d => ({...d, region_id: d.regionId, rep_id: d.repId})));
+        const { error } = await supabase.from('doctors').insert(newDoctors.map(d => ({
+            name: d.name,
+            region_id: d.regionId,
+            rep_id: d.repId,
+            specialization: d.specialization
+        })));
         if (error) {
             result.failed += newDoctors.length;
             result.errors.push(`Database error: ${error.message}`);
@@ -449,7 +452,12 @@ export const api = {
       });
 
       if (newPharmacies.length > 0) {
-          const { error } = await supabase.from('pharmacies').insert(newPharmacies.map(p => ({...p, region_id: p.regionId, rep_id: p.repId})));
+          const { error } = await supabase.from('pharmacies').insert(newPharmacies.map(p => ({
+              name: p.name,
+              region_id: p.regionId,
+              rep_id: p.repId,
+              specialization: p.specialization
+          })));
           if (error) {
               result.failed += newPharmacies.length;
               result.errors.push(`Database error: ${error.message}`);
