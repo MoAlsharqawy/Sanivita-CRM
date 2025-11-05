@@ -89,6 +89,8 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
           setError(t('user_already_exists'));
       } else if (errorMessage.toLowerCase().includes('violates row-level security policy')) {
           setError(t('error_permission_denied'));
+      } else if (errorMessage.toLowerCase().includes('error sending confirmation mail')) {
+          setError(t('error_smtp_not_configured'));
       } else {
           setError(t('error_unexpected'));
       }
