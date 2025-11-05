@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { api } from '../services/api';
@@ -101,9 +102,9 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
           <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" />
         </div>
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-slate-800">{t('username')} <span className="text-xs text-slate-500">{t('must_be_email')}</span></label>
+          <label htmlFor="username" className="block text-sm font-medium text-slate-800">{t('username')}</label>
           <input 
-            type="email" 
+            type="text" 
             id="username" 
             value={username} 
             onChange={e => setUsername(e.target.value)} 

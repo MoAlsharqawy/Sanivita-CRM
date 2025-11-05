@@ -68,9 +68,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'send_reset_link': 'إرسال رابط إعادة التعيين',
     'reset_link_sent': 'إذا كان اسم المستخدم موجودًا، فسيتم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني المرتبط به.',
     'back_to_login': 'العودة لتسجيل الدخول',
-    'error_enter_username': 'يرجى إدخال اسم المستخدم (البريد الإلكتروني).',
+    'error_enter_username': 'يرجى إدخال اسم المستخدم.',
     'reset_password_request_title': 'إعادة تعيين كلمة المرور',
-    'reset_password_request_subtitle': 'أدخل اسم المستخدم (البريد الإلكتروني) وسنرسل لك رابطًا لإعادة تعيين كلمة مرورك.',
+    'reset_password_request_subtitle': 'أدخل اسم المستخدم. إذا كان بريدًا إلكترونيًا صالحًا، فسيتم إرسال رابط لإعادة تعيين كلمة مرورك.',
+    'reset_requires_email_warning': 'إعادة تعيين كلمة المرور تتطلب أن يكون اسم المستخدم بريدًا إلكترونيًا صالحًا. قد لا تنجح هذه العملية.',
 
 
     // Rep Dashboard
@@ -245,11 +246,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_all_fields_required': 'يرجى ملء جميع الحقول المطلوبة.',
     'error_password_required': 'كلمة المرور مطلوبة للمستخدم الجديد.',
     'username_cannot_be_changed': 'لا يمكن تغيير اسم المستخدم بعد الإنشاء.',
-    'must_be_email': '(يجب أن يكون بريد إلكتروني صالح)',
+    'must_be_email': '',
     'reset_password_title': 'إعادة تعيين كلمة المرور',
     'reset_password_subtitle': 'أدخل كلمة المرور الجديدة لحسابك.',
     'password_reset_success': 'تم تغيير كلمة المرور بنجاح! سيتم الآن إعادة توجيهك لتسجيل الدخول.',
-    'user_already_exists': 'اسم المستخدم (البريد الإلكتروني) مسجل بالفعل.',
+    'user_already_exists': 'اسم المستخدم مسجل بالفعل.',
     'error_permission_denied': 'خطأ في الصلاحيات. تأكد من أن لديك الإذن لإضافة مستخدمين جدد ومن أن إعدادات قاعدة البيانات تسمح بذلك.',
     'error_reauthentication_needed': 'لأسباب أمنية، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى قبل تغيير كلمة المرور.',
 
@@ -359,9 +360,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'send_reset_link': 'Send Reset Link',
     'reset_link_sent': 'If the username exists, a password reset link will be sent to the associated email.',
     'back_to_login': 'Back to Login',
-    'error_enter_username': 'Please enter your username (email).',
+    'error_enter_username': 'Please enter your username.',
     'reset_password_request_title': 'Reset Password',
-    'reset_password_request_subtitle': 'Enter your username (email) and we\'ll send you a link to reset your password.',
+    'reset_password_request_subtitle': 'Enter your username. If it is a valid email address, a reset link will be sent.',
+    'reset_requires_email_warning': 'Password reset requires the username to be a valid email. This may not work for non-email usernames.',
 
     // Rep Dashboard
     'rep_dashboard_title': 'Representative Dashboard',
@@ -535,11 +537,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_all_fields_required': 'Please fill all required fields.',
     'error_password_required': 'Password is required for a new user.',
     'username_cannot_be_changed': 'Username cannot be changed after creation.',
-    'must_be_email': '(must be a valid email)',
+    'must_be_email': '',
     'reset_password_title': 'Reset Your Password',
     'reset_password_subtitle': 'Enter the new password for your account.',
     'password_reset_success': 'Password changed successfully! Redirecting you to login...',
-    'user_already_exists': 'Username (email) is already registered.',
+    'user_already_exists': 'Username is already registered.',
     'error_permission_denied': 'Permission error. Ensure you have privileges to add new users and that database settings allow it.',
     'error_reauthentication_needed': 'For security, please log out and log back in before changing your password.',
 

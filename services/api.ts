@@ -9,6 +9,8 @@ const handleSupabaseError = (error: any, context: string) => {
   throw new Error(error.message || `An unknown error occurred in ${context}`);
 };
 
+const DUMMY_DOMAIN = '@sanivita.app';
+
 export const api = {
   // --- CONNECTION TEST ---
   testSupabaseConnection: async (): Promise<boolean> => {
@@ -35,9 +37,11 @@ export const api = {
 
   login: async (username: string, password: string): Promise<User> => {
     const supabase = getSupabaseClient();
+    const email = username.includes('@') ? username : `${username}${DUMMY_DOMAIN}`;
+    
     // Supabase auth uses email, but we can use the username field as if it were an email
     const { data: { user: authUser }, error } = await supabase.auth.signInWithPassword({
-      email: username,
+      email: email,
       password: password,
     });
 
@@ -108,11 +112,12 @@ export const api = {
 
   addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
     const supabase = getSupabaseClient();
-    
+    const email = userData.username.includes('@') ? userData.username : `${userData.username}${DUMMY_DOMAIN}`;
+
     // Step 1: Create the user in Supabase Auth.
     // The database trigger 'on_auth_user_created' will automatically create a corresponding profile.
     const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: userData.username,
+        email: email,
         password: userData.password,
         options: {
             data: {
@@ -126,11 +131,11 @@ export const api = {
         throw authError; // Rethrow to be caught by the UI
     }
 
-    // Step 2: Update the newly created profile with the correct role.
-    // The trigger creates the profile with a default role, and here we set the specific role chosen in the UI.
+    // Step 2: Update the newly created profile with the correct role and original (short) username.
+    // This is crucial to ensure the username is stored correctly, regardless of how the trigger is configured.
     const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .update({ role: userData.role })
+        .update({ role: userData.role, username: userData.username })
         .eq('id', authData.user.id)
         .select()
         .single();
@@ -138,7 +143,7 @@ export const api = {
     if (profileError) {
         // Log the error but don't throw, as the user is already created.
         // The manager can manually fix the role if needed. This is more robust.
-        console.error(`User ${authData.user.id} created, but failed to set role to ${userData.role}:`, profileError);
+        console.error(`User ${authData.user.id} created, but failed to set role/username:`, profileError);
         
         // Fetch the created profile to return it even if the update failed
         const finalProfile = await api.getUserProfile(authData.user.id);
@@ -189,7 +194,9 @@ export const api = {
   
   sendPasswordResetEmail: async (username: string): Promise<void> => {
     const supabase = getSupabaseClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(username, {
+    const email = username.includes('@') ? username : `${username}${DUMMY_DOMAIN}`;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin,
     });
 
