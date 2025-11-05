@@ -53,12 +53,16 @@ export const api = {
     }
     
     // After successful auth, fetch the user profile from our public.profiles table
-    const profile = await api.getUserProfile(authUser.id);
-    if (!profile) {
-      // getUserProfile already logged the user out. Now we tell the UI why the login failed.
-      throw new Error('profile_not_found');
+    // A failure here is critical, so we catch it, logout the partially-authed user, and re-throw.
+    try {
+        const profile = await api.getUserProfile(authUser.id);
+        return profile;
+    } catch (e: any) {
+        console.error("Critical error: Failed to get profile immediately after login. Logging out.", e);
+        await api.logout();
+        // Throw a specific, translatable error key to the UI.
+        throw new Error('profile_not_found');
     }
-    return profile;
   },
 
   logout: async (): Promise<void> => {
@@ -67,7 +71,7 @@ export const api = {
     if (error) handleSupabaseError(error, 'logout');
   },
 
-  getUserProfile: async (userId: string): Promise<User | null> => {
+  getUserProfile: async (userId: string): Promise<User> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('profiles')
@@ -81,18 +85,15 @@ export const api = {
             // Throw a specific error for the UI to catch and display a helpful message.
             throw new Error('rls_error');
         }
-        // For other errors, the user is likely unrecoverable, so log them out.
-        await api.logout();
-        return null;
+        handleSupabaseError(error, 'getUserProfile');
     }
 
     if (!data) { // Explicitly handle profile not found
-        console.error(`Profile not found for user ID ${userId}. The user exists in authentication but not in the profiles table. Logging out.`);
-        await api.logout();
-        return null;
+        console.error(`Profile not found for user ID ${userId}. The user exists in authentication but not in the profiles table.`);
+        throw new Error('profile_not_found');
     }
 
-    return data ? { ...data, password: '' } as User : null;
+    return { ...data, password: '' } as User;
   },
 
   updateUserPassword: async (newPassword: string): Promise<boolean> => {
