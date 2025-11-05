@@ -433,24 +433,28 @@ const ManagerDashboard: React.FC = () => {
                       {t('reports')}
                   </button>
               </li>
-              <li className="me-2">
-                  <button 
-                      onClick={() => setActiveTab('users')}
-                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'users' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
-                  >
-                      <UsersIcon className="w-5 h-5 me-2" />
-                      {t('user_management')}
-                  </button>
-              </li>
-              <li className="me-2">
-                  <button 
-                      onClick={() => setActiveTab('dataImport')}
-                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'dataImport' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
-                  >
-                      <UploadIcon className="w-5 h-5 me-2" />
-                      {t('data_import')}
-                  </button>
-              </li>
+              {user?.role === UserRole.Manager && (
+                <>
+                  <li className="me-2">
+                      <button 
+                          onClick={() => setActiveTab('users')}
+                          className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'users' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                      >
+                          <UsersIcon className="w-5 h-5 me-2" />
+                          {t('user_management')}
+                      </button>
+                  </li>
+                  <li className="me-2">
+                      <button 
+                          onClick={() => setActiveTab('dataImport')}
+                          className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'dataImport' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                      >
+                          <UploadIcon className="w-5 h-5 me-2" />
+                          {t('data_import')}
+                      </button>
+                  </li>
+                </>
+              )}
                <li className="me-2">
                   <button 
                       onClick={() => setActiveTab('approvals')}
