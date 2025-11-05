@@ -107,43 +107,46 @@ export const api = {
   },
 
   addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
-      const supabase = getSupabaseClient();
-      // Step 1: Create the user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: userData.username,
-          password: userData.password,
-          options: {
-              data: {
-                  name: userData.name,
-              }
-          }
-      });
-      if (authError || !authData.user) {
-          handleSupabaseError(authError, 'addUser (signUp)');
-          throw authError; // Rethrow to be caught by the UI
-      }
-      
-      // Step 2: Insert into our public profiles table
-      const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-              id: authData.user.id,
-              name: userData.name,
-              username: userData.username,
-              role: userData.role,
-          })
-          .select()
-          .single();
-      
-      if (profileError) {
-          // If profile insert fails, we should delete the auth user to avoid orphans
-          // This requires admin privileges, best handled by a database trigger/function in a real app
-          console.error("Profile creation failed, cleaning up auth user is recommended.", profileError);
-          handleSupabaseError(profileError, 'addUser (insert profile)');
-          throw profileError;
-      }
+    const supabase = getSupabaseClient();
+    
+    // Step 1: Create the user in Supabase Auth.
+    // The database trigger 'on_auth_user_created' will automatically create a corresponding profile.
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.username,
+        password: userData.password,
+        options: {
+            data: {
+                name: userData.name, // Pass name to be used by the trigger
+            }
+        }
+    });
 
-      return { ...profileData, password: '' };
+    if (authError || !authData.user) {
+        handleSupabaseError(authError, 'addUser (signUp)');
+        throw authError; // Rethrow to be caught by the UI
+    }
+
+    // Step 2: Update the newly created profile with the correct role.
+    // The trigger creates the profile with a default role, and here we set the specific role chosen in the UI.
+    const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: userData.role })
+        .eq('id', authData.user.id)
+        .select()
+        .single();
+    
+    if (profileError) {
+        // Log the error but don't throw, as the user is already created.
+        // The manager can manually fix the role if needed. This is more robust.
+        console.error(`User ${authData.user.id} created, but failed to set role to ${userData.role}:`, profileError);
+        
+        // Fetch the created profile to return it even if the update failed
+        const finalProfile = await api.getUserProfile(authData.user.id);
+        if (!finalProfile) throw new Error("Failed to retrieve profile after creation.");
+        return finalProfile;
+    }
+
+    return { ...profileData, password: '' };
   },
 
   updateUser: async (userId: string, updates: Partial<Pick<User, 'name' | 'role'>>): Promise<User | null> => {

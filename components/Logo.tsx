@@ -12,11 +12,12 @@ export const Logo: React.FC<{ className?: string }> = ({ className }) => {
 
   return (
     // The className from props is applied here, which can set height and color.
-    <div className={`flex items-center justify-center font-bold ${className}`}>
+    <div className={`flex items-baseline justify-center font-bold gap-1 ${className}`}>
       {/* Font size is fixed, which should be okay. Text color is conditional. */}
       <span className={`text-3xl ${textClasses}`}>
         SaniVita
       </span>
+      <span className="text-sm font-bold text-orange-500">v2</span>
     </div>
   );
 };
