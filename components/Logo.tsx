@@ -1,23 +1,33 @@
 import React from 'react';
 
 export const Logo: React.FC<{ className?: string }> = ({ className }) => {
-  // This check allows the logo to be either a gradient or a single color.
-  // If a text color utility (e.g., `text-cyan-400`) is passed in the className,
-  // the logo will be that single color. Otherwise, it defaults to the gradient.
-  const hasColorOverride = className?.includes('text-');
-
-  const textClasses = hasColorOverride
-    ? "" // Inherit color from parent for a monocolor look
-    : "bg-gradient-to-r from-blue-800 to-orange-500 text-transparent bg-clip-text";
-
   return (
-    // The className from props is applied here, which can set height and color.
-    <div className={`flex items-baseline justify-center font-bold gap-1 ${className}`}>
-      {/* Font size is fixed, which should be okay. Text color is conditional. */}
-      <span className={`text-3xl ${textClasses}`}>
+    <div className={`flex items-center justify-center gap-2 ${className}`}>
+      {/* 
+        This is a custom two-toned pill capsule SVG icon.
+        The colors are chosen from the app's primary color palette (blue and orange).
+        The `h-full` class makes the icon's height scale with its parent container,
+        which is controlled by the `className` prop (e.g., h-12, h-20).
+      */}
+      <svg
+        className="h-full"
+        viewBox="0 0 512 512"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        role="img"
+      >
+        <path
+          d="M256 512c141.4 0 256-114.6 256-256S397.4 0 256 0 0 114.6 0 256s114.6 256 256 256zM256 48a208.1 208.1 0 010 416V48z"
+          fill="#2563eb" // Blue-600
+        ></path>
+        <path
+          d="M256 48a208.1 208.1 0 000 416c114.9 0 208-93.1 208-208S370.9 48 256 48z"
+          fill="#f97316" // Orange-500
+        ></path>
+      </svg>
+      <span className="text-3xl font-bold bg-gradient-to-r from-blue-800 to-orange-500 text-transparent bg-clip-text">
         SaniVita
       </span>
-      <span className="text-sm font-bold text-orange-500">v2</span>
     </div>
   );
 };
