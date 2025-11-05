@@ -10,9 +10,10 @@ import Spinner from './components/Spinner';
 import SupabaseConnect from './components/SupabaseConnect';
 import { hasSupabaseCredentials, getSupabaseClient } from './services/supabaseClient';
 import ResetPassword from './components/ResetPassword';
+import DbErrorScreen from './components/DbErrorScreen';
 
 const AppContent: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, authError } = useAuth();
   const { dir } = useLanguage();
 
   if (loading) {
@@ -21,6 +22,10 @@ const AppContent: React.FC = () => {
         <Spinner />
       </div>
     );
+  }
+
+  if (authError) {
+      return <DbErrorScreen error={authError} />;
   }
 
 

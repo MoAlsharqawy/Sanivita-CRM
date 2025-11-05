@@ -1,5 +1,3 @@
-
-
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -305,6 +303,15 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'file_processing_error': 'حدث خطأ أثناء معالجة الملف.',
     'file_reading_error': 'حدث خطأ أثناء قراءة الملف.',
     'import_completed': 'اكتمل الاستيراد!',
+    
+    // DB Error Screen
+    'db_error_title': 'مطلوب إعداد قاعدة البيانات',
+    'db_error_rls_explanation_1': 'لم يتمكن التطبيق من الوصول إلى ملفك الشخصي بعد تسجيل الدخول. يحدث هذا دائمًا بسبب عدم وجود أو خطأ في سياسة أمان الوصول (RLS) على جدول "profiles" في قاعدة بيانات Supabase.',
+    'db_error_rls_explanation_2': 'RLS هي ميزة أمان تتحكم في صفوف البيانات التي يمكن للمستخدم الوصول إليها. لإصلاح ذلك، تحتاج إلى سياسة تسمح للمستخدمين المسجلين بقراءة ملفاتهم الشخصية.',
+    'db_error_rls_solution': 'يرجى تشغيل أمر SQL التالي في محرر SQL الخاص بـ Supabase لإنشاء السياسة الصحيحة:',
+    'copy_sql': 'نسخ الكود',
+    'copied': 'تم النسخ!',
+    'try_again': 'لقد قمت بتشغيل الكود، حاول مرة أخرى',
   },
   en: {
     // General
@@ -609,5 +616,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'file_processing_error': 'An error occurred while processing the file.',
     'file_reading_error': 'An error occurred while reading the file.',
     'import_completed': 'Import Completed!',
+
+    // DB Error Screen
+    'db_error_title': 'Database Configuration Required',
+    'db_error_rls_explanation_1': 'The application could not access your user profile after login. This is almost always caused by a missing or incorrect Row Level Security (RLS) policy on the "profiles" table in your Supabase database.',
+    'db_error_rls_explanation_2': 'RLS is a security feature that controls which data rows a user can access. To fix this, you need a policy that allows logged-in users to read their own profile.',
+    'db_error_rls_solution': 'Please run the following SQL command in your Supabase SQL Editor to create the correct policy:',
+    'copy_sql': 'Copy SQL',
+    'copied': 'Copied!',
+    'try_again': "I've run the SQL, Try Again",
   }
 };

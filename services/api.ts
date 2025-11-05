@@ -77,6 +77,11 @@ export const api = {
     
     if (error) {
         console.error("Database error fetching user profile:", error);
+        if (error.message.includes('violates row-level security policy')) {
+            // Throw a specific error for the UI to catch and display a helpful message.
+            throw new Error('rls_error');
+        }
+        // For other errors, the user is likely unrecoverable, so log them out.
         await api.logout();
         return null;
     }

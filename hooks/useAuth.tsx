@@ -1,5 +1,3 @@
-
-
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
@@ -10,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   login: (username: string, password: string) => Promise<User>;
   logout: () => void;
+  authError: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,29 +16,30 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
+    setAuthError(null);
     const supabase = getSupabaseClient();
 
-    // onAuthStateChange fires immediately with the initial session or null.
-    // This is the recommended way to handle session restoration.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
-        // If a session exists, fetch the user's profile.
         if (session?.user) {
           const profile = await api.getUserProfile(session.user.id);
           setUser(profile);
         } else {
-          // If no session, ensure user is null.
           setUser(null);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Error during onAuthStateChange handling:", e);
-        // If fetching the profile fails, treat the user as logged out.
+        if (e.message === 'rls_error') {
+            // This specific error means the database is misconfigured.
+            // We set an error state for the UI to handle, instead of just logging out.
+            setAuthError(e.message);
+        }
         setUser(null);
       } finally {
-        // Once the initial session check is complete, loading is finished.
         setLoading(false);
       }
     });
@@ -51,24 +51,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
   const login = async (username: string, password: string) => {
-    // The onAuthStateChange listener will handle setting the user state upon successful login.
+    setAuthError(null);
     return await api.login(username, password);
   };
 
   const logout = async () => {
-    // Optimistically log out on the client for instant UI feedback.
     setUser(null);
+    setAuthError(null);
     try {
       await api.logout();
     } catch (error) {
       console.error("Error signing out from server:", error);
-      // Even if server fails, the client is logged out.
     }
   };
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, authError }}>
       {children}
     </AuthContext.Provider>
   );
