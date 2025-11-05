@@ -11,6 +11,7 @@ const DataImport: React.FC = () => {
     const [importType, setImportType] = useState<'doctors' | 'pharmacies'>('doctors');
     const [file, setFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [progress, setProgress] = useState(0);
     const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
     const [dragOver, setDragOver] = useState(false);
 
@@ -37,9 +38,9 @@ const DataImport: React.FC = () => {
         if (selectedFile && (selectedFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || selectedFile.type === 'application/vnd.ms-excel')) {
             setFile(selectedFile);
             setImportResult(null);
+            setProgress(0);
         } else {
             setFile(null);
-            // Optionally show an error for wrong file type
         }
     };
     
@@ -75,6 +76,7 @@ const DataImport: React.FC = () => {
 
         setIsProcessing(true);
         setImportResult(null);
+        setProgress(0);
 
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -83,13 +85,16 @@ const DataImport: React.FC = () => {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
+                const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                const rows = sheetData.slice(1);
 
                 let result;
+                const onProgressUpdate = (p: number) => setProgress(p);
+
                 if (importType === 'doctors') {
-                    result = await api.addDoctorsBatch(json);
+                    result = await api.addDoctorsBatch(rows, onProgressUpdate);
                 } else {
-                    result = await api.addPharmaciesBatch(json);
+                    result = await api.addPharmaciesBatch(rows, onProgressUpdate);
                 }
                 setImportResult(result);
             } catch (error) {
@@ -190,26 +195,40 @@ const DataImport: React.FC = () => {
                 </button>
             </div>
             
-            {/* Result Display */}
-            {importResult && (
-                <div className="p-4 rounded-lg bg-white/50">
-                    <h4 className="font-bold text-slate-800 mb-2">{t('import_summary')}</h4>
-                    <div className="flex items-center gap-2 text-green-700">
-                        <CheckIcon className="w-5 h-5"/>
-                        <p>{t('records_imported_successfully', importResult.success)}</p>
+            {/* Progress and Result Display */}
+            {isProcessing && (
+                <div className="mt-4">
+                    <div className="w-full bg-slate-200/70 rounded-full h-2.5">
+                        <div className="bg-gradient-to-r from-blue-500 to-orange-500 h-2.5 rounded-full" style={{ width: `${progress}%`, transition: 'width 0.3s ease-in-out' }}></div>
                     </div>
-                     <div className="flex items-center gap-2 text-red-700 mt-1">
-                        <XIcon className="w-5 h-5"/>
-                        <p>{t('records_failed_to_import', importResult.failed)}</p>
-                    </div>
-                    {importResult.errors.length > 0 && (
-                        <div className="mt-4">
-                            <h5 className="font-semibold text-sm text-slate-700 mb-1">{t('error_details')}</h5>
-                            <ul className="list-disc list-inside space-y-1 text-sm text-red-800 bg-red-50/50 p-3 rounded-md max-h-40 overflow-y-auto">
-                                {importResult.errors.map((error, index) => <li key={index}>{error}</li>)}
-                            </ul>
+                    <p className="text-sm text-center text-slate-600 mt-2">{t('importing')}... {progress}%</p>
+                </div>
+            )}
+            
+            {importResult && !isProcessing && (
+                <div className="p-4 rounded-lg bg-white/50 animate-fade-in mt-4">
+                    <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <CheckIcon className="w-6 h-6 text-green-600"/>
+                        {t('import_completed')}
+                    </h4>
+                    <div className="ps-8 space-y-1">
+                        <div className="flex items-center gap-2 text-green-700">
+                            <CheckIcon className="w-5 h-5"/>
+                            <p>{t('records_imported_successfully', importResult.success)}</p>
                         </div>
-                    )}
+                         <div className="flex items-center gap-2 text-red-700">
+                            <XIcon className="w-5 h-5"/>
+                            <p>{t('records_failed_to_import', importResult.failed)}</p>
+                        </div>
+                        {importResult.errors.length > 0 && (
+                            <div className="pt-2">
+                                <h5 className="font-semibold text-sm text-slate-700 mb-1">{t('error_details')}</h5>
+                                <ul className="list-disc list-inside space-y-1 text-sm text-red-800 bg-red-50/50 p-3 rounded-md max-h-40 overflow-y-auto">
+                                    {importResult.errors.map((error, index) => <li key={index}>{error}</li>)}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

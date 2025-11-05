@@ -296,6 +296,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_details': 'تفاصيل الأخطاء:',
     'file_processing_error': 'حدث خطأ أثناء معالجة الملف.',
     'file_reading_error': 'حدث خطأ أثناء قراءة الملف.',
+    'import_completed': 'اكتمل الاستيراد!',
   },
   en: {
     // General
@@ -591,5 +592,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_details': 'Error Details:',
     'file_processing_error': 'An error occurred while processing the file.',
     'file_reading_error': 'An error occurred while reading the file.',
+    'import_completed': 'Import Completed!',
   }
 };

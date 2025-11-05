@@ -380,20 +380,27 @@ export const api = {
   },
   
   // --- BATCH IMPORTS ---
-  addDoctorsBatch: async (rows: any[]): Promise<{success: number, failed: number, errors: string[]}> => {
+  addDoctorsBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<{success: number, failed: number, errors: string[]}> => {
     const supabase = getSupabaseClient();
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
     
-    const newDoctors: Omit<Doctor, 'id'>[] = [];
+    const doctorsToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pediatrics | Specialization.Pulmonology }[] = [];
 
     rows.forEach((row, index) => {
-        const { Name, Region, Specialization: Spec, 'Rep Username': repUsername } = row;
+        if (row.length < 4 || row.every(cell => cell === null || cell === '')) return;
+
+        const Name = row[0];
+        const Region = row[1];
+        const Spec = row[2];
+        const repUsername = row[3];
+        const rowIndex = index + 2;
+
         if (!Name || !Region || !Spec || !repUsername) {
             result.failed++;
-            result.errors.push(`Row ${index + 2}: Missing required fields.`);
+            result.errors.push(`Row ${rowIndex}: Missing required fields.`);
             return;
         }
         const regionId = regionMap.get(String(Region).trim().toLowerCase());
@@ -401,69 +408,87 @@ export const api = {
         const specValues = [Specialization.Pediatrics, Specialization.Pulmonology] as const;
         const validSpec = specValues.find(s => s.toLowerCase() === String(Spec).trim().toLowerCase());
 
-        if (!regionId) { result.failed++; result.errors.push(`Row ${index + 2}: Region "${Region}" not found.`); return; }
-        if (!repId) { result.failed++; result.errors.push(`Row ${index + 2}: Rep with username "${repUsername}" not found.`); return; }
-        if (!validSpec) { result.failed++; result.errors.push(`Row ${index + 2}: Invalid specialization "${Spec}".`); return; }
+        if (!regionId) { result.failed++; result.errors.push(`Row ${rowIndex}: Region "${Region}" not found.`); return; }
+        if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); return; }
+        if (!validSpec) { result.failed++; result.errors.push(`Row ${rowIndex}: Invalid specialization "${Spec}".`); return; }
         
-        newDoctors.push({ name: Name, regionId, repId, specialization: validSpec });
+        doctorsToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: validSpec });
     });
 
-    if (newDoctors.length > 0) {
-        const { error } = await supabase.from('doctors').insert(newDoctors.map(d => ({
-            name: d.name,
-            region_id: d.regionId,
-            rep_id: d.repId,
-            specialization: d.specialization
-        })));
-        if (error) {
-            result.failed += newDoctors.length;
-            result.errors.push(`Database error: ${error.message}`);
-        } else {
-            result.success = newDoctors.length;
+    const totalToInsert = doctorsToInsert.length;
+    if (totalToInsert > 0) {
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < totalToInsert; i += CHUNK_SIZE) {
+            const chunk = doctorsToInsert.slice(i, i + CHUNK_SIZE);
+            const { error } = await supabase.from('doctors').insert(chunk);
+            if (error) {
+                result.failed += chunk.length;
+                result.errors.push(`Database error on a batch: ${error.message}`);
+                onProgress(100);
+                return result;
+            } else {
+                result.success += chunk.length;
+            }
+            const currentProgress = Math.round(((i + chunk.length) / totalToInsert) * 100);
+            onProgress(currentProgress);
         }
+    } else {
+        onProgress(100);
     }
     
     return result;
   },
 
-  addPharmaciesBatch: async (rows: any[]): Promise<{success: number, failed: number, errors: string[]}> => {
+  addPharmaciesBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<{success: number, failed: number, errors: string[]}> => {
       const supabase = getSupabaseClient();
       const result = { success: 0, failed: 0, errors: [] as string[] };
       const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
       const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
       const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
-      const newPharmacies: Omit<Pharmacy, 'id'>[] = [];
+      const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pharmacy }[] = [];
 
       rows.forEach((row, index) => {
-          const { Name, Region, 'Rep Username': repUsername } = row;
+          if (row.length < 3 || row.every(cell => cell === null || cell === '')) return;
+
+          const Name = row[0];
+          const Region = row[1];
+          const repUsername = row[2];
+          const rowIndex = index + 2;
+
           if (!Name || !Region || !repUsername) {
               result.failed++;
-              result.errors.push(`Row ${index + 2}: Missing required fields.`);
+              result.errors.push(`Row ${rowIndex}: Missing required fields.`);
               return;
           }
           const regionId = regionMap.get(String(Region).trim().toLowerCase());
           const repId = userMap.get(String(repUsername).trim().toLowerCase());
 
-          if (!regionId) { result.failed++; result.errors.push(`Row ${index + 2}: Region "${Region}" not found.`); return; }
-          if (!repId) { result.failed++; result.errors.push(`Row ${index + 2}: Rep with username "${repUsername}" not found.`); return; }
+          if (!regionId) { result.failed++; result.errors.push(`Row ${rowIndex}: Region "${Region}" not found.`); return; }
+          if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); return; }
 
-          newPharmacies.push({ name: Name, regionId, repId, specialization: Specialization.Pharmacy });
+          pharmaciesToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: Specialization.Pharmacy });
       });
 
-      if (newPharmacies.length > 0) {
-          const { error } = await supabase.from('pharmacies').insert(newPharmacies.map(p => ({
-              name: p.name,
-              region_id: p.regionId,
-              rep_id: p.repId,
-              specialization: p.specialization
-          })));
-          if (error) {
-              result.failed += newPharmacies.length;
-              result.errors.push(`Database error: ${error.message}`);
-          } else {
-              result.success = newPharmacies.length;
+      const totalToInsert = pharmaciesToInsert.length;
+      if (totalToInsert > 0) {
+          const CHUNK_SIZE = 50;
+          for (let i = 0; i < totalToInsert; i += CHUNK_SIZE) {
+              const chunk = pharmaciesToInsert.slice(i, i + CHUNK_SIZE);
+              const { error } = await supabase.from('pharmacies').insert(chunk);
+              if (error) {
+                  result.failed += chunk.length;
+                  result.errors.push(`Database error on a batch: ${error.message}`);
+                  onProgress(100);
+                  return result;
+              } else {
+                  result.success += chunk.length;
+              }
+              const currentProgress = Math.round(((i + chunk.length) / totalToInsert) * 100);
+              onProgress(currentProgress);
           }
+      } else {
+          onProgress(100);
       }
 
       return result;
