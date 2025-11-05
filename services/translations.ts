@@ -1,4 +1,5 @@
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -254,6 +255,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_permission_denied': 'خطأ في الصلاحيات. تأكد من أن لديك الإذن لإضافة مستخدمين جدد ومن أن إعدادات قاعدة البيانات تسمح بذلك.',
     'error_reauthentication_needed': 'لأسباب أمنية، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى قبل تغيير كلمة المرور.',
     'password_changed_successfully': 'تم تغيير كلمة المرور بنجاح.',
+    'user_added_successfully': 'تمت إضافة المندوب {0} بنجاح.',
+    'user_updated_successfully': 'تم تحديث بيانات المندوب {0} بنجاح.',
+
 
     // Weekly View
     'previous_week': 'الأسبوع السابق',
@@ -546,6 +550,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_permission_denied': 'Permission error. Ensure you have privileges to add new users and that database settings allow it.',
     'error_reauthentication_needed': 'For security, please log out and log back in before changing your password.',
     'password_changed_successfully': 'Password changed successfully.',
+    'user_added_successfully': 'User {0} added successfully.',
+    'user_updated_successfully': 'User {0} updated successfully.',
 
 
     // Weekly View
