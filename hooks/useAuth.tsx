@@ -3,7 +3,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { getSupabaseClient, clearSupabaseCredentials } from '../services/supabaseClient';
+import { getSupabaseClient } from '../services/supabaseClient';
 
 interface AuthContextType {
   user: User | null;
@@ -19,35 +19,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkUser = async () => {
+    setLoading(true);
+    const supabase = getSupabaseClient();
+
+    // onAuthStateChange fires immediately with the initial session or null.
+    // This is the recommended way to handle session restoration.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
-        const supabase = getSupabaseClient();
-        const { data: { session }, error } = await supabase.auth.getSession();
-
-        if (error) throw error; // Throw to be caught by catch block
-
+        // If a session exists, fetch the user's profile.
         if (session?.user) {
           const profile = await api.getUserProfile(session.user.id);
           setUser(profile);
+        } else {
+          // If no session, ensure user is null.
+          setUser(null);
         }
       } catch (e) {
-        console.error("Error checking user session, likely invalid credentials.", e);
-        clearSupabaseCredentials(); // Clear bad credentials
-        window.location.reload(); // Reload to show connect screen
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkUser();
-
-    const supabase = getSupabaseClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const profile = await api.getUserProfile(session.user.id);
-        setUser(profile);
-      } else {
+        console.error("Error during onAuthStateChange handling:", e);
+        // If fetching the profile fails, treat the user as logged out.
         setUser(null);
+      } finally {
+        // Once the initial session check is complete, loading is finished.
+        setLoading(false);
       }
     });
 
@@ -58,7 +51,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
   const login = async (username: string, password: string) => {
-    // The onAuthStateChange listener will handle setting the user state
+    // The onAuthStateChange listener will handle setting the user state upon successful login.
     return await api.login(username, password);
   };
 
@@ -70,14 +63,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error("Error signing out from server:", error);
       // Even if server fails, the client is logged out.
-      // This is safer than the old implementation.
     }
   };
 
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
