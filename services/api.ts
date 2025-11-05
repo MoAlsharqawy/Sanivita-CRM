@@ -226,6 +226,36 @@ export const api = {
     return data || [];
   },
 
+  addRegion: async (regionName: string): Promise<Region> => {
+    const supabase = getSupabaseClient();
+    if (!regionName) {
+        throw new Error("Region name cannot be empty.");
+    }
+    const { data, error } = await supabase
+      .from('regions')
+      .insert({ name: regionName })
+      .select()
+      .single();
+
+    if (error) {
+        // Handle unique constraint violation if region already exists (race condition)
+        if (error.code === '23505') { // unique_violation
+            console.warn(`Region "${regionName}" already exists, fetching it instead.`);
+            const { data: existingData, error: fetchError } = await supabase
+                .from('regions')
+                .select('*')
+                .eq('name', regionName)
+                .single();
+            if (fetchError) handleSupabaseError(fetchError, 'addRegion (fetch existing)');
+            if (!existingData) throw new Error(`Failed to fetch existing region "${regionName}" after unique constraint violation.`);
+            return existingData as Region;
+        }
+        handleSupabaseError(error, 'addRegion');
+    }
+    if (!data) throw new Error("addRegion did not return the new region data.");
+    return data as Region;
+  },
+
   getProducts: async (): Promise<Product[]> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('products').select('*');
@@ -389,31 +419,44 @@ export const api = {
     
     const doctorsToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pediatrics | Specialization.Pulmonology }[] = [];
 
-    rows.forEach((row, index) => {
-        if (row.length < 4 || row.every(cell => cell === null || cell === '')) return;
+    for (const [index, row] of rows.entries()) {
+        if (row.length < 4 || row.every(cell => cell === null || cell === '')) continue;
 
         const Name = row[0];
-        const Region = row[1];
+        const RegionName = row[1];
         const Spec = row[2];
         const repUsername = row[3];
         const rowIndex = index + 2;
 
-        if (!Name || !Region || !Spec || !repUsername) {
+        if (!Name || !RegionName || !Spec || !repUsername) {
             result.failed++;
             result.errors.push(`Row ${rowIndex}: Missing required fields.`);
-            return;
+            continue;
         }
-        const regionId = regionMap.get(String(Region).trim().toLowerCase());
+
+        let regionId = regionMap.get(String(RegionName).trim().toLowerCase());
+
+        if (!regionId) {
+            try {
+                const newRegion = await api.addRegion(String(RegionName).trim());
+                regionId = newRegion.id;
+                regionMap.set(newRegion.name.trim().toLowerCase(), newRegion.id);
+            } catch (e: any) {
+                result.failed++;
+                result.errors.push(`Row ${rowIndex}: Could not find or create region "${RegionName}". Error: ${e.message}`);
+                continue;
+            }
+        }
+        
         const repId = userMap.get(String(repUsername).trim().toLowerCase());
         const specValues = [Specialization.Pediatrics, Specialization.Pulmonology] as const;
         const validSpec = specValues.find(s => s.toLowerCase() === String(Spec).trim().toLowerCase());
 
-        if (!regionId) { result.failed++; result.errors.push(`Row ${rowIndex}: Region "${Region}" not found.`); return; }
-        if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); return; }
-        if (!validSpec) { result.failed++; result.errors.push(`Row ${rowIndex}: Invalid specialization "${Spec}".`); return; }
+        if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); continue; }
+        if (!validSpec) { result.failed++; result.errors.push(`Row ${rowIndex}: Invalid specialization "${Spec}".`); continue; }
         
         doctorsToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: validSpec });
-    });
+    }
 
     const totalToInsert = doctorsToInsert.length;
     if (totalToInsert > 0) {
@@ -448,27 +491,39 @@ export const api = {
 
       const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pharmacy }[] = [];
 
-      rows.forEach((row, index) => {
-          if (row.length < 3 || row.every(cell => cell === null || cell === '')) return;
+      for (const [index, row] of rows.entries()) {
+          if (row.length < 3 || row.every(cell => cell === null || cell === '')) continue;
 
           const Name = row[0];
-          const Region = row[1];
+          const RegionName = row[1];
           const repUsername = row[2];
           const rowIndex = index + 2;
 
-          if (!Name || !Region || !repUsername) {
+          if (!Name || !RegionName || !repUsername) {
               result.failed++;
               result.errors.push(`Row ${rowIndex}: Missing required fields.`);
-              return;
+              continue;
           }
-          const regionId = regionMap.get(String(Region).trim().toLowerCase());
+          let regionId = regionMap.get(String(RegionName).trim().toLowerCase());
+          
+          if (!regionId) {
+              try {
+                  const newRegion = await api.addRegion(String(RegionName).trim());
+                  regionId = newRegion.id;
+                  regionMap.set(newRegion.name.trim().toLowerCase(), newRegion.id);
+              } catch (e: any) {
+                  result.failed++;
+                  result.errors.push(`Row ${rowIndex}: Could not find or create region "${RegionName}". Error: ${e.message}`);
+                  continue;
+              }
+          }
+          
           const repId = userMap.get(String(repUsername).trim().toLowerCase());
 
-          if (!regionId) { result.failed++; result.errors.push(`Row ${rowIndex}: Region "${Region}" not found.`); return; }
-          if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); return; }
+          if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); continue; }
 
           pharmaciesToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: Specialization.Pharmacy });
-      });
+      }
 
       const totalToInsert = pharmaciesToInsert.length;
       if (totalToInsert > 0) {
