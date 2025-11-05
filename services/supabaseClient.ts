@@ -6,11 +6,21 @@ const ANON_KEY_KEY = `${APP_PREFIX}supabaseAnonKey`;
 
 let supabaseInstance: SupabaseClient | null = null;
 
+// Explicitly define auth options to ensure session persistence in localStorage.
+const supabaseOptions = {
+    auth: {
+        storage: window.localStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+    },
+};
+
 export const initializeSupabase = (url: string, key: string): SupabaseClient => {
     try {
         // Clear any previous instance before creating a new one
         supabaseInstance = null;
-        const client = createClient(url, key);
+        const client = createClient(url, key, supabaseOptions);
         supabaseInstance = client;
         localStorage.setItem(URL_KEY, url);
         localStorage.setItem(ANON_KEY_KEY, key);
@@ -33,7 +43,7 @@ export const getSupabaseClient = (): SupabaseClient => {
 
     if (envUrl && envKey) {
         try {
-            const client = createClient(envUrl, envKey);
+            const client = createClient(envUrl, envKey, supabaseOptions);
             supabaseInstance = client;
             return supabaseInstance;
         } catch (e) {
@@ -48,7 +58,7 @@ export const getSupabaseClient = (): SupabaseClient => {
 
     if (url && key) {
         try {
-            supabaseInstance = createClient(url, key);
+            supabaseInstance = createClient(url, key, supabaseOptions);
             return supabaseInstance;
         } catch(e) {
             console.error("Error creating Supabase client from localStorage", e);
