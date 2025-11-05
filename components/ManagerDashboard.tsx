@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
-import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
-import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon } from './icons';
+import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
+import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -39,7 +39,7 @@ const ManagerDashboard: React.FC = () => {
   ], [t]);
 
 
-  type ManagerTab = 'reports' | 'users' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport';
+  type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport';
 
 
   // Tab and Modal states
@@ -51,6 +51,7 @@ const ManagerDashboard: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [viewingRepClients, setViewingRepClients] = useState<User | null>(null);
 
 
   // Settings tab local state
@@ -265,6 +266,27 @@ const ManagerDashboard: React.FC = () => {
         }));
   }, [allPlans, reps, t]);
 
+  const clientStatsByRep = useMemo(() => {
+    return reps.map(rep => {
+      const repDoctors = totalDoctors.filter(d => d.repId === rep.id);
+      const repPharmacies = totalPharmacies.filter(p => p.repId === rep.id);
+
+      const specializationCounts = repDoctors.reduce((acc, doctor) => {
+        const spec = doctor.specialization;
+        acc[spec] = (acc[spec] || 0) + 1;
+        return acc;
+      }, {} as Record<Specialization.Pediatrics | Specialization.Pulmonology, number>);
+
+      return {
+        rep,
+        doctorCount: repDoctors.length,
+        pharmacyCount: repPharmacies.length,
+        totalClients: repDoctors.length + repPharmacies.length,
+        specializationCounts,
+      };
+    });
+  }, [reps, totalDoctors, totalPharmacies]);
+
   const handleReviewPlan = async (repId: string, status: 'approved' | 'rejected') => {
       try {
           await api.reviewRepPlan(repId, status);
@@ -444,6 +466,15 @@ const ManagerDashboard: React.FC = () => {
                           {t('user_management')}
                       </button>
                   </li>
+                   <li className="me-2">
+                        <button 
+                            onClick={() => setActiveTab('clients')}
+                            className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'clients' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                        >
+                            <UserGroupIcon className="w-5 h-5 me-2" />
+                            {t('client_management')}
+                        </button>
+                    </li>
                   <li className="me-2">
                       <button 
                           onClick={() => setActiveTab('dataImport')}
@@ -821,6 +852,55 @@ const ManagerDashboard: React.FC = () => {
         </>
       )}
 
+      {activeTab === 'clients' && (
+        <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden">
+            <h3 className="text-xl font-semibold p-4 flex items-center text-blue-800 bg-white/50 border-b border-white/30">
+                <UserGroupIcon className="w-6 h-6 me-3"/>
+                {t('client_management')}
+            </h3>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-start text-gray-500">
+                    <thead className="text-xs text-blue-800 uppercase bg-white/50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3">{t('rep_name')}</th>
+                            <th scope="col" className="px-6 py-3">{t('doctors')}</th>
+                            <th scope="col" className="px-6 py-3">{t('pharmacies')}</th>
+                            <th scope="col" className="px-6 py-3">{t('total_clients')}</th>
+                            <th scope="col" className="px-6 py-3">{t('doctor_specialization_breakdown')}</th>
+                            <th scope="col" className="px-6 py-3">{t('actions')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {clientStatsByRep.map(stat => (
+                            <tr key={stat.rep.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
+                                <td className="px-6 py-4 font-medium text-slate-900">{stat.rep.name}</td>
+                                <td className="px-6 py-4 text-center">{stat.doctorCount}</td>
+                                <td className="px-6 py-4 text-center">{stat.pharmacyCount}</td>
+                                <td className="px-6 py-4 text-center font-bold text-slate-800">{stat.totalClients}</td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(stat.specializationCounts).length > 0 ? Object.entries(stat.specializationCounts).map(([spec, count]) => (
+                                      <span key={spec} className="text-xs bg-slate-200 text-slate-700 font-medium px-2 py-1 rounded-full">
+                                        {t(spec as any)}: {count}
+                                      </span>
+                                    )) : <span className="text-xs text-slate-500">{t('no_doctors_assigned')}</span>}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <button onClick={() => setViewingRepClients(stat.rep)} className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-4 py-2 flex items-center gap-2 transition-colors">
+                                        <EyeIcon className="w-4 h-4"/>
+                                        {t('view_clients')}
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {reps.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_data')}</p>}
+            </div>
+        </div>
+      )}
+
       {activeTab === 'dataImport' && (
         <DataImport />
       )}
@@ -1062,8 +1142,96 @@ const ManagerDashboard: React.FC = () => {
                 </div>
             </Modal>
         )}
+        
+        {viewingRepClients && <ClientListModal rep={viewingRepClients} onClose={() => setViewingRepClients(null)} />}
     </div>
   );
 };
+
+
+// A sub-component for the client list modal to keep the main component cleaner
+const ClientListModal: React.FC<{rep: User, onClose: () => void}> = ({ rep, onClose }) => {
+    const { t } = useLanguage();
+    // These states are read from the parent component, so we pass them down or re-fetch if needed.
+    // For simplicity, we assume the parent `ManagerDashboard` passes what's necessary or they are available in its scope.
+    // Here, we'll define it inside ManagerDashboard to avoid prop drilling.
+    const { totalDoctors, totalPharmacies, regions } = (ManagerDashboard as any).useContext(); // This is a trick; it will be defined in the parent scope.
+
+    const [activeModalTab, setActiveModalTab] = useState<'doctors' | 'pharmacies'>('doctors');
+    const repDoctors = useMemo(() => totalDoctors.filter((d: Doctor) => d.repId === rep.id), [rep.id, totalDoctors]);
+    const repPharmacies = useMemo(() => totalPharmacies.filter((p: Pharmacy) => p.repId === rep.id), [rep.id, totalPharmacies]);
+    const regionMap = useMemo(() => new Map(regions.map((r: Region) => [r.id, r.name])), [regions]);
+
+
+    const handleExport = () => {
+        exportClientsToExcel(repDoctors, repPharmacies, regions, `clients_${rep.username}`, t);
+    };
+
+    return (
+      <Modal isOpen={true} onClose={onClose} title={t('clients_for_rep', rep.name)}>
+          <div className="space-y-4">
+              <div className="flex justify-between items-center pb-3 border-b border-slate-300/50">
+                  <div role="tablist" className="grid grid-cols-2 gap-1 rounded-lg p-1 bg-slate-200/60">
+                      <button type="button" role="tab" aria-selected={activeModalTab === 'doctors'} onClick={() => setActiveModalTab('doctors')} className={`flex items-center justify-center gap-2 w-full p-2 rounded-md text-sm font-semibold transition-colors duration-200 ${activeModalTab === 'doctors' ? 'bg-blue-600 text-white shadow' : 'text-slate-700 hover:bg-white/50'}`}>
+                          <DoctorIcon className="w-5 h-5"/> {t('doctors')} ({repDoctors.length})
+                      </button>
+                      <button type="button" role="tab" aria-selected={activeModalTab === 'pharmacies'} onClick={() => setActiveModalTab('pharmacies')} className={`flex items-center justify-center gap-2 w-full p-2 rounded-md text-sm font-semibold transition-colors duration-200 ${activeModalTab === 'pharmacies' ? 'bg-orange-500 text-white shadow' : 'text-slate-700 hover:bg-white/50'}`}>
+                          <PharmacyIcon className="w-5 h-5"/> {t('pharmacies')} ({repPharmacies.length})
+                      </button>
+                  </div>
+                  <button onClick={handleExport} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2">
+                      <DownloadIcon className="w-5 h-5"/>
+                      <span>{t('download_list')}</span>
+                  </button>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                  {activeModalTab === 'doctors' ? (
+                      repDoctors.length > 0 ? (
+                          <table className="w-full text-sm text-start">
+                              <thead className="text-xs text-blue-800 uppercase bg-slate-100/50 sticky top-0">
+                                  <tr>
+                                      <th className="px-4 py-2">{t('name')}</th>
+                                      <th className="px-4 py-2">{t('specialization')}</th>
+                                      <th className="px-4 py-2">{t('region')}</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  {repDoctors.map(doctor => (
+                                      <tr key={doctor.id} className="border-b border-slate-200/50">
+                                          <td className="px-4 py-2 font-medium text-slate-800">{doctor.name}</td>
+                                          <td className="px-4 py-2">{t(doctor.specialization)}</td>
+                                          <td className="px-4 py-2">{regionMap.get(doctor.regionId) || t('unknown')}</td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      ) : <p className="text-center p-8 text-slate-600">{t('no_doctors_assigned')}</p>
+                  ) : (
+                      repPharmacies.length > 0 ? (
+                           <table className="w-full text-sm text-start">
+                              <thead className="text-xs text-orange-800 uppercase bg-slate-100/50 sticky top-0">
+                                  <tr>
+                                      <th className="px-4 py-2">{t('name')}</th>
+                                      <th className="px-4 py-2">{t('region')}</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  {repPharmacies.map(pharmacy => (
+                                      <tr key={pharmacy.id} className="border-b border-slate-200/50">
+                                          <td className="px-4 py-2 font-medium text-slate-800">{pharmacy.name}</td>
+                                          <td className="px-4 py-2">{regionMap.get(pharmacy.regionId) || t('unknown')}</td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      ) : <p className="text-center p-8 text-slate-600">{t('no_pharmacies_assigned')}</p>
+                  )}
+              </div>
+          </div>
+      </Modal>
+    );
+}
+
 
 export default ManagerDashboard;
