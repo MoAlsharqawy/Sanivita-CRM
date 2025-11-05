@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 import { api } from '../services/api';
 import Modal from './Modal';
 import { useLanguage } from '../hooks/useLanguage';
@@ -19,6 +19,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState<UserRole>(UserRole.Rep);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,9 +28,11 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
         if (userToEdit) {
           setName(userToEdit.name);
           setUsername(userToEdit.username);
+          setRole(userToEdit.role);
         } else {
           setName('');
           setUsername('');
+          setRole(UserRole.Rep);
         }
         setPassword('');
         setConfirmPassword('');
@@ -62,13 +65,13 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
     setSubmitting(true);
     try {
         if (isEditMode && userToEdit) {
-            const updates: Partial<Pick<User, 'name' | 'username'>> = {
+            const updates: Partial<Pick<User, 'name' | 'role'>> = {
                 name,
-                username: userToEdit.username, // Username is not editable, so we pass the original
+                role,
             };
             await api.updateUser(userToEdit.id, updates);
         } else {
-            await api.addUser({ name, username, password });
+            await api.addUser({ name, username, password, role });
         }
         onSuccess();
     } catch (err: any) {
@@ -109,6 +112,20 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
             className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-slate-200/50 disabled:text-slate-500" 
           />
            {isEditMode && <p className="text-xs text-slate-500 mt-1">{t('username_cannot_be_changed')}</p>}
+        </div>
+
+        <div>
+            <label htmlFor="role" className="block text-sm font-medium text-slate-800">{t('role')}</label>
+            <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value as UserRole)}
+                required
+                className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500"
+            >
+                <option value={UserRole.Rep}>{t('REP')}</option>
+                <option value={UserRole.Supervisor}>{t('SUPERVISOR')}</option>
+            </select>
         </div>
 
         {!isEditMode && (

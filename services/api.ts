@@ -106,7 +106,7 @@ export const api = {
     return (data || []).map(u => ({...u, password: ''}));
   },
 
-  addUser: async (userData: Omit<User, 'id' | 'role'> & { password: string }): Promise<User> => {
+  addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
       const supabase = getSupabaseClient();
       // Step 1: Create the user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -130,7 +130,7 @@ export const api = {
               id: authData.user.id,
               name: userData.name,
               username: userData.username,
-              role: UserRole.Rep,
+              role: userData.role,
           })
           .select()
           .single();
@@ -146,17 +146,17 @@ export const api = {
       return { ...profileData, password: '' };
   },
 
-  updateUser: async (userId: string, updates: Partial<Pick<User, 'name' | 'username'>>): Promise<User | null> => {
+  updateUser: async (userId: string, updates: Partial<Pick<User, 'name' | 'role'>>): Promise<User | null> => {
     const supabase = getSupabaseClient();
     // Note: Updating username (email) or password for another user requires admin privileges 
     // and should ideally be a server-side operation for security.
     // We are preventing this on the client-side to avoid data desync.
     
     // Update non-auth fields in profiles table
-    const { name, username } = updates;
+    const { name, role } = updates;
     const { data, error } = await supabase
       .from('profiles')
-      .update({ name, username })
+      .update({ name, role })
       .eq('id', userId)
       .select()
       .single();
