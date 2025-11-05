@@ -253,6 +253,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'user_already_exists': 'اسم المستخدم مسجل بالفعل.',
     'error_permission_denied': 'خطأ في الصلاحيات. تأكد من أن لديك الإذن لإضافة مستخدمين جدد ومن أن إعدادات قاعدة البيانات تسمح بذلك.',
     'error_reauthentication_needed': 'لأسباب أمنية، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى قبل تغيير كلمة المرور.',
+    'password_changed_successfully': 'تم تغيير كلمة المرور بنجاح.',
 
     // Weekly View
     'previous_week': 'الأسبوع السابق',
@@ -544,6 +545,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'user_already_exists': 'Username is already registered.',
     'error_permission_denied': 'Permission error. Ensure you have privileges to add new users and that database settings allow it.',
     'error_reauthentication_needed': 'For security, please log out and log back in before changing your password.',
+    'password_changed_successfully': 'Password changed successfully.',
 
 
     // Weekly View
