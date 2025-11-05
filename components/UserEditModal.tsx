@@ -128,7 +128,9 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
                     className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-slate-200/50 disabled:text-slate-500" 
                     autoComplete="off"
                 />
-                {isEditMode && <p className="text-xs text-slate-500 mt-1">{t('username_cannot_be_changed')}</p>}
+                <p className="text-xs text-slate-500 mt-1">
+                    {isEditMode ? t('username_cannot_be_changed') : t('username_helper_text')}
+                </p>
                 </div>
 
                 <div>
