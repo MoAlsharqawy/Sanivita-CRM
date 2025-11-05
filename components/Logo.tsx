@@ -17,7 +17,7 @@ export const Logo: React.FC<{ className?: string }> = ({ className }) => {
       <span className={`text-3xl ${textClasses}`}>
         SaniVita
       </span>
-      <span className="text-sm font-bold text-orange-500">v2</span>
+      <span className="text-sm font-bold text-orange-500">v11</span>
     </div>
   );
 };
