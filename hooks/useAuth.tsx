@@ -63,9 +63,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    await api.logout();
-    setUser(null); // Clear user immediately for faster UI response
+    // Optimistically log out on the client for instant UI feedback.
+    setUser(null);
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error("Error signing out from server:", error);
+      // Even if server fails, the client is logged out.
+      // This is safer than the old implementation.
+    }
   };
+
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>

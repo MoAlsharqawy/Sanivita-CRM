@@ -1,4 +1,5 @@
 
+
 import { getSupabaseClient, initializeSupabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole } from '../types';
 
@@ -114,8 +115,10 @@ export const api = {
     const supabase = getSupabaseClient();
     const email = userData.username.includes('@') ? userData.username : `${userData.username}${DUMMY_DOMAIN}`;
 
-    // Step 1: Create the user in Supabase Auth.
-    // The database trigger 'on_auth_user_created' will automatically create a corresponding profile.
+    // Step 1: Save the manager's current session to prevent it from being overwritten.
+    const { data: { session: managerSession } } = await supabase.auth.getSession();
+
+    // Step 2: Create the new user. This signs in the new user temporarily.
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: userData.password,
@@ -131,8 +134,8 @@ export const api = {
         throw authError; // Rethrow to be caught by the UI
     }
 
-    // Step 2: Update the newly created profile with the correct role and original (short) username.
-    // This is crucial to ensure the username is stored correctly, regardless of how the trigger is configured.
+    // Step 3: Update the new user's profile with role and original username.
+    // The DB trigger `on_auth_user_created` creates the profile row.
     const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .update({ role: userData.role, username: userData.username })
@@ -140,15 +143,22 @@ export const api = {
         .select()
         .single();
     
+    // Step 4: Restore the manager's original session. This is critical.
+    if (managerSession) {
+        const { error: restoreError } = await supabase.auth.setSession({
+            access_token: managerSession.access_token,
+            refresh_token: managerSession.refresh_token,
+        });
+        if (restoreError) {
+            console.error("CRITICAL: Failed to restore manager session. A page refresh may be required.", restoreError);
+        }
+    } else {
+        await supabase.auth.signOut(); // Sign out the new user if manager had no session
+    }
+    
+    // After restoring the session, handle any errors from the profile update.
     if (profileError) {
-        // Log the error but don't throw, as the user is already created.
-        // The manager can manually fix the role if needed. This is more robust.
-        console.error(`User ${authData.user.id} created, but failed to set role/username:`, profileError);
-        
-        // Fetch the created profile to return it even if the update failed
-        const finalProfile = await api.getUserProfile(authData.user.id);
-        if (!finalProfile) throw new Error("Failed to retrieve profile after creation.");
-        return finalProfile;
+        handleSupabaseError(profileError, 'addUser (profile update)');
     }
 
     return { ...profileData, password: '' };
