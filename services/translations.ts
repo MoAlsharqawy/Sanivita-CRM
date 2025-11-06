@@ -69,7 +69,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'back_to_login': 'العودة لتسجيل الدخول',
     'error_enter_email': 'يرجى إدخال البريد الإلكتروني.', // Updated
     'reset_password_request_title': 'إعادة تعيين كلمة المرور',
-    'reset_password_request_subtitle': 'أدخل بريدك الإلكتروني. إذا كان بريدًا إلكترونيًا صالحًا، فسيتم إرسال رابط لإعادة تعيين كلمة مرورك.',
+    'reset_password_request_subtitle': 'أدخل بريدك الإلكتروني. إذا كان بريدًا إلكترونياً صالحًا، فسيتم إرسال رابط لإعادة تعيين كلمة مرورك.',
     // 'reset_requires_email_warning': 'إعادة تعيين كلمة المرور تتطلب أن يكون اسم المستخدم بريدًا إلكترونيًا صالحًا. قد لا تنجح هذه العملية.', // Removed
 
 
@@ -255,14 +255,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'email_cannot_be_changed': 'لا يمكن تغيير البريد الإلكتروني بعد الإنشاء.', // Updated
     'email_helper_text': 'هذا هو المعرف الدائم للمندوب (بريد إلكتروني). لا يمكن تغييره لاحقاً.', // Updated
     'error_invalid_email_format': 'صيغة البريد الإلكتروني غير صحيحة.', // Added
-    // 'must_be_email': '', // Removed
     'reset_password_title': 'إعادة تعيين كلمة المرور',
     'reset_password_subtitle': 'أدخل كلمة المرور الجديدة لحسابك.',
     'password_reset_success': 'تم تغيير كلمة المرور بنجاح! سيتم الآن إعادة توجيهك لتسجيل الدخول.',
     'user_already_exists': 'البريد الإلكتروني مسجل بالفعل.', // Updated
-    'error_permission_denied': 'خطأ في الصلاحيات. تأكد من أن لديك الإذن لإضافة مستخدمين جدد ومن أن إعدادات قاعدة البيانات تسمح بذلك.',
+    'error_permission_denied': 'خطأ في الصلاحيات. تأكد من أن لديك الإذن لإضافة مستخدمين جدد ومن أن إعدادات قاعدة البيانات تسمح بذلك (خاصة RLS على جدول profiles).', // Updated for clarity
+    'error_permission_denied_delete_user': 'خطأ في الصلاحيات. لا يمكنك حذف المستخدمين بدون صلاحيات المسؤول في Supabase.',
     'error_smtp_not_configured': 'فشل إنشاء المستخدم. هذا يحدث عادةً لأن "تأكيد البريد الإلكتروني" مفعل في إعدادات Supabase ولكن خادم البريد (SMTP) غير مهيأ. الحل الأسهل هو إيقاف "Enable email confirmations" من قسم Authentication > Providers > Email في لوحة تحكم Supabase.',
-    'error_db_trigger_failed': 'فشل إنشاء المستخدم. يحدث هذا غالبًا بسبب خطأ في قاعدة البيانات عند إنشاء ملف تعريف المستخدم (عبر trigger). الأسباب الشائعة هي وجود عمود `NOT NULL` في جدول `profiles` بدون قيمة افتراضية، أو خطأ في دالة `handle_new_user`. يرجى مراجعة سجلات قاعدة البيانات في لوحة تحكم Supabase لمزيد من التفاصيل.',
+    'error_db_trigger_failed': 'فشل إنشاء المستخدم. يحدث هذا غالبًا بسبب عدم وجود أو خطأ في "trigger" قاعدة البيانات الذي ينشئ ملف تعريف المستخدم (profiles) عند إضافة مستخدم جديد. يرجى مراجعة سجلات قاعدة البيانات في لوحة تحكم Supabase لمزيد من التفاصيل.', // Updated for clarity
     'error_reauthentication_needed': 'لأسباب أمنية، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى قبل تغيير كلمة المرور.',
     'password_changed_successfully': 'تم تغيير كلمة المرور بنجاح.',
     'user_added_successfully': 'تمت إضافة المندوب {0} بنجاح.',
@@ -572,14 +572,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'email_cannot_be_changed': 'Email address cannot be changed after creation.', // Updated
     'email_helper_text': 'This is the permanent identifier for the rep (email address). It cannot be changed later.', // Updated
     'error_invalid_email_format': 'Invalid email format.', // Added
-    // 'must_be_email': '', // Removed
     'reset_password_title': 'Reset Your Password',
     'reset_password_subtitle': 'Enter the new password for your account.',
     'password_reset_success': 'Password changed successfully! Redirecting you to login...',
     'user_already_exists': 'Email address is already registered.', // Updated
-    'error_permission_denied': 'Permission error. Ensure you have privileges to add new users and that database settings allow it.',
+    'error_permission_denied': 'Permission error. Ensure you have privileges to add new users and that database settings allow it (especially RLS on the profiles table).', // Updated for clarity
+    'error_permission_denied_delete_user': 'Permission error. You cannot delete users without admin privileges in Supabase.',
     'error_smtp_not_configured': 'User creation failed. This usually happens because "Email Confirmations" is enabled in Supabase settings but the mail server (SMTP) is not configured. The easiest solution is to turn OFF "Enable email confirmations" in your Supabase dashboard under Authentication > Providers > Email.',
-    'error_db_trigger_failed': 'User creation failed. This is often caused by a database error when creating the user profile (via a trigger). Common causes are a `NOT NULL` column in the `profiles` table without a default value, or an error in the `handle_new_user` function. Please check the database logs in your Supabase dashboard for more details.',
+    'error_db_trigger_failed': 'User creation failed. This is often caused by a missing or incorrect database "trigger" that creates the user profile (profiles) when a new user is added. Please check the database logs in your Supabase dashboard for more details.', // Updated for clarity
     'error_reauthentication_needed': 'For security, please log out and log back in before changing your password.',
     'password_changed_successfully': 'Password changed successfully.',
     'user_added_successfully': 'User {0} added successfully.',

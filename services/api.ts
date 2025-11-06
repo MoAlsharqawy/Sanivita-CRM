@@ -14,6 +14,7 @@ export const api = {
     try {
         const supabase = getSupabaseClient();
         // A lightweight query to check if keys are valid and table exists.
+        // We're checking 'regions' table as it's fundamental for the app.
         const { error } = await supabase.from('regions').select('id', { count: 'exact', head: true });
         if (error) {
             console.error("Supabase connection test failed:", error.message);
@@ -34,9 +35,10 @@ export const api = {
 
   login: async (username: string, password: string): Promise<User> => {
     const supabase = getSupabaseClient();
-    const email = username; // username is now always treated as an email
+    // The 'username' field is now always treated as the user's email address.
+    const email = username; 
     
-    // Supabase auth uses email, but we can use the username field as if it were an email
+    // Supabase auth uses email for signInWithPassword.
     const { data: { user: authUser }, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
@@ -50,7 +52,8 @@ export const api = {
       throw new Error('incorrect_credentials');
     }
     
-    // After successful auth, fetch the user profile from our public.profiles table
+    // After successful auth, fetch the user profile from our public.profiles table.
+    // This step is crucial for getting user metadata (like role, name).
     // A failure here is critical, so we catch it, logout the partially-authed user, and re-throw.
     try {
         const profile = await api.getUserProfile(authUser.id);
@@ -115,32 +118,44 @@ export const api = {
 
   addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
     const supabase = getSupabaseClient();
-    const email = userData.username; // username is now always treated as an email
+    // The 'username' field from the UI is now always treated as the user's email address.
+    const email = userData.username; 
 
     // Step 1: Save the manager's current session to prevent it from being overwritten.
     const { data: { session: managerSession } } = await supabase.auth.getSession();
 
-    // Step 2: Create the new user. This signs in the new user temporarily.
+    // Step 2: Create the new user in Supabase Auth. This action temporarily signs in the new user.
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: userData.password,
         options: {
             data: {
-                name: userData.name, // Pass name to be used by the trigger
+                name: userData.name, // Pass name to be used by the 'on_auth_user_created' trigger (if configured)
             }
         }
     });
 
-    if (authError || !authData.user) {
+    if (authError) {
+        // More specific error handling for common signUp errors
+        if (authError.message.includes('user already registered') || authError.message.includes('email already registered')) {
+            throw new Error('user_already_exists');
+        }
+        if (authError.message.includes('error sending confirmation mail')) {
+            throw new Error('error_smtp_not_configured');
+        }
         handleSupabaseError(authError, 'addUser (signUp)');
-        throw authError; // Rethrow to be caught by the UI
+    }
+    if (!authData.user) {
+        // This case should ideally be covered by authError, but as a safeguard.
+        throw new Error('database_error_creating_new_user');
     }
 
-    // Step 3: Update the new user's profile with role and original username.
-    // The DB trigger `on_auth_user_created` creates the profile row.
+    // Step 3: Update the new user's profile with role and original username (email).
+    // NOTE: This assumes a Supabase trigger (e.g., 'on_auth_user_created') has ALREADY created a basic profile entry.
+    // If no trigger is configured, this 'update' will fail because the row does not exist.
     const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .update({ role: userData.role, username: userData.username }) // username column stores the email
+        .update({ role: userData.role, username: userData.username }) // 'username' column stores the email
         .eq('id', authData.user.id)
         .select()
         .single();
@@ -155,11 +170,20 @@ export const api = {
             console.error("CRITICAL: Failed to restore manager session. A page refresh may be required.", restoreError);
         }
     } else {
-        await supabase.auth.signOut(); // Sign out the new user if manager had no session
+        // If the manager wasn't logged in (e.g., first user setup), sign out the newly created user.
+        await supabase.auth.signOut(); 
     }
     
     // After restoring the session, handle any errors from the profile update.
     if (profileError) {
+        // If the profile row wasn't created by a trigger, this update will fail.
+        if (profileError.message.includes('violates row-level security policy')) {
+            throw new Error('error_permission_denied');
+        }
+        // Specific error for trigger failure if profile doesn't exist.
+        if (profileError.code === 'PGRST116') { // No rows were affected by the update.
+             throw new Error('error_db_trigger_failed');
+        }
         handleSupabaseError(profileError, 'addUser (profile update)');
     }
 
@@ -168,9 +192,9 @@ export const api = {
 
   updateUser: async (userId: string, updates: Partial<Pick<User, 'name' | 'role'>>): Promise<User | null> => {
     const supabase = getSupabaseClient();
-    // Note: Updating username (email) or password for another user requires admin privileges 
-    // and should ideally be a server-side operation for security.
-    // We are preventing this on the client-side to avoid data desync.
+    // NOTE: Updating another user's username (email) or password requires admin privileges
+    // and should ideally be a server-side operation for security reasons.
+    // In this client-side demo, we're preventing email changes for existing users via the UI.
     
     // Update non-auth fields in profiles table
     const { name, role } = updates;
@@ -190,33 +214,41 @@ export const api = {
   },
   
   deleteUser: async (userId: string): Promise<boolean> => {
-      // Deleting a user requires admin privileges.
-      // This function won't work with just the anon key.
-      // A secure way is to call a serverless function or an RPC with security definer.
-      // For now, we'll try and it will fail if RLS is restrictive, which is correct.
-      alert("Note: Deleting users requires admin privileges and is disabled in this client-side demo for security reasons.");
-      // const supabase = getSupabaseClient();
-      // const { error } = await supabase.auth.admin.deleteUser(userId);
-      // if (error) {
-      //   handleSupabaseError(error, 'deleteUser');
-      //   return false;
-      // }
-      return false; // Returning false as it's a mock of a failed attempt
+      // Deleting a user requires admin privileges in Supabase Auth.
+      // This functionality will NOT work with just the anon key unless an RPC is configured with 'security definer'.
+      // For a secure, production-ready solution, consider calling a serverless function.
+      console.warn("Attempting to delete user. This typically requires admin privileges or an RPC in Supabase.");
+      const supabase = getSupabaseClient();
+      // Example of an RPC call if you have a custom function to delete:
+      // const { error: rpcError } = await supabase.rpc('delete_user_and_profile', { p_user_id: userId });
+      // if (rpcError) handleSupabaseError(rpcError, 'deleteUser RPC');
+
+      // Direct client-side admin.deleteUser is usually not enabled for anon key.
+      const { error } = await supabase.auth.admin.deleteUser(userId); // This will likely fail with anon key
+      if (error) {
+        // Log a more descriptive error if it's a permission issue from admin.deleteUser
+        console.error("Failed to delete user with admin privileges:", error.message);
+        throw new Error('error_permission_denied_delete_user'); // Custom error for UI
+      }
+      return true;
   },
   
   sendPasswordResetEmail: async (username: string): Promise<void> => {
     const supabase = getSupabaseClient();
-    const email = username; // username is now always treated as an email
+    // The 'username' field is now always treated as the user's email address.
+    const email = username; 
 
+    // Supabase will send a reset email to this address.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: window.location.origin, // Redirects back to the app after reset
     });
 
     if (error) {
-      // Don't expose details for security reasons (e.g., user not found)
+      // For security, avoid exposing whether an email exists or not.
+      // We log the error internally but the UI will show a generic message.
       console.error('Password reset request error:', error.message);
     }
-    // We don't throw here, the UI will always show a generic success message
+    // We don't throw here; the UI will always show a generic success message
     // to prevent leaking information about which emails are registered.
   },
 
@@ -419,6 +451,7 @@ export const api = {
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
+    // NOTE: userMap now uses the 'username' field (which holds the email) for mapping.
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
     
     const doctorsToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pediatrics | Specialization.Pulmonology }[] = [];
@@ -452,12 +485,13 @@ export const api = {
             }
         }
         
+        // NOTE: repId is found using the provided repEmail (username) from the import file.
         const repId = userMap.get(String(repEmail).trim().toLowerCase());
         const specValues = [Specialization.Pediatrics, Specialization.Pulmonology] as const;
         const validSpec = specValues.find(s => s.toLowerCase() === String(Spec).trim().toLowerCase());
 
-        if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found.`); continue; }
-        if (!validSpec) { result.failed++; result.errors.push(`Row ${rowIndex}: Invalid specialization "${Spec}".`); continue; }
+        if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found. Ensure this email exists in the system.`); continue; }
+        if (!validSpec) { result.failed++; result.errors.push(`Row ${rowIndex}: Invalid specialization "${Spec}". Valid values are: PEDIATRICS, PULMONOLOGY.`); continue; }
         
         doctorsToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: validSpec });
     }
@@ -491,6 +525,7 @@ export const api = {
       const result = { success: 0, failed: 0, errors: [] as string[] };
       const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
       const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
+      // NOTE: userMap now uses the 'username' field (which holds the email) for mapping.
       const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
       const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pharmacy }[] = [];
@@ -522,9 +557,10 @@ export const api = {
               }
           }
           
+          // NOTE: repId is found using the provided repEmail (username) from the import file.
           const repId = userMap.get(String(repEmail).trim().toLowerCase());
 
-          if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found.`); continue; }
+          if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found. Ensure this email exists in the system.`); continue; }
 
           pharmaciesToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: Specialization.Pharmacy });
       }

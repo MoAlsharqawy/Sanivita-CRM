@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -51,7 +50,8 @@ const Login: React.FC = () => {
       await api.sendPasswordResetEmail(username);
       setResetMessage(t('reset_link_sent'));
     } catch (err) {
-      setError(t('error_unexpected'));
+      // In reset password, we intentionally do not expose specific errors for security (e.g., email not found)
+      setResetMessage(t('reset_link_sent')); // Always show success message for security reasons
     } finally {
       setLoading(false);
     }

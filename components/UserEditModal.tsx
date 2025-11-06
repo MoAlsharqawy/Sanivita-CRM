@@ -101,6 +101,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
       } else if (errorMessage.toLowerCase().includes('error sending confirmation mail')) {
           setError(t('error_smtp_not_configured'));
       } else if (errorMessage.toLowerCase().includes('database error creating new user')) {
+          // This specific error message implies an issue with the trigger or profiles table setup.
           setError(t('error_db_trigger_failed'));
       } else {
           setError(t('error_unexpected'));
