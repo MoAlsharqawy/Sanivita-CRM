@@ -316,6 +316,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'copy_sql': 'نسخ الكود',
     'copied': 'تم النسخ!',
     'try_again': 'لقد قمت بتشغيل الكود، حاول مرة أخرى',
+    'database_error_creating_new_user': 'خطأ في قاعدة البيانات أثناء إنشاء مستخدم جديد. يرجى التحقق من سجلات Supabase.',
   },
   en: {
     // General
@@ -632,5 +633,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'copy_sql': 'Copy SQL',
     'copied': 'Copied!',
     'try_again': "I've run the SQL, Try Again",
+    'database_error_creating_new_user': 'Database error creating new user. Please check Supabase logs.',
   }
 };

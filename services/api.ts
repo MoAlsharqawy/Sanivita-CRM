@@ -181,7 +181,8 @@ export const api = {
             throw new Error('error_permission_denied');
         }
         // Specific error for trigger failure if profile doesn't exist.
-        if (profileError.code === 'PGRST116') { // No rows were affected by the update.
+        // Supabase error code for "no rows affected" (if the profile wasn't created by trigger)
+        if (profileError.code === 'PGRST116') { 
              throw new Error('error_db_trigger_failed');
         }
         handleSupabaseError(profileError, 'addUser (profile update)');
@@ -206,6 +207,10 @@ export const api = {
       .single();
 
     if (error) {
+        // More specific error handling for common RLS issues when updating another user
+        if (error.message.includes('violates row-level security policy')) {
+            throw new Error('error_permission_denied');
+        }
         handleSupabaseError(error, 'updateUser (profile)');
         return null;
     }
