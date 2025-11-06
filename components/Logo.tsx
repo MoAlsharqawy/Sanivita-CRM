@@ -32,7 +32,7 @@ export const Logo: React.FC<{ className?: string, showIcon?: boolean }> = ({ cla
           SaniVita
         </span>
         <span className="text-xl font-light text-orange-500">
-          Pharma
+          PharmaV35
         </span>
       </div>
     </div>

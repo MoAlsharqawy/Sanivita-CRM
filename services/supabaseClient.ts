@@ -6,86 +6,87 @@ const ANON_KEY_KEY = `${APP_PREFIX}supabaseAnonKey`;
 
 let supabaseInstance: SupabaseClient | null = null;
 
-// Explicitly define auth options to ensure session persistence in localStorage.
+// Build auth options but guard access to `window` (avoid ReferenceError in non-browser)
 const supabaseOptions = {
-    auth: {
-        storage: window.localStorage,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-    },
+  auth: {
+    // storage may be undefined on server / build time
+    storage: (typeof window !== 'undefined' ? window.localStorage : undefined) as unknown as Storage | undefined,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
 };
 
 export const initializeSupabase = (url: string, key: string): SupabaseClient => {
-    try {
-        // Clear any previous instance before creating a new one
-        supabaseInstance = null;
-        const client = createClient(url, key, supabaseOptions);
-        supabaseInstance = client;
-        localStorage.setItem(URL_KEY, url);
-        localStorage.setItem(ANON_KEY_KEY, key);
-        return client;
-    } catch (e) {
-        console.error("Error initializing Supabase", e);
-        clearSupabaseCredentials();
-        throw e;
+  try {
+    supabaseInstance = null;
+    const client = createClient(url, key, supabaseOptions);
+    supabaseInstance = client;
+    // only access localStorage if available
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(URL_KEY, url);
+      localStorage.setItem(ANON_KEY_KEY, key);
     }
+    return client;
+  } catch (e) {
+    console.error('Error initializing Supabase', e);
+    clearSupabaseCredentials();
+    throw e;
+  }
 };
 
 export const getSupabaseClient = (): SupabaseClient => {
-    if (supabaseInstance) {
-        return supabaseInstance;
+  if (supabaseInstance) return supabaseInstance;
+
+  // Use Vite env (available at build/runtime in the browser)
+  // Guard with typeof so TypeScript/SSR doesn't fail
+  const envUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) || null;
+  const envKey = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY) || null;
+
+  if (envUrl && envKey) {
+    try {
+      const client = createClient(String(envUrl), String(envKey), supabaseOptions);
+      supabaseInstance = client;
+      return supabaseInstance;
+    } catch (e) {
+      console.error('Error creating Supabase client from environment variables', e);
+      // fall through to localStorage fallback
     }
+  }
 
-    // Prioritize environment variables for deployment (e.g., on Vercel)
-    const envUrl = process.env.SUPABASE_URL;
-    const envKey = process.env.SUPABASE_ANON_KEY;
-
-    if (envUrl && envKey) {
-        try {
-            const client = createClient(envUrl, envKey, supabaseOptions);
-            supabaseInstance = client;
-            return supabaseInstance;
-        } catch (e) {
-            console.error("Error creating Supabase client from environment variables", e);
-            // Don't throw, fall through to try localStorage
-        }
-    }
-
-    // Fallback to localStorage for local development
+  // Fallback to localStorage (only in browser)
+  if (typeof window !== 'undefined') {
     const url = localStorage.getItem(URL_KEY);
     const key = localStorage.getItem(ANON_KEY_KEY);
 
     if (url && key) {
-        try {
-            supabaseInstance = createClient(url, key, supabaseOptions);
-            return supabaseInstance;
-        } catch(e) {
-            console.error("Error creating Supabase client from localStorage", e);
-            clearSupabaseCredentials();
-            // Don't throw, as it crashes the app. Fall through to create a dummy client.
-        }
+      try {
+        supabaseInstance = createClient(url, key, supabaseOptions);
+        return supabaseInstance;
+      } catch (e) {
+        console.error('Error creating Supabase client from localStorage', e);
+        clearSupabaseCredentials();
+      }
     }
+  }
 
-    // If we're here, no valid credentials were found or they were malformed.
-    // The original code threw an error, crashing the app.
-    // Instead, we will create and return a temporary dummy client.
-    // Any API call using this client will fail. This failure is caught by the
-    // logic in useAuth.tsx, which clears credentials and reloads, forcing
-    // the user to the connection screen. This prevents the app from crashing.
-    console.warn("No valid Supabase credentials found. Creating a temporary dummy client.");
-    return createClient('http://127.0.0.1:54321', 'dummy-anon-key');
+  // Last resort: return a dummy client (won't work for requests) but prevents app from throwing
+  console.warn('No valid Supabase credentials found. Creating a temporary dummy client.');
+  return createClient('http://127.0.0.1:54321', 'dummy-anon-key');
 };
 
 export const hasSupabaseCredentials = (): boolean => {
-    // Check for environment variables first
-    return (!!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY) ||
-           // Then check localStorage
-           (!!localStorage.getItem(URL_KEY) && !!localStorage.getItem(ANON_KEY_KEY));
+  const envPresent = !!((typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) &&
+                       (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY));
+  const localPresent = (typeof window !== 'undefined') &&
+                       (!!localStorage.getItem(URL_KEY) && !!localStorage.getItem(ANON_KEY_KEY));
+  return envPresent || localPresent;
 };
 
 export const clearSupabaseCredentials = () => {
+  if (typeof window !== 'undefined') {
     localStorage.removeItem(URL_KEY);
     localStorage.removeItem(ANON_KEY_KEY);
-    supabaseInstance = null;
+  }
+  supabaseInstance = null;
 };
