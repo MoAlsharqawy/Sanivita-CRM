@@ -19,7 +19,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'pharmacies': 'الصيدليات',
     'responsible_rep': 'المندوب المسؤول',
     'full_name': 'الاسم الكامل',
-    'username': 'اسم المستخدم',
+    'username': 'البريد الإلكتروني', // Updated
     'role': 'الدور',
     'users': 'المستخدمون',
     'locale': 'ar-EG',
@@ -54,23 +54,23 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Login
     'welcome_back': 'مرحباً بعودتك',
     'signin_to_account': 'سجل الدخول إلى حسابك',
-    'incorrect_credentials': 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى أو استخدام رابط "هل نسيت كلمة المرور؟".',
+    'incorrect_credentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى أو استخدام رابط "هل نسيت كلمة المرور؟".',
     'login_error': 'حدث خطأ أثناء تسجيل الدخول.',
     'profile_not_found': 'تم تسجيل الدخول بنجاح ولكن لم يتم العثور على ملف تعريف المستخدم. يرجى الاتصال بالمسؤول.',
     'email_not_confirmed': 'يرجى تأكيد عنوان بريدك الإلكتروني قبل تسجيل الدخول. تحقق من إعدادات المستخدم في Supabase.',
-    'email_address': 'اسم المستخدم',
+    'email_address': 'البريد الإلكتروني', // Explicitly defined
     'password': 'كلمة المرور',
     'remember_me': 'تذكرني',
     'sign_in': 'تسجيل الدخول',
     'signing_in': 'جاري تسجيل الدخول...',
     'forgot_password': 'هل نسيت كلمة المرور؟',
     'send_reset_link': 'إرسال رابط إعادة التعيين',
-    'reset_link_sent': 'إذا كان اسم المستخدم موجودًا، فسيتم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني المرتبط به.',
+    'reset_link_sent': 'إذا كان البريد الإلكتروني موجودًا، فسيتم إرسال رابط إعادة تعيين كلمة المرور إليه.',
     'back_to_login': 'العودة لتسجيل الدخول',
-    'error_enter_username': 'يرجى إدخال اسم المستخدم.',
+    'error_enter_email': 'يرجى إدخال البريد الإلكتروني.', // Updated
     'reset_password_request_title': 'إعادة تعيين كلمة المرور',
-    'reset_password_request_subtitle': 'أدخل اسم المستخدم. إذا كان بريدًا إلكترونيًا صالحًا، فسيتم إرسال رابط لإعادة تعيين كلمة مرورك.',
-    'reset_requires_email_warning': 'إعادة تعيين كلمة المرور تتطلب أن يكون اسم المستخدم بريدًا إلكترونيًا صالحًا. قد لا تنجح هذه العملية.',
+    'reset_password_request_subtitle': 'أدخل بريدك الإلكتروني. إذا كان بريدًا إلكترونيًا صالحًا، فسيتم إرسال رابط لإعادة تعيين كلمة مرورك.',
+    // 'reset_requires_email_warning': 'إعادة تعيين كلمة المرور تتطلب أن يكون اسم المستخدم بريدًا إلكترونيًا صالحًا. قد لا تنجح هذه العملية.', // Removed
 
 
     // Rep Dashboard
@@ -252,13 +252,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'confirm_password': 'تأكيد كلمة المرور',
     'error_all_fields_required': 'يرجى ملء جميع الحقول المطلوبة.',
     'error_password_required': 'كلمة المرور مطلوبة للمستخدم الجديد.',
-    'username_cannot_be_changed': 'لا يمكن تغيير اسم المستخدم بعد الإنشاء.',
-    'username_helper_text': 'هذا هو المعرف الدائم للمندوب (كود المندوب). لا يمكن تغييره لاحقاً.',
-    'must_be_email': '',
+    'email_cannot_be_changed': 'لا يمكن تغيير البريد الإلكتروني بعد الإنشاء.', // Updated
+    'email_helper_text': 'هذا هو المعرف الدائم للمندوب (بريد إلكتروني). لا يمكن تغييره لاحقاً.', // Updated
+    'error_invalid_email_format': 'صيغة البريد الإلكتروني غير صحيحة.', // Added
+    // 'must_be_email': '', // Removed
     'reset_password_title': 'إعادة تعيين كلمة المرور',
     'reset_password_subtitle': 'أدخل كلمة المرور الجديدة لحسابك.',
     'password_reset_success': 'تم تغيير كلمة المرور بنجاح! سيتم الآن إعادة توجيهك لتسجيل الدخول.',
-    'user_already_exists': 'اسم المستخدم مسجل بالفعل.',
+    'user_already_exists': 'البريد الإلكتروني مسجل بالفعل.', // Updated
     'error_permission_denied': 'خطأ في الصلاحيات. تأكد من أن لديك الإذن لإضافة مستخدمين جدد ومن أن إعدادات قاعدة البيانات تسمح بذلك.',
     'error_smtp_not_configured': 'فشل إنشاء المستخدم. هذا يحدث عادةً لأن "تأكيد البريد الإلكتروني" مفعل في إعدادات Supabase ولكن خادم البريد (SMTP) غير مهيأ. الحل الأسهل هو إيقاف "Enable email confirmations" من قسم Authentication > Providers > Email في لوحة تحكم Supabase.',
     'error_db_trigger_failed': 'فشل إنشاء المستخدم. يحدث هذا غالبًا بسبب خطأ في قاعدة البيانات عند إنشاء ملف تعريف المستخدم (عبر trigger). الأسباب الشائعة هي وجود عمود `NOT NULL` في جدول `profiles` بدون قيمة افتراضية، أو خطأ في دالة `handle_new_user`. يرجى مراجعة سجلات قاعدة البيانات في لوحة تحكم Supabase لمزيد من التفاصيل.',
@@ -336,7 +337,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'pharmacies': 'Pharmacies',
     'responsible_rep': 'Responsible Rep',
     'full_name': 'Full Name',
-    'username': 'Username',
+    'username': 'Email Address', // Updated
     'role': 'Role',
     'users': 'Users',
     'locale': 'en-US',
@@ -371,23 +372,23 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Login
     'welcome_back': 'Welcome Back',
     'signin_to_account': 'Sign in to your account',
-    'incorrect_credentials': 'Incorrect username or password. Please try again or use the "Forgot password?" link.',
+    'incorrect_credentials': 'Incorrect email address or password. Please try again or use the "Forgot password?" link.',
     'login_error': 'An error occurred during login.',
     'profile_not_found': 'Login successful, but user profile was not found. Please contact an administrator.',
     'email_not_confirmed': 'Please confirm your email address before signing in. Check the user settings in Supabase.',
-    'email_address': 'Username',
+    'email_address': 'Email Address', // Explicitly defined
     'password': 'Password',
     'remember_me': 'Remember me',
     'sign_in': 'Sign In',
     'signing_in': 'Signing In...',
     'forgot_password': 'Forgot password?',
     'send_reset_link': 'Send Reset Link',
-    'reset_link_sent': 'If the username exists, a password reset link will be sent to the associated email.',
+    'reset_link_sent': 'If the email address exists, a password reset link will be sent to the associated email.',
     'back_to_login': 'Back to Login',
-    'error_enter_username': 'Please enter your username.',
+    'error_enter_email': 'Please enter the email address.', // Updated
     'reset_password_request_title': 'Reset Password',
-    'reset_password_request_subtitle': 'Enter your username. If it is a valid email address, a reset link will be sent.',
-    'reset_requires_email_warning': 'Password reset requires the username to be a valid email. This may not work for non-email usernames.',
+    'reset_password_request_subtitle': 'Enter your email address. If it is a valid email address, a reset link will be sent.',
+    // 'reset_requires_email_warning': 'Password reset requires the username to be a valid email. This may not work for non-email usernames.', // Removed
 
     // Rep Dashboard
     'rep_dashboard_title': 'Representative Dashboard',
@@ -469,7 +470,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'plan_review_error': 'An error occurred while reviewing the plan.',
     'approve': 'Approve',
     'reject': 'Reject',
-    'no_new_plans_to_review': 'No new plans to review.',
+    'no_new_plans_to_review': 'No new plans to review. Great job!',
     'weekly_plans_overview': 'Weekly Plans Overview',
     'rep': 'Rep',
     'rest_day': 'Rest',
@@ -568,13 +569,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'confirm_password': 'Confirm Password',
     'error_all_fields_required': 'Please fill all required fields.',
     'error_password_required': 'Password is required for a new user.',
-    'username_cannot_be_changed': 'Username cannot be changed after creation.',
-    'username_helper_text': 'This is the permanent identifier for the rep (employee code). It cannot be changed later.',
-    'must_be_email': '',
+    'email_cannot_be_changed': 'Email address cannot be changed after creation.', // Updated
+    'email_helper_text': 'This is the permanent identifier for the rep (email address). It cannot be changed later.', // Updated
+    'error_invalid_email_format': 'Invalid email format.', // Added
+    // 'must_be_email': '', // Removed
     'reset_password_title': 'Reset Your Password',
     'reset_password_subtitle': 'Enter the new password for your account.',
     'password_reset_success': 'Password changed successfully! Redirecting you to login...',
-    'user_already_exists': 'Username is already registered.',
+    'user_already_exists': 'Email address is already registered.', // Updated
     'error_permission_denied': 'Permission error. Ensure you have privileges to add new users and that database settings allow it.',
     'error_smtp_not_configured': 'User creation failed. This usually happens because "Email Confirmations" is enabled in Supabase settings but the mail server (SMTP) is not configured. The easiest solution is to turn OFF "Enable email confirmations" in your Supabase dashboard under Authentication > Providers > Email.',
     'error_db_trigger_failed': 'User creation failed. This is often caused by a database error when creating the user profile (via a trigger). Common causes are a `NOT NULL` column in the `profiles` table without a default value, or an error in the `handle_new_user` function. Please check the database logs in your Supabase dashboard for more details.',
@@ -582,7 +584,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'password_changed_successfully': 'Password changed successfully.',
     'user_added_successfully': 'User {0} added successfully.',
     'user_updated_successfully': 'User {0} updated successfully.',
-
 
     // Weekly View
     'previous_week': 'Previous Week',

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -42,7 +43,7 @@ const Login: React.FC = () => {
     setError('');
     setResetMessage('');
     if (!username.trim()) {
-      setError(t('error_enter_username'));
+      setError(t('error_enter_email')); // Updated error message
       return;
     }
     setLoading(true);
@@ -69,8 +70,6 @@ const Login: React.FC = () => {
       setAuthView('login');
   };
   
-  const isEmail = username.includes('@');
-
   if (authView === 'reset') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -85,25 +84,18 @@ const Login: React.FC = () => {
           {error && <p className="text-red-400 bg-red-900/50 text-sm text-center p-3 rounded-lg">{error}</p>}
           {resetMessage && <p className="text-green-400 bg-green-900/50 text-sm text-center p-3 rounded-lg">{resetMessage}</p>}
           
-          {!resetMessage && !isEmail && username.trim().length > 0 && (
-            <p className="text-yellow-400 bg-yellow-900/50 text-sm text-center p-3 rounded-lg">
-                {t('reset_requires_email_warning')}
-            </p>
-          )}
-
-
           {!resetMessage && (
             <form className="space-y-6" onSubmit={handlePasswordReset}>
               <div>
                 <input
-                  type="text"
+                  type="email" // Changed to email type
                   id="username-reset"
                   name="username-reset"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-700/50 rounded-lg border border-slate-500/50 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition"
-                  placeholder={t('username')}
-                  autoComplete="username"
+                  placeholder={t('email_address')} // Updated placeholder
+                  autoComplete="email" // Updated autocomplete
                   required
                 />
               </div>
@@ -155,14 +147,14 @@ const Login: React.FC = () => {
           {/* Username Input */}
           <div className="relative">
             <input
-              type="text"
+              type="email" // Changed to email type
               id="username"
               name="username"
               value={username}
               onChange={e => setUsername(e.target.value)}
               className="w-full px-4 py-3 bg-slate-700/50 rounded-lg border border-slate-500/50 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition"
-              placeholder={t('username')}
-              autoComplete="username"
+              placeholder={t('email_address')} // Updated placeholder
+              autoComplete="email" // Updated autocomplete
               required
             />
           </div>

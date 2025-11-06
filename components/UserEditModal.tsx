@@ -17,7 +17,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
   const isEditMode = !!userToEdit;
 
   const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(''); // This now represents the email
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.Rep);
@@ -29,7 +29,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
     if (isOpen) {
         if (userToEdit) {
           setName(userToEdit.name);
-          setUsername(userToEdit.username);
+          setUsername(userToEdit.username); // User's email
           setRole(userToEdit.role);
         } else {
           setName('');
@@ -53,6 +53,11 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
         setError(t('error_all_fields_required'));
         return;
     }
+    // Basic email format validation
+    if (!/\S+@\S+\.\S+/.test(username)) {
+        setError(t('error_invalid_email_format'));
+        return;
+    }
     if (!isEditMode && !password) { // Password required for new user
         setError(t('error_password_required'));
         return;
@@ -73,6 +78,10 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
                 name,
                 role,
             };
+            // If username (email) needs to be updated, it needs to be handled via supabase.auth.updateUser
+            // which requires admin privileges or re-authentication. For simplicity in this client-side demo,
+            // we are preventing email changes for existing users here.
+            // A more robust solution for changing email would be server-side.
             await api.updateUser(userToEdit.id, updates);
             setSuccessMessage(t('user_updated_successfully', name));
         } else {
@@ -85,7 +94,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
 
     } catch (err: any) {
       const errorMessage = err.message || '';
-      if (errorMessage.toLowerCase().includes('user already registered')) {
+      if (errorMessage.toLowerCase().includes('user already registered') || errorMessage.toLowerCase().includes('email already registered')) {
           setError(t('user_already_exists'));
       } else if (errorMessage.toLowerCase().includes('violates row-level security policy')) {
           setError(t('error_permission_denied'));
@@ -121,19 +130,19 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSucces
                 <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" />
                 </div>
                 <div>
-                <label htmlFor="username" className="block text-sm font-medium text-slate-800">{t('username')}</label>
+                <label htmlFor="username" className="block text-sm font-medium text-slate-800">{t('email_address')}</label>
                 <input 
-                    type="text" 
+                    type="email" // Changed to email type
                     id="username" 
                     value={username} 
                     onChange={e => setUsername(e.target.value)} 
                     required 
-                    disabled={isEditMode}
+                    disabled={isEditMode} // Cannot change email for existing user via this modal
                     className="mt-1 block w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-slate-200/50 disabled:text-slate-500" 
                     autoComplete="off"
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                    {isEditMode ? t('username_cannot_be_changed') : t('username_helper_text')}
+                    {isEditMode ? t('email_cannot_be_changed') : t('email_helper_text')}
                 </p>
                 </div>
 

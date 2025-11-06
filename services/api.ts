@@ -8,8 +8,6 @@ const handleSupabaseError = (error: any, context: string) => {
   throw new Error(error.message || `An unknown error occurred in ${context}`);
 };
 
-const DUMMY_DOMAIN = '@sanivita.app';
-
 export const api = {
   // --- CONNECTION TEST ---
   testSupabaseConnection: async (): Promise<boolean> => {
@@ -36,7 +34,7 @@ export const api = {
 
   login: async (username: string, password: string): Promise<User> => {
     const supabase = getSupabaseClient();
-    const email = username.includes('@') ? username : `${username}${DUMMY_DOMAIN}`;
+    const email = username; // username is now always treated as an email
     
     // Supabase auth uses email, but we can use the username field as if it were an email
     const { data: { user: authUser }, error } = await supabase.auth.signInWithPassword({
@@ -117,7 +115,7 @@ export const api = {
 
   addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
     const supabase = getSupabaseClient();
-    const email = userData.username.includes('@') ? userData.username : `${userData.username}${DUMMY_DOMAIN}`;
+    const email = userData.username; // username is now always treated as an email
 
     // Step 1: Save the manager's current session to prevent it from being overwritten.
     const { data: { session: managerSession } } = await supabase.auth.getSession();
@@ -142,7 +140,7 @@ export const api = {
     // The DB trigger `on_auth_user_created` creates the profile row.
     const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .update({ role: userData.role, username: userData.username })
+        .update({ role: userData.role, username: userData.username }) // username column stores the email
         .eq('id', authData.user.id)
         .select()
         .single();
@@ -208,7 +206,7 @@ export const api = {
   
   sendPasswordResetEmail: async (username: string): Promise<void> => {
     const supabase = getSupabaseClient();
-    const email = username.includes('@') ? username : `${username}${DUMMY_DOMAIN}`;
+    const email = username; // username is now always treated as an email
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin,
@@ -431,10 +429,10 @@ export const api = {
         const Name = row[0];
         const RegionName = row[1];
         const Spec = row[2];
-        const repUsername = row[3];
+        const repEmail = row[3]; // Expecting a full email address now
         const rowIndex = index + 2;
 
-        if (!Name || !RegionName || !Spec || !repUsername) {
+        if (!Name || !RegionName || !Spec || !repEmail) {
             result.failed++;
             result.errors.push(`Row ${rowIndex}: Missing required fields.`);
             continue;
@@ -454,11 +452,11 @@ export const api = {
             }
         }
         
-        const repId = userMap.get(String(repUsername).trim().toLowerCase());
+        const repId = userMap.get(String(repEmail).trim().toLowerCase());
         const specValues = [Specialization.Pediatrics, Specialization.Pulmonology] as const;
         const validSpec = specValues.find(s => s.toLowerCase() === String(Spec).trim().toLowerCase());
 
-        if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); continue; }
+        if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found.`); continue; }
         if (!validSpec) { result.failed++; result.errors.push(`Row ${rowIndex}: Invalid specialization "${Spec}".`); continue; }
         
         doctorsToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: validSpec });
@@ -502,10 +500,10 @@ export const api = {
 
           const Name = row[0];
           const RegionName = row[1];
-          const repUsername = row[2];
+          const repEmail = row[2]; // Expecting a full email address now
           const rowIndex = index + 2;
 
-          if (!Name || !RegionName || !repUsername) {
+          if (!Name || !RegionName || !repEmail) {
               result.failed++;
               result.errors.push(`Row ${rowIndex}: Missing required fields.`);
               continue;
@@ -524,9 +522,9 @@ export const api = {
               }
           }
           
-          const repId = userMap.get(String(repUsername).trim().toLowerCase());
+          const repId = userMap.get(String(repEmail).trim().toLowerCase());
 
-          if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with username "${repUsername}" not found.`); continue; }
+          if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found.`); continue; }
 
           pharmaciesToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: Specialization.Pharmacy });
       }
