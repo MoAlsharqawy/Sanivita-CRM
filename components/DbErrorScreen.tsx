@@ -40,7 +40,7 @@ USING (auth.uid() = id);
     return (
         <div className="min-h-screen bg-[#3a3358] text-slate-100 flex items-center justify-center p-4" dir={t('dir')}>
             <div className="w-full max-w-2xl bg-slate-800/50 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up">
-                <Logo className="h-20 mx-auto text-cyan-400"/>
+                <Logo className="h-20 mx-auto text-cyan-400" showIcon={false}/>
                 
                 <div className="text-center space-y-2 flex flex-col items-center">
                     <WarningIcon className="h-16 w-16 text-yellow-400 mb-4" />

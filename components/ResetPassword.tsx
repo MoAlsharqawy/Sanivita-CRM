@@ -50,7 +50,7 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess }) => {
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
             <div className="w-full max-w-sm bg-slate-800/50 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up">
-                <Logo className="h-20 mx-auto text-cyan-400"/>
+                <Logo className="h-20 mx-auto text-cyan-400" showIcon={false}/>
 
                 <div className="text-center space-y-2">
                     <h1 className="text-3xl font-bold text-white">{t('reset_password_title')}</h1>
