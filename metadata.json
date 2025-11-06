@@ -1,5 +1,5 @@
 {
-  "name": "SaniVita",
+  "name": "SaniVita-CRM",
   "description": "A custom CRM application for a pharmaceutical distribution company. It allows field representatives to log their daily visits to doctors and pharmacies, and for a manager to review reports, filter data, and export results.",
   "requestFramePermissions": []
 }

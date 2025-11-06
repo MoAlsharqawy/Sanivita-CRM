@@ -27,6 +27,7 @@ export const Logo: React.FC<{ className?: string }> = ({ className }) => {
       </svg>
       <span className="text-3xl font-bold bg-gradient-to-r from-blue-800 to-orange-500 text-transparent bg-clip-text">
         SaniVita
+        Pharma 
       </span>
     </div>
   );
