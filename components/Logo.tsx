@@ -17,14 +17,7 @@ export const Logo: React.FC<{ className?: string, showIcon?: boolean }> = ({ cla
           aria-hidden="true"
           role="img"
         >
-          <path
-            d="M256 512c141.4 0 256-114.6 256-256S397.4 0 256 0 0 114.6 0 256s114.6 256 256 256zM256 48a208.1 208.1 0 010 416V48z"
-            fill="#2563eb" // Blue-600
-          ></path>
-          <path
-            d="M256 48a208.1 208.1 0 000 416c114.9 0 208-93.1 208-208S370.9 48 256 48z"
-            fill="#f97316" // Orange-500
-          ></path>
+          
         </svg>
       )}
       <div className="flex flex-col items-center leading-none">
@@ -32,7 +25,7 @@ export const Logo: React.FC<{ className?: string, showIcon?: boolean }> = ({ cla
           SaniVita
         </span>
         <span className="text-xl font-light text-orange-500">
-          PharmaV35
+          Pharmav.36
         </span>
       </div>
     </div>
