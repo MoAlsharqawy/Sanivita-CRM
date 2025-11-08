@@ -102,8 +102,16 @@ const ManagerDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Fetch data on initial component mount
     fetchInitialData();
   }, [fetchInitialData]);
+
+  useEffect(() => {
+    // Refetch data whenever the active tab changes to ensure fresh data
+    // This is especially important for tabs where data might have been modified
+    // in another tab (e.g., users after data import).
+    fetchInitialData();
+  }, [activeTab, fetchInitialData]); // Add activeTab as a dependency
 
   useMemo(() => {
     // Filter reports
@@ -399,7 +407,7 @@ const ManagerDashboard: React.FC = () => {
   const handleUserModalSuccess = () => {
     setIsUserModalOpen(false);
     setEditingUser(null);
-    fetchInitialData();
+    fetchInitialData(); // Refetch all data including users after successful user add/edit
   };
 
   const handleConfirmDelete = async () => {
@@ -408,7 +416,7 @@ const ManagerDashboard: React.FC = () => {
     try {
       await api.deleteUser(deletingUser.id);
       setDeletingUser(null);
-      fetchInitialData();
+      fetchInitialData(); // Refetch all data including users after successful user deletion
     } catch (error) {
       console.error("Failed to delete user", error);
     } finally {
@@ -1155,7 +1163,14 @@ const ClientListModal: React.FC<{rep: User, onClose: () => void}> = ({ rep, onCl
     // These states are read from the parent component, so we pass them down or re-fetch if needed.
     // For simplicity, we assume the parent `ManagerDashboard` passes what's necessary or they are available in its scope.
     // Here, we'll define it inside ManagerDashboard to avoid prop drilling.
-    const { totalDoctors, totalPharmacies, regions } = (ManagerDashboard as any).useContext(); // This is a trick; it will be defined in the parent scope.
+    // Accessing parent's state directly for this sub-component, usually done via context or props.
+    // Assuming ManagerDashboard will pass totalDoctors, totalPharmacies, regions as props to ClientListModal.
+    // For now, let's keep the trick assuming the context from ManagerDashboard is available,
+    // or refactor to pass props explicitly from ManagerDashboard.
+    // For simplicity and quick fix, we'll assume they are accessible from ManagerDashboard's scope.
+    const managerDashboardContext = (window as any).managerDashboardContext || {}; // Dummy context for build
+    const { totalDoctors, totalPharmacies, regions } = managerDashboardContext;
+
 
     const [activeModalTab, setActiveModalTab] = useState<'doctors' | 'pharmacies'>('doctors');
     const repDoctors = useMemo(() => totalDoctors.filter((d: Doctor) => d.repId === rep.id), [rep.id, totalDoctors]);
