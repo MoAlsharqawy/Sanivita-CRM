@@ -25,7 +25,7 @@ export const Logo: React.FC<{ className?: string, showIcon?: boolean }> = ({ cla
           SaniVita
         </span>
         <span className="text-xl font-light text-orange-500">
-          Pharmav.36
+          Pharma v.37
         </span>
       </div>
     </div>
