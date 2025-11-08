@@ -28,7 +28,7 @@ export interface Doctor {
   name: string;
   regionId: number;
   repId: string; // Changed from number for UUID
-  specialization: Specialization.Pediatrics | Specialization.Pulmonology;
+  specialization: string; // Changed to string to allow dynamic specializations from import
 }
 
 export interface Pharmacy {
@@ -72,7 +72,7 @@ export type VisitReport = {
     repName: string;
     regionName: string;
     targetName: string;
-    targetSpecialization?: Specialization;
+    targetSpecialization?: string; // Changed to string to match Doctor specialization
     productName?: string;
     visitType?: 'Coaching' | 'Single';
     notes: string;

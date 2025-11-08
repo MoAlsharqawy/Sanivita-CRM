@@ -290,7 +290,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     
     // Data Import
     'step_1_prepare_file': 'الخطوة 1: تجهيز الملف',
-    'doctors_import_instructions': 'تأكد من أن ملف الإكسل يحتوي على الأعمدة التالية بالترتيب: {0}. قيم التخصص المتاحة هي: {1}.',
+    'doctors_import_instructions': 'تأكد من أن ملف الإكسل يحتوي على الأعمدة التالية بالترتيب: {0}. يمكنك استخدام أي قيمة للتخصص.',
     'pharmacies_import_instructions': 'تأكد من أن ملف الإكسل يحتوي على الأعمدة التالية بالترتيب: {0}.',
     'download_template_for': 'تحميل قالب {0}',
     'step_2_upload_file': 'الخطوة 2: رفع الملف',
@@ -607,7 +607,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     
     // Data Import
     'step_1_prepare_file': 'Step 1: Prepare Your File',
-    'doctors_import_instructions': 'Ensure your Excel file has the following columns in order: {0}. Available specializations are: {1}.',
+    'doctors_import_instructions': 'Ensure your Excel file has the following columns in order: {0}. You can use any string value for specialization.',
     'pharmacies_import_instructions': 'Ensure your Excel file has the following columns in order: {0}.',
     'download_template_for': 'Download {0} Template',
     'step_2_upload_file': 'Step 2: Upload Your File',
