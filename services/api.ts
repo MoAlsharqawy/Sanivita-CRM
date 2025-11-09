@@ -219,7 +219,7 @@ export const api = {
         email: profile.username || '',
         last_sign_in: 'غير معروف',
         status: 'مفعل'
-      }));
+      } as User));
 
     } catch (error: any) {
       console.error('Complete failure in getUsers:', error);
@@ -348,7 +348,7 @@ export const api = {
         ...profileData, 
         password: '',
         email: email
-      };
+      } as User;
 
     } catch (error: any) {
       // محاولة استعادة session في حالة الخطأ
@@ -391,7 +391,7 @@ export const api = {
       return null;
     }
 
-    return data ? { ...data, password: '' } : null;
+    return data ? { ...data, password: '' } as User : null;
   },
 
   deleteUser: async (userId: string): Promise<boolean> => {
@@ -466,28 +466,28 @@ export const api = {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('doctors').select('*');
     if (error) handleSupabaseError(error, 'getAllDoctors');
-    return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
+    return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id } as Doctor));
   },
 
   getDoctorsForRep: async (repId: string): Promise<Doctor[]> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('doctors').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getDoctorsForRep');
-    return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
+    return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id } as Doctor));
   },
 
   getAllPharmacies: async (): Promise<Pharmacy[]> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('pharmacies').select('*');
     if (error) handleSupabaseError(error, 'getAllPharmacies');
-    return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
+    return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id } as Pharmacy));
   },
 
   getPharmaciesForRep: async (repId: string): Promise<Pharmacy[]> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
-    return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
+    return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id } as Pharmacy));
   },
 
   // --- VISITS & REPORTS (using RPC) ---
@@ -509,7 +509,15 @@ export const api = {
     }
 
     const visitData = data as any;
-    return { ...visitData, doctorId: visitData.doctor_id, repId: visitData.rep_id, productIds: visit.productIds, regionId: visitData.region_id, visitType: visitData.visit_type, doctorComment: visitData.doctor_comment };
+    return { 
+      ...visitData, 
+      doctorId: visitData.doctor_id, 
+      repId: visitData.rep_id, 
+      productIds: visit.productIds, 
+      regionId: visitData.region_id, 
+      visitType: visitData.visit_type, 
+      doctorComment: visitData.doctor_comment 
+    } as DoctorVisit;
   },
 
   addPharmacyVisit: async (visit: Omit<PharmacyVisit, 'id' | 'date'>): Promise<PharmacyVisit> => {
@@ -521,7 +529,14 @@ export const api = {
       visit_notes: visit.visitNotes,
     }).select().single();
     if (error) handleSupabaseError(error, 'addPharmacyVisit');
-    return { ...data, pharmacyId: data.pharmacy_id, repId: data.rep_id, regionId: data.region_id, visitNotes: data.visit_notes };
+    const visitData = data as any;
+    return { 
+      ...visitData, 
+      pharmacyId: visitData.pharmacy_id, 
+      repId: visitData.rep_id, 
+      regionId: visitData.region_id, 
+      visitNotes: visitData.visit_notes 
+    } as PharmacyVisit;
   },
 
   getVisitReportsForRep: async (repId: string): Promise<VisitReport[]> => {
@@ -535,7 +550,7 @@ export const api = {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('get_visit_reports');
     if (error) handleSupabaseError(error, 'getAllVisitReports');
-    return (data || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return (data || []).sort((a: VisitReport, b: VisitReport) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
 
   getOverdueVisits: async (): Promise<ClientAlert[]> => {
@@ -681,7 +696,7 @@ export const api = {
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
-    const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pharmacy }[] = [];
+    const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization }[] = [];
 
     for (const [index, row] of rows.entries()) {
       if (row.length < 3 || row.every(cell => cell === null || cell === '')) continue;
