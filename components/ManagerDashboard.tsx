@@ -59,7 +59,7 @@ const ManagerDashboard: React.FC = () => {
   const [localHolidays, setLocalHolidays] = useState<string[]>([]);
   const [newHoliday, setNewHoliday] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
-
+  const [isSavingSettings, setIsSavingSettings] = useState(false); // New state for settings button
 
   // Filter states
   const [selectedRep, setSelectedRep] = useState<string>('all');
@@ -380,7 +380,14 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const handleSaveSettings = async () => {
-      if (!systemSettings) return;
+      setIsSavingSettings(true); // Start saving
+      // FIX: Changed 'setMessage' to 'setSettingsMessage'
+      setSettingsMessage('');
+      if (!systemSettings) { // Defensive check, should ideally not be null after initial fetch
+          setSettingsMessage(t('settings_saved_error')); // Or a more specific "settings_not_loaded_error"
+          setIsSavingSettings(false);
+          return;
+      }
       const newSettings = { weekends: localWeekends, holidays: localHolidays };
       try {
           await api.updateSystemSettings(newSettings);
@@ -391,6 +398,8 @@ const ManagerDashboard: React.FC = () => {
           console.error("Failed to save settings", error);
           setSettingsMessage(t('settings_saved_error'));
           setTimeout(() => setSettingsMessage(''), 3000);
+      } finally {
+          setIsSavingSettings(false); // End saving
       }
   };
 
@@ -1049,9 +1058,17 @@ const ManagerDashboard: React.FC = () => {
                 </div>
                 <button 
                     onClick={handleSaveSettings} 
-                    className="bg-orange-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    disabled={isSavingSettings} // Disable button while saving
+                    className="bg-orange-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:bg-orange-300 flex items-center justify-center"
                 >
-                    {t('save_settings')}
+                    {isSavingSettings ? (
+                        <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white me-3"></div>
+                            {t('saving_settings')}
+                        </>
+                    ) : (
+                        t('save_settings')
+                    )}
                 </button>
             </div>
         </div>
@@ -1151,26 +1168,31 @@ const ManagerDashboard: React.FC = () => {
             </Modal>
         )}
         
-        {viewingRepClients && <ClientListModal rep={viewingRepClients} onClose={() => setViewingRepClients(null)} />}
+        {viewingRepClients && 
+            <ClientListModal 
+                rep={viewingRepClients} 
+                onClose={() => setViewingRepClients(null)} 
+                totalDoctors={totalDoctors}
+                totalPharmacies={totalPharmacies}
+                regions={regions}
+            />
+        }
     </div>
   );
 };
 
 
 // A sub-component for the client list modal to keep the main component cleaner
-const ClientListModal: React.FC<{rep: User, onClose: () => void}> = ({ rep, onClose }) => {
-    const { t } = useLanguage();
-    // These states are read from the parent component, so we pass them down or re-fetch if needed.
-    // For simplicity, we assume the parent `ManagerDashboard` passes what's necessary or they are available in its scope.
-    // Here, we'll define it inside ManagerDashboard to avoid prop drilling.
-    // Accessing parent's state directly for this sub-component, usually done via context or props.
-    // Assuming ManagerDashboard will pass totalDoctors, totalPharmacies, regions as props to ClientListModal.
-    // For now, let's keep the trick assuming the context from ManagerDashboard is available,
-    // or refactor to pass props explicitly from ManagerDashboard.
-    // For simplicity and quick fix, we'll assume they are accessible from ManagerDashboard's scope.
-    const managerDashboardContext = (window as any).managerDashboardContext || {}; // Dummy context for build
-    const { totalDoctors, totalPharmacies, regions } = managerDashboardContext;
+interface ClientListModalProps {
+    rep: User;
+    onClose: () => void;
+    totalDoctors: Doctor[]; // Explicitly passed
+    totalPharmacies: Pharmacy[]; // Explicitly passed
+    regions: Region[]; // Explicitly passed
+}
 
+const ClientListModal: React.FC<ClientListModalProps> = ({ rep, onClose, totalDoctors, totalPharmacies, regions }) => {
+    const { t } = useLanguage();
 
     const [activeModalTab, setActiveModalTab] = useState<'doctors' | 'pharmacies'>('doctors');
     const repDoctors = useMemo(() => totalDoctors.filter((d: Doctor) => d.repId === rep.id), [rep.id, totalDoctors]);

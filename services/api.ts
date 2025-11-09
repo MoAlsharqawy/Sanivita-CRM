@@ -4,8 +4,64 @@ import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, Vi
 // Helper to handle Supabase errors
 const handleSupabaseError = (error: any, context: string) => {
   console.error(`Error in ${context}:`, error);
-  // In a real app, you might want to log this to a service like Sentry
   throw new Error(error.message || `An unknown error occurred in ${context}`);
+};
+
+// دالة مساعدة للتحقق من صلاحيات المدير
+const checkAdminPermissions = async (): Promise<boolean> => {
+  const supabase = getSupabaseClient();
+  
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    return profile?.role === 'manager' || profile?.role === 'admin';
+  } catch {
+    return false;
+  }
+};
+
+// دالة لإنشاء بروفايل إذا لم يوجد
+const ensureUserProfile = async (userId: string, userData: { email: string; name?: string; role?: UserRole }): Promise<any> => {
+  const supabase = getSupabaseClient();
+  
+  // التحقق أولاً إذا البروفايل موجود
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  // إنشاء بروفايل جديد
+  const { data: newProfile, error } = await supabase
+    .from('profiles')
+    .insert({
+      id: userId,
+      username: userData.email,
+      email: userData.email,
+      name: userData.name || userData.email.split('@')[0],
+      role: userData.role || 'user',
+      created_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Failed to create profile:', error);
+    throw new Error(`فشل إنشاء الملف الشخصي: ${error.message}`);
+  }
+
+  return newProfile;
 };
 
 export const api = {
@@ -13,8 +69,6 @@ export const api = {
   testSupabaseConnection: async (): Promise<boolean> => {
     try {
       const supabase = getSupabaseClient();
-      // A lightweight query to check if keys are valid and table exists.
-      // We're checking 'regions' table as it's fundamental for the app.
       const { error } = await supabase.from('regions').select('id', { count: 'exact', head: true });
       if (error) {
         console.error("Supabase connection test failed:", error.message);
@@ -30,15 +84,11 @@ export const api = {
     }
   },
 
-
   // --- AUTH & USER PROFILE ---
-
   login: async (username: string, password: string): Promise<User> => {
     const supabase = getSupabaseClient();
-    // The 'username' field is now always treated as the user's email address.
     const email = username;
 
-    // Supabase auth uses email for signInWithPassword.
     const { data: { user: authUser }, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
@@ -52,16 +102,12 @@ export const api = {
       throw new Error('incorrect_credentials');
     }
 
-    // After successful auth, fetch the user profile from our public.profiles table.
-    // This step is crucial for getting user metadata (like role, name).
-    // A failure here is critical, so we catch it, logout the partially-authed user, and re-throw.
     try {
       const profile = await api.getUserProfile(authUser.id);
       return profile;
     } catch (e: any) {
       console.error("Critical error: Failed to get profile immediately after login. Logging out.", e);
       await api.logout();
-      // Throw a specific, translatable error key to the UI.
       throw new Error('profile_not_found');
     }
   },
@@ -83,13 +129,12 @@ export const api = {
     if (error) {
       console.error("Database error fetching user profile:", error);
       if (error.message.includes('violates row-level security policy')) {
-        // Throw a specific error for the UI to catch and display a helpful message.
         throw new Error('rls_error');
       }
       handleSupabaseError(error, 'getUserProfile');
     }
 
-    if (!data) { // Explicitly handle profile not found
+    if (!data) {
       console.error(`Profile not found for user ID ${userId}. The user exists in authentication but not in the profiles table.`);
       throw new Error('profile_not_found');
     }
@@ -108,96 +153,228 @@ export const api = {
   },
 
   // --- USER MANAGEMENT (MANAGER) ---
-
   getUsers: async (): Promise<User[]> => {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('profiles').select('*');
-    if (error) handleSupabaseError(error, 'getUsers');
-    return (data || []).map(u => ({ ...u, password: '' }));
+    
+    try {
+      // المحاولة الأولى: استخدام Admin API مع Service Role Key
+      const { data: { users: authUsers }, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (!authError && authUsers) {
+        // نجح Admin API - الآن دمج مع بيانات profiles
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', authUsers.map(u => u.id));
+
+        // إنشاء map للبروفايلات للبحث السريع
+        const profilesMap = new Map();
+        if (!profilesError && profiles) {
+          profiles.forEach(profile => {
+            profilesMap.set(profile.id, profile);
+          });
+        }
+
+        // دمج البيانات مع fallback ذكي
+        const mergedUsers = authUsers.map(authUser => {
+          const profile = profilesMap.get(authUser.id);
+          
+          return {
+            id: authUser.id,
+            username: authUser.email || profile?.username || '',
+            name: profile?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+            role: (profile?.role as UserRole) || 
+                  (authUser.user_metadata?.role as UserRole) || 
+                  'user',
+            password: '',
+            email: authUser.email || '',
+            created_at: profile?.created_at || authUser.created_at,
+            last_sign_in_at: authUser.last_sign_in_at,
+            email_confirmed_at: authUser.email_confirmed_at,
+            last_sign_in: authUser.last_sign_in_at ? 
+              new Date(authUser.last_sign_in_at).toLocaleDateString('ar-EG') : 
+              'لم يسجل دخول',
+            status: authUser.email_confirmed_at ? 'مفعل' : 'في انتظار التفعيل'
+          };
+        });
+
+        return mergedUsers;
+      }
+
+      // المحاولة الثانية: Fallback إلى profiles table فقط
+      console.warn('Admin API unavailable, falling back to profiles table');
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Profiles fallback also failed:', error);
+        throw error;
+      }
+
+      return (profiles || []).map(profile => ({
+        ...profile,
+        password: '',
+        email: profile.username || '',
+        last_sign_in: 'غير معروف',
+        status: 'مفعل'
+      }));
+
+    } catch (error: any) {
+      console.error('Complete failure in getUsers:', error);
+      
+      // Fallback نهائي آمن
+      if (error.message?.includes('JWT')) {
+        throw new Error('خطأ في الصلاحيات: تأكد من استخدام مفتاح Service Role في واجهة المدير');
+      }
+      
+      if (error.message?.includes('row-level security')) {
+        throw new Error('تم رفض الوصول: سياسات الأمان تمنع عرض المستخدمين');
+      }
+      
+      throw new Error(`فشل تحميل بيانات المستخدمين: ${error.message || 'سبب غير معروف'}`);
+    }
+  },
+
+  getUsersStats: async (): Promise<{
+    total: number;
+    active: number;
+    pending: number;
+    managers: number;
+    reps: number;
+  }> => {
+    try {
+      const users = await api.getUsers();
+      
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
+
+      return {
+        total: users.length,
+        active: users.filter(u => u.last_sign_in_at && new Date(u.last_sign_in_at) > thirtyDaysAgo).length,
+        pending: users.filter(u => !u.email_confirmed_at).length,
+        managers: users.filter(u => u.role === 'manager').length,
+        reps: users.filter(u => u.role === 'rep').length
+      };
+    } catch (error) {
+      console.error('Error getting users stats:', error);
+      return {
+        total: 0,
+        active: 0,
+        pending: 0,
+        managers: 0,
+        reps: 0
+      };
+    }
   },
 
   addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
     const supabase = getSupabaseClient();
-    // The 'username' field from the UI is now always treated as the user's email address.
-    const email = userData.username;
+    
+    // التحقق من الصلاحيات
+    const isAdmin = await checkAdminPermissions();
+    if (!isAdmin) {
+      throw new Error('error_permission_denied');
+    }
 
-    // Step 1: Save the manager's current session to prevent it from being overwritten.
+    const email = userData.username.toLowerCase().trim();
+
+    // التحقق من صحة البريد الإلكتروني
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('بريد إلكتروني غير صالح');
+    }
+
+    // التحقق من قوة كلمة المرور
+    if (userData.password.length < 6) {
+      throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    }
+
+    // حفظ session المدير الحالي
     const { data: { session: managerSession } } = await supabase.auth.getSession();
+    let sessionRestored = false;
 
-    // Step 2: Create the new user in Supabase Auth. This action temporarily signs in the new user.
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: email,
-      password: userData.password,
-      options: {
-        data: {
-          name: userData.name, // Pass name to be used by the 'on_auth_user_created' trigger (if configured)
+    try {
+      // إنشاء المستخدم في Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
+        password: userData.password,
+        options: {
+          data: {
+            name: userData.name,
+            role: userData.role
+          }
+        }
+      });
+
+      if (authError) {
+        if (authError.message.includes('user already registered')) {
+          throw new Error('user_already_exists');
+        }
+        if (authError.message.includes('password')) {
+          throw new Error('كلمة المرور غير مقبولة');
+        }
+        if (authError.message.includes('email')) {
+          throw new Error('البريد الإلكتروني غير مقبول');
+        }
+        handleSupabaseError(authError, 'addUser (signUp)');
+      }
+      
+      if (!authData.user) {
+        throw new Error('فشل إنشاء المستخدم في النظام');
+      }
+
+      // تأكيد إنشاء البروفايل
+      const profileData = await ensureUserProfile(authData.user.id, {
+        email: email,
+        name: userData.name,
+        role: userData.role
+      });
+
+      // استعادة session المدير
+      if (managerSession) {
+        const { error: restoreError } = await supabase.auth.setSession({
+          access_token: managerSession.access_token,
+          refresh_token: managerSession.refresh_token,
+        });
+        
+        if (!restoreError) {
+          sessionRestored = true;
         }
       }
-    });
 
-    if (authError) {
-      // More specific error handling for common signUp errors
-      if (authError.message.includes('user already registered') || authError.message.includes('email already registered')) {
+      return { 
+        ...profileData, 
+        password: '',
+        email: email
+      };
+
+    } catch (error: any) {
+      // محاولة استعادة session في حالة الخطأ
+      if (!sessionRestored && managerSession) {
+        try {
+          await supabase.auth.setSession({
+            access_token: managerSession.access_token,
+            refresh_token: managerSession.refresh_token,
+          });
+        } catch (restoreError) {
+          console.error('Failed to restore session:', restoreError);
+        }
+      }
+
+      // إعادة throw الخطأ مع رسالة مناسبة
+      if (error.message === 'user_already_exists') {
         throw new Error('user_already_exists');
       }
-      if (authError.message.includes('error sending confirmation mail')) {
-        throw new Error('error_smtp_not_configured');
-      }
-      handleSupabaseError(authError, 'addUser (signUp)');
+      
+      throw new Error(error.message || 'فشل إنشاء المستخدم');
     }
-    if (!authData.user) {
-      // This case should ideally be covered by authError, but as a safeguard.
-      throw new Error('database_error_creating_new_user');
-    }
-
-    // Step 3: Update the new user's profile with role and original username (email).
-    // NOTE: This assumes a Supabase trigger (e.g., 'on_auth_user_created') has ALREADY created a basic profile entry.
-    // If no trigger is configured, this 'update' will fail because the row does not exist.
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .update({ role: userData.role, username: userData.username }) // 'username' column stores the email
-      .eq('id', authData.user.id)
-      .select()
-      .single();
-
-    // Step 4: Restore the manager's original session. This is critical.
-    if (managerSession) {
-      const { error: restoreError } = await supabase.auth.setSession({
-        access_token: managerSession.access_token,
-        refresh_token: managerSession.refresh_token,
-      });
-      if (restoreError) {
-        console.error("CRITICAL: Failed to restore manager session. A page refresh may be required.", restoreError);
-      }
-    } else {
-      // If the manager wasn't logged in (e.g., first user setup), sign out the newly created user.
-      await supabase.auth.signOut();
-    }
-
-    // After restoring the session, handle any errors from the profile update.
-    if (profileError) {
-      // If the profile row wasn't created by a trigger, this update will fail.
-      if (profileError.message.includes('violates row-level security policy')) {
-        throw new Error('error_permission_denied');
-      }
-      // Specific error for trigger failure if profile doesn't exist.
-      // Supabase error code for "no rows affected" (if the profile wasn't created by trigger)
-      if (profileError.code === 'PGRST116') {
-        throw new Error('error_db_trigger_failed');
-      }
-      handleSupabaseError(profileError, 'addUser (profile update)');
-    }
-
-    return { ...profileData, password: '' };
   },
 
   updateUser: async (userId: string, updates: Partial<Pick<User, 'name' | 'role'>>): Promise<User | null> => {
     const supabase = getSupabaseClient();
-    // NOTE: Updating another user's username (email) or password requires admin privileges
-    // and should ideally be a server-side operation for security reasons.
-    // In this client-side demo, we're preventing email changes for existing users via the UI.
-
-    // Update non-auth fields in profiles table
+    
     const { name, role } = updates;
     const { data, error } = await supabase
       .from('profiles')
@@ -207,7 +384,6 @@ export const api = {
       .single();
 
     if (error) {
-      // More specific error handling for common RLS issues when updating another user
       if (error.message.includes('violates row-level security policy')) {
         throw new Error('error_permission_denied');
       }
@@ -219,47 +395,30 @@ export const api = {
   },
 
   deleteUser: async (userId: string): Promise<boolean> => {
-    // Deleting a user requires admin privileges in Supabase Auth.
-    // This functionality will NOT work with just the anon key unless an RPC is configured with 'security definer'.
-    // For a secure, production-ready solution, consider calling a serverless function.
-    console.warn("Attempting to delete user. This typically requires admin privileges or an RPC in Supabase.");
     const supabase = getSupabaseClient();
-    // Example of an RPC call if you have a custom function to delete:
-    // const { error: rpcError } = await supabase.rpc('delete_user_and_profile', { p_user_id: userId });
-    // if (rpcError) handleSupabaseError(rpcError, 'deleteUser RPC');
-
-    // Direct client-side admin.deleteUser is usually not enabled for anon key.
-    const { error } = await supabase.auth.admin.deleteUser(userId); // This will likely fail with anon key
+    
+    const { error } = await supabase.auth.admin.deleteUser(userId);
     if (error) {
-      // Log a more descriptive error if it's a permission issue from admin.deleteUser
       console.error("Failed to delete user with admin privileges:", error.message);
-      throw new Error('error_permission_denied_delete_user'); // Custom error for UI
+      throw new Error('error_permission_denied_delete_user');
     }
     return true;
   },
 
   sendPasswordResetEmail: async (username: string): Promise<void> => {
     const supabase = getSupabaseClient();
-    // The 'username' field is now always treated as the user's email address.
     const email = username;
 
-    // Supabase will send a reset email to this address.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin, // Redirects back to the app after reset
+      redirectTo: window.location.origin,
     });
 
     if (error) {
-      // For security, avoid exposing whether an email exists or not.
-      // We log the error internally but the UI will show a generic message.
       console.error('Password reset request error:', error.message);
     }
-    // We don't throw here; the UI will always show a generic success message
-    // to prevent leaking information about which emails are registered.
   },
 
-
   // --- CORE DATA FETCHING ---
-
   getRegions: async (): Promise<Region[]> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('regions').select('*');
@@ -279,8 +438,7 @@ export const api = {
       .single();
 
     if (error) {
-      // Handle unique constraint violation if region already exists (race condition)
-      if (error.code === '23505') { // unique_violation
+      if (error.code === '23505') {
         console.warn(`Region "${regionName}" already exists, fetching it instead.`);
         const { data: existingData, error: fetchError } = await supabase
           .from('regions')
@@ -329,7 +487,6 @@ export const api = {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
-    // FIX: Corrected a typo from `d.rep_id` to `p.rep_id` to match the map variable.
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
   },
 
@@ -389,7 +546,6 @@ export const api = {
   },
 
   // --- WEEKLY PLANS ---
-
   getRepPlan: async (repId: string): Promise<WeeklyPlan> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('weekly_plans').select('*').eq('rep_id', repId).maybeSingle();
@@ -420,7 +576,6 @@ export const api = {
     const { data, error } = await supabase.from('weekly_plans').select('*');
     if (error) handleSupabaseError(error, 'getAllPlans');
 
-    // Transform array to object, matching the old data structure for easier frontend integration
     const plansObject: { [repId: string]: WeeklyPlan } = {};
     (data || []).forEach(plan => {
       plansObject[plan.rep_id] = {
@@ -432,7 +587,6 @@ export const api = {
   },
 
   // --- SYSTEM SETTINGS ---
-
   getSystemSettings: async (): Promise<SystemSettings> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('system_settings').select('*').eq('id', 1).single();
@@ -456,7 +610,6 @@ export const api = {
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
-    // NOTE: userMap now uses the 'username' field (which holds the email) for mapping.
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
     const doctorsToInsert: { name: string; region_id: number; rep_id: string; specialization: string }[] = [];
@@ -466,8 +619,8 @@ export const api = {
 
       const Name = row[0];
       const RegionName = row[1];
-      const Spec = row[2]; // Specialization from Excel
-      const repEmail = row[3]; // Expecting a full email address now
+      const Spec = row[2];
+      const repEmail = row[3];
       const rowIndex = index + 2;
 
       if (!Name || !RegionName || !Spec || !repEmail) {
@@ -490,13 +643,10 @@ export const api = {
         }
       }
 
-      // NOTE: repId is found using the provided repEmail (username) from the import file.
       const repId = userMap.get(String(repEmail).trim().toLowerCase());
 
       if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found. Ensure this email exists in the system.`); continue; }
 
-      // Specialization: Directly use the provided string from the Excel file
-      // Assuming the database column 'specialization' is of type 'text' or 'varchar'
       doctorsToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: String(Spec).trim() });
     }
 
@@ -529,7 +679,6 @@ export const api = {
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
-    // NOTE: userMap now uses the 'username' field (which holds the email) for mapping.
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
     const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pharmacy }[] = [];
@@ -539,7 +688,7 @@ export const api = {
 
       const Name = row[0];
       const RegionName = row[1];
-      const repEmail = row[2]; // Expecting a full email address now
+      const repEmail = row[2];
       const rowIndex = index + 2;
 
       if (!Name || !RegionName || !repEmail) {
@@ -561,7 +710,6 @@ export const api = {
         }
       }
 
-      // NOTE: repId is found using the provided repEmail (username) from the import file.
       const repId = userMap.get(String(repEmail).trim().toLowerCase());
 
       if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found. Ensure this email exists in the system.`); continue; }
