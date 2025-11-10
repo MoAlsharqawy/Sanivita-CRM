@@ -36,6 +36,7 @@ const RepDashboard: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
+    console.log('RepDashboard: Current user ID:', user.id); // Added console.log
     setLoading(true);
     try {
       const [doctorsData, pharmaciesData, productsData, visitsData, regionsData, overdueData, settingsData, planData] = await Promise.all([

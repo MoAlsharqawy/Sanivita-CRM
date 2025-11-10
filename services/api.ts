@@ -313,8 +313,10 @@ export const api = {
 
   getDoctorsForRep: async (repId: string): Promise<Doctor[]> => {
     const supabase = getSupabaseClient();
+    console.log('API: Fetching doctors for repId:', repId); // Added console.log
     const { data, error } = await supabase.from('doctors').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getDoctorsForRep');
+    console.log('API: Raw doctors data from Supabase:', data); // Added console.log
     return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
   },
 
@@ -327,8 +329,10 @@ export const api = {
 
   getPharmaciesForRep: async (repId: string): Promise<Pharmacy[]> => {
     const supabase = getSupabaseClient();
+    console.log('API: Fetching pharmacies for repId:', repId); // Added console.log
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
+    console.log('API: Raw pharmacies data from Supabase:', data); // Added console.log
     // FIX: Corrected a typo from `d.rep_id` to `p.rep_id` to match the map variable.
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
   },

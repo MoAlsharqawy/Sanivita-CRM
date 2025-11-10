@@ -380,26 +380,34 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const handleSaveSettings = async () => {
+      console.log('handleSaveSettings triggered');
       setIsSavingSettings(true); // Start saving
-      // FIX: Changed 'setMessage' to 'setSettingsMessage'
-      setSettingsMessage('');
-      if (!systemSettings) { // Defensive check, should ideally not be null after initial fetch
-          setSettingsMessage(t('settings_saved_error')); // Or a more specific "settings_not_loaded_error"
-          setIsSavingSettings(false);
+      console.log('isSavingSettings set to true');
+
+      setSettingsMessage(''); // Clear previous messages
+
+      if (!systemSettings) {
+          console.error('System settings are null when trying to save.');
+          setSettingsMessage(t('settings_saved_error')); // Provide specific error feedback
+          setIsSavingSettings(false); // Ensure button is re-enabled
           return;
       }
       const newSettings = { weekends: localWeekends, holidays: localHolidays };
       try {
+          console.log('Attempting to update system settings with:', newSettings);
           await api.updateSystemSettings(newSettings);
-          setSystemSettings(newSettings);
+          setSystemSettings(newSettings); // Update local state with potentially new settings from DB
           setSettingsMessage(t('settings_saved_success'));
+          console.log('Settings saved successfully.');
           setTimeout(() => setSettingsMessage(''), 3000);
-      } catch (error) {
-          console.error("Failed to save settings", error);
-          setSettingsMessage(t('settings_saved_error'));
-          setTimeout(() => setSettingsMessage(''), 3000);
+      } catch (error: any) {
+          console.error("Failed to save settings:", error);
+          // Ensure the error message from API is displayed if available, otherwise generic.
+          setSettingsMessage(error.message ? t(error.message) : t('settings_saved_error'));
+          setTimeout(() => setSettingsMessage(''), 5000); // Give user more time to read error
       } finally {
           setIsSavingSettings(false); // End saving
+          console.log('isSavingSettings set to false (finally block)');
       }
   };
 
