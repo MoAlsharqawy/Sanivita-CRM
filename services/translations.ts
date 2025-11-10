@@ -1,3 +1,5 @@
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -212,7 +214,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'doctor': 'الطبيب',
     'pharmacy': 'الصيدلية',
     'search_for_doctor': 'ابحث عن طبيب...',
-    'search_for_pharmacy': 'ابحث عن صيدلية...',
+    // Fix: Renamed duplicate 'pharmacy' key to 'search_for_pharmacy' for consistency with 'search_for_doctor'
+    'search_for_pharmacy': 'ابحث عن صيدلية...', 
     'products_select_limit': 'المنتجات (اختر حتى 3)',
     'coaching_single_select': 'نوع الزيارة',
     'doctor_comment': 'تعليق الطبيب',
@@ -269,7 +272,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'user_added_successfully': 'تمت إضافة المندوب {0} بنجاح.',
     'user_updated_successfully': 'تم تحديث بيانات المندوب {0} بنجاح.',
 
-
     // Weekly View
     'previous_week': 'الأسبوع السابق',
     'next_week': 'الأسبوع التالي',
@@ -318,6 +320,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'copied': 'تم النسخ!',
     'try_again': 'لقد قمت بتشغيل الكود، حاول مرة أخرى',
     'database_error_creating_new_user': 'خطأ في قاعدة البيانات أثناء إنشاء مستخدم جديد. يرجى التحقق من سجلات Supabase.',
+    // New error keys for SQL function issue
+    'error_get_visit_reports_sql_config': 'فشل جلب تقارير الزيارة بسبب خطأ في تكوين دالة قاعدة البيانات (عدم تطابق أنواع UNION في "التخصص").',
+
   },
   en: {
     // General
@@ -531,6 +536,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'doctor': 'Doctor',
     'pharmacy': 'Pharmacy',
     'search_for_doctor': 'Search for a doctor...',
+    // Fix: Renamed duplicate 'pharmacy' key to 'search_for_pharmacy' for consistency with 'search_for_doctor'
     'search_for_pharmacy': 'Search for a pharmacy...',
     'products_select_limit': 'Products (Select up to 3)',
     'coaching_single_select': 'Visit Type',
@@ -636,5 +642,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'copied': 'Copied!',
     'try_again': "I've run the SQL, Try Again",
     'database_error_creating_new_user': 'Database error creating new user. Please check Supabase logs.',
+    // New error keys for SQL function issue
+    'error_get_visit_reports_sql_config': 'Failed to fetch visit reports due to a database function configuration error (UNION types mismatch in "specialization").',
   }
 };

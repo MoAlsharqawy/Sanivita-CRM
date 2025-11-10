@@ -1,3 +1,4 @@
+
 import { getSupabaseClient, initializeSupabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole } from '../types';
 
@@ -313,10 +314,10 @@ export const api = {
 
   getDoctorsForRep: async (repId: string): Promise<Doctor[]> => {
     const supabase = getSupabaseClient();
-    console.log('API: Fetching doctors for repId:', repId); // Added console.log
+    console.log(`API: Fetching doctors for repId: ${repId}`);
     const { data, error } = await supabase.from('doctors').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getDoctorsForRep');
-    console.log('API: Raw doctors data from Supabase:', data); // Added console.log
+    console.log(`API: Raw doctors data from Supabase for repId ${repId}:`, data);
     return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
   },
 
@@ -329,11 +330,11 @@ export const api = {
 
   getPharmaciesForRep: async (repId: string): Promise<Pharmacy[]> => {
     const supabase = getSupabaseClient();
-    console.log('API: Fetching pharmacies for repId:', repId); // Added console.log
+    console.log(`API: Fetching pharmacies for repId: ${repId}`);
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
-    console.log('API: Raw pharmacies data from Supabase:', data); // Added console.log
-    // FIX: Corrected a typo from `d.rep_id` to `p.rep_id` to match the map variable.
+    console.log(`API: Raw pharmacies data from Supabase for repId ${repId}:`, data);
+    // Corrected type in map function (p.rep_id instead of d.rep_id)
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
   },
 
@@ -374,14 +375,32 @@ export const api = {
   getVisitReportsForRep: async (repId: string): Promise<VisitReport[]> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('get_visit_reports', { p_rep_id: repId });
-    if (error) handleSupabaseError(error, 'getVisitReportsForRep');
+    if (error) {
+      // Specific error handling for the 'UNION types' issue
+      if (error.code === '42804' && error.message.includes('UNION types text and specialization cannot be matched')) {
+        console.error("Critical SQL Function Error: 'get_visit_reports' RPC failed due to UNION type mismatch.");
+        console.error("This usually means the 'specialization' column in your 'doctors' table is an ENUM type in the database, and the 'get_visit_reports' function is trying to UNION it with a TEXT or NULL type for pharmacy visits without explicit casting.");
+        console.error("Solution: Edit your 'get_visit_reports' SQL function in Supabase. Ensure that the 'target_specialization' column for BOTH doctor and pharmacy visits is explicitly cast to 'TEXT' (e.g., `d.specialization::text` and `NULL::text`).");
+        throw new Error("error_get_visit_reports_sql_config");
+      }
+      handleSupabaseError(error, 'getVisitReportsForRep');
+    }
     return data || [];
   },
 
   getAllVisitReports: async (): Promise<VisitReport[]> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('get_visit_reports');
-    if (error) handleSupabaseError(error, 'getAllVisitReports');
+    if (error) {
+      // Apply the same specific error handling for all reports as well.
+      if (error.code === '42804' && error.message.includes('UNION types text and specialization cannot be matched')) {
+        console.error("Critical SQL Function Error: 'get_visit_reports' RPC failed due to UNION type mismatch.");
+        console.error("This usually means the 'specialization' column in your 'doctors' table is an ENUM type in the database, and the 'get_visit_reports' function is trying to UNION it with a TEXT or NULL type for pharmacy visits without explicit casting.");
+        console.error("Solution: Edit your 'get_visit_reports' SQL function in Supabase. Ensure that the 'target_specialization' column for BOTH doctor and pharmacy visits is explicitly cast to 'TEXT' (e.g., `d.specialization::text` and `NULL::text`).");
+        throw new Error("error_get_visit_reports_sql_config");
+      }
+      handleSupabaseError(error, 'getAllVisitReports');
+    }
     return (data || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
 
