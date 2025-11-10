@@ -58,7 +58,7 @@ const RepDashboard: React.FC = () => {
       setSystemSettings(settingsData);
       setPlan(planData);
     } catch (error) {
-      console.error("Failed to fetch data", error);
+      console.error("Failed to fetch data", error); // Keep general error logging
     } finally {
       setLoading(false);
     }
@@ -491,3 +491,4 @@ const RepDashboard: React.FC = () => {
 };
 
 export default RepDashboard;
+    
