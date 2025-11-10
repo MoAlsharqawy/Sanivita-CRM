@@ -319,7 +319,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'try_again': 'لقد قمت بتشغيل الكود، حاول مرة أخرى',
     'database_error_creating_new_user': 'خطأ في قاعدة البيانات أثناء إنشاء مستخدم جديد. يرجى التحقق من سجلات Supabase.',
     // New error keys for SQL function issue
-    'error_get_visit_reports_sql_config': 'فشل جلب تقارير الزيارة بسبب خطأ في تكوين دالة قاعدة البيانات (عدم تطابق أنواع UNION في عمود "التخصص").',
+    'error_get_visit_reports_sql_config': 'فشل جلب تقارير الزيارة بسبب خطأ في تكوين دالة قاعدة البيانات (عدم تطابق أنواع UNION). يرجى مراجعة تعريف دالة "get_visit_reports" في Supabase للتأكد من توافق أنواع الأعمدة.',
 
   },
   en: {
@@ -640,7 +640,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'try_again': "I've run the SQL, Try Again",
     'database_error_creating_new_user': 'Database error creating new user. Please check Supabase logs.',
     // New error keys for SQL function issue
-    'error_get_visit_reports_sql_config': 'Failed to fetch visit reports due to a database function configuration error (UNION types mismatch in "specialization" column).',
+    'error_get_visit_reports_sql_config': 'Failed to fetch visit reports due to a database function configuration error (UNION types mismatch). Please review your "get_visit_reports" function definition in Supabase to ensure column type compatibility.',
   }
 };
-    
