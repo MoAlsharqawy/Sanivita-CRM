@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
@@ -5,11 +7,51 @@ import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClient
 import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
-import { useLanguage } from '../hooks/useLanguage';
+import { useLanguage, TranslationFunction } from '../hooks/useLanguage';
 import DataImport from './DataImport';
 import Spinner from './Spinner';
 import UserEditModal from './UserEditModal';
 import AnalyticsCharts from './AnalyticsCharts';
+import DailyVisitsDetailModal from './DailyVisitsDetailModal';
+import OverdueClientsDetailModal from './OverdueClientsDetailModal'; // New import
+
+// Helper functions for dates (YYYY-MM-DD format)
+const toYYYYMMDD = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
+const getTodayDateString = (): string => {
+  return toYYYYMMDD(new Date());
+};
+
+const getCurrentWeekDateStrings = (t: TranslationFunction): { start: string; end: string } => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+  const startDate = new Date(today);
+  // Adjust to the most recent Saturday (or today if it's Saturday)
+  startDate.setDate(today.getDate() - (dayOfWeek === 6 ? 0 : dayOfWeek + 1));
+  
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6); // End of the week (Friday)
+
+  return {
+    start: toYYYYMMDD(startDate),
+    end: toYYYYMMDD(endDate),
+  };
+};
+
+const getCurrentMonthDateStrings = (): { start: string; end: string } => {
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Day 0 of next month is last day of current
+
+  return {
+    start: toYYYYMMDD(startOfMonth),
+    end: toYYYYMMDD(endOfMonth),
+  };
+};
+
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -47,6 +89,8 @@ const ManagerDashboard: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedRepsForExport, setSelectedRepsForExport] = useState<string[]>([]);
   const [selectedRepForDailyVisits, setSelectedRepForDailyVisits] = useState<string | 'all'>('all');
+  const [isDailyVisitsDetailModalOpen, setIsDailyVisitsDetailModalOpen] = useState(false);
+  const [isOverdueClientsDetailModalOpen, setIsOverdueClientsDetailModalOpen] = useState(false); // New state for overdue clients detail modal
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
@@ -66,6 +110,8 @@ const ManagerDashboard: React.FC = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [selectedQuickFilter, setSelectedQuickFilter] = useState<'none' | 'today' | 'currentWeek' | 'currentMonth'>('none');
+
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -114,19 +160,39 @@ const ManagerDashboard: React.FC = () => {
   }, [activeTab, fetchInitialData]); // Add activeTab as a dependency
 
   useMemo(() => {
-    // Filter reports
     let reports = allReports;
+    let currentStartDate = startDate;
+    let currentEndDate = endDate;
+
+    // Apply quick filters if selected, overriding manual inputs
+    if (selectedQuickFilter === 'today') {
+      const today = getTodayDateString();
+      currentStartDate = today;
+      currentEndDate = today;
+    } else if (selectedQuickFilter === 'currentWeek') {
+      const { start, end } = getCurrentWeekDateStrings(t);
+      currentStartDate = start;
+      currentEndDate = end;
+    } else if (selectedQuickFilter === 'currentMonth') {
+      const { start, end } = getCurrentMonthDateStrings();
+      currentStartDate = start;
+      currentEndDate = end;
+    }
+
     if (selectedRep !== 'all') {
       reports = reports.filter(r => r.repName === selectedRep);
     }
     if (selectedRegion !== 'all') {
       reports = reports.filter(r => r.regionName === selectedRegion);
     }
-    if (startDate) {
-      reports = reports.filter(r => new Date(r.date) >= new Date(startDate));
+    if (currentStartDate) {
+      reports = reports.filter(r => new Date(r.date) >= new Date(currentStartDate));
     }
-    if (endDate) {
-      reports = reports.filter(r => new Date(r.date) <= new Date(endDate));
+    if (currentEndDate) {
+      // Add one day to endDate to include visits on the selected end date
+      const endOfDay = new Date(currentEndDate);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+      reports = reports.filter(r => new Date(r.date) < endOfDay);
     }
     setFilteredReports(reports);
     
@@ -140,7 +206,7 @@ const ManagerDashboard: React.FC = () => {
     }
     setFilteredAlerts(alerts);
 
-  }, [selectedRep, selectedRegion, startDate, endDate, allReports, overdueAlerts]);
+  }, [selectedRep, selectedRegion, startDate, endDate, selectedQuickFilter, allReports, overdueAlerts, t]);
   
   const displayedStats = useMemo(() => {
     const today = new Date();
@@ -321,7 +387,35 @@ const ManagerDashboard: React.FC = () => {
     setSelectedRegion('all');
     setStartDate('');
     setEndDate('');
+    setSelectedQuickFilter('none');
   }
+
+  const handleQuickFilterClick = (filter: 'today' | 'currentWeek' | 'currentMonth') => {
+    if (filter === 'today') {
+      const today = getTodayDateString();
+      setStartDate(today);
+      setEndDate(today);
+    } else if (filter === 'currentWeek') {
+      const { start, end } = getCurrentWeekDateStrings(t);
+      setStartDate(start);
+      setEndDate(end);
+    } else if (filter === 'currentMonth') {
+      const { start, end } = getCurrentMonthDateStrings();
+      setStartDate(start);
+      setEndDate(end);
+    }
+    setSelectedQuickFilter(filter);
+  };
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+    setSelectedQuickFilter('none'); // Clear quick filter if manual date is set
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+    setSelectedQuickFilter('none'); // Clear quick filter if manual date is set
+  };
 
   const handleExportUsers = () => {
     exportUsersToExcel(reps, 'representatives_list', t);
@@ -634,6 +728,15 @@ const ManagerDashboard: React.FC = () => {
                         </p>
                     </div>
                 </div>
+                <div>
+                    <button
+                        onClick={() => setIsDailyVisitsDetailModalOpen(true)}
+                        className="mt-4 w-full bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <EyeIcon className="w-5 h-5"/>
+                        {t('view_details')}
+                    </button>
+                </div>
             </div>
 
           {/* Stats Cards */}
@@ -691,42 +794,52 @@ const ManagerDashboard: React.FC = () => {
                 <option value="all">{t('all_regions')}</option>
                 {regions.map(region => <option key={region.id} value={region.name}>{region.name}</option>)}
               </select>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('from_date')} />
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('to_date')} />
+              <input type="date" value={startDate} onChange={handleStartDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('from_date')} />
+              <input type="date" value={endDate} onChange={handleEndDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('to_date')} />
               <button onClick={handleResetFilters} className="w-full bg-slate-500 text-white p-2 rounded-md hover:bg-slate-600 transition-colors">{t('reset')}</button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-300/50">
+                <h4 className="text-md font-semibold mb-2 text-slate-700">{t('quick_filters')}</h4>
+                <div className="flex flex-wrap gap-2">
+                    <button 
+                        onClick={() => handleQuickFilterClick('today')} 
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                    >
+                        {t('today')}
+                    </button>
+                    <button 
+                        onClick={() => handleQuickFilterClick('currentWeek')} 
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentWeek' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                    >
+                        {t('current_week')}
+                    </button>
+                    <button 
+                        onClick={() => handleQuickFilterClick('currentMonth')} 
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentMonth' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                    >
+                        {t('current_month')}
+                    </button>
+                </div>
             </div>
           </div>
 
-          {/* Alerts Table */}
+          {/* Alerts Table - Modified to show only title and button */}
           {filteredAlerts.length > 0 && (
             <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden mb-8">
-              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50"><WarningIcon className="w-6 h-6 me-3"/>{t('overdue_visits_alerts_table')}</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-start text-gray-500">
-                  <thead className="text-xs text-red-800 uppercase bg-red-50/50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3">{t('client')}</th>
-                      <th scope="col" className="px-6 py-3">{t('visit_type')}</th>
-                      <th scope="col" className="px-6 py-3">{t('responsible_rep')}</th>
-                      <th scope="col" className="px-6 py-3">{t('region')}</th>
-                      <th scope="col" className="px-6 py-3">{t('last_visit')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAlerts.map(alert => (
-                      <tr key={alert.id} className="bg-red-50/20 border-b border-red-100/30 hover:bg-red-100/40">
-                        <td className="px-6 py-4 font-medium text-slate-900">{alert.name}</td>
-                        <td className="px-6 py-4">{t(alert.type === 'doctor' ? 'client_type_doctor' : 'client_type_pharmacy')}</td>
-                        <td className="px-6 py-4">{alert.repName}</td>
-                        <td className="px-6 py-4">{alert.regionName}</td>
-                        <td className="px-6 py-4 font-semibold text-red-600">
-                          {alert.daysSinceLastVisit === null ? t('never_visited') : t('days_ago', alert.daysSinceLastVisit)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50">
+                <WarningIcon className="w-6 h-6 me-3"/>
+                {t('overdue_visits_alerts_table')} ({filteredAlerts.length})
+              </h3>
+              {/* Removed the table content here. It will now be displayed in the modal. */}
+              <div className="flex justify-center p-4">
+                <button
+                    onClick={() => setIsOverdueClientsDetailModalOpen(true)}
+                    className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-all shadow-lg flex items-center gap-2"
+                >
+                    <EyeIcon className="w-5 h-5" />
+                    {t('view_details')}
+                </button>
+            </div>
             </div>
           )}
           
@@ -1185,6 +1298,26 @@ const ManagerDashboard: React.FC = () => {
                 regions={regions}
             />
         }
+
+        {isDailyVisitsDetailModalOpen && (
+            <DailyVisitsDetailModal
+                isOpen={isDailyVisitsDetailModalOpen}
+                onClose={() => setIsDailyVisitsDetailModalOpen(false)}
+                reports={allReports}
+                reps={reps}
+                selectedRepId={selectedRepForDailyVisits}
+            />
+        )}
+
+        {isOverdueClientsDetailModalOpen && (
+          <OverdueClientsDetailModal
+            isOpen={isOverdueClientsDetailModalOpen}
+            onClose={() => setIsOverdueClientsDetailModalOpen(false)}
+            alerts={overdueAlerts} // Pass the full list of overdue alerts
+            reps={reps}
+            regions={regions}
+          />
+        )}
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -35,6 +36,19 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'delete': 'حذف',
     'confirm': 'تأكيد',
     'deleting': 'جاري الحذف...',
+    'view_details': 'عرض التفاصيل', // New
+    'daily_visits_details': 'تفاصيل الزيارات اليومية', // New
+    'daily_visits_for_rep': 'الزيارات اليومية لـ {0}', // New
+    'daily_visits_all_reps': 'الزيارات اليومية (جميع المندوبين)', // New
+    'filter_by_rep': 'تصفية حسب المندوب', // New
+    'no_daily_visits': 'لا توجد زيارات مسجلة لهذا اليوم.', // New
+    'overdue_clients_details_title': 'تفاصيل العملاء المتأخرين ({0})', // New
+    'no_overdue_clients_found': 'لم يتم العثور على عملاء متأخرين للمعايير المحددة.', // New
+    'today': 'اليوم', // New
+    'current_week': 'الأسبوع الحالي', // New
+    'current_month': 'الشهر الحالي', // New
+    'quick_filters': 'فلاتر سريعة', // New
+
 
     // Enums
     'MANAGER': 'مدير',
@@ -357,6 +371,18 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'delete': 'Delete',
     'confirm': 'Confirm',
     'deleting': 'Deleting...',
+    'view_details': 'View Details', // New
+    'daily_visits_details': 'Daily Visits Details', // New
+    'daily_visits_for_rep': 'Daily Visits for {0}', // New
+    'daily_visits_all_reps': 'Daily Visits (All Reps)', // New
+    'filter_by_rep': 'Filter by Representative', // New
+    'no_daily_visits': 'No visits recorded for today.', // New
+    'overdue_clients_details_title': 'Overdue Clients Details ({0})', // New
+    'no_overdue_clients_found': 'No overdue clients found for the selected criteria.', // New
+    'today': 'Today', // New
+    'current_week': 'Current Week', // New
+    'current_month': 'Current Month', // New
+    'quick_filters': 'Quick Filters', // New
 
     // Enums
     'MANAGER': 'Manager',
