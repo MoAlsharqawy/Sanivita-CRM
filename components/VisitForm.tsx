@@ -43,7 +43,8 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
   }, [regionId, visitTargetType, doctors, pharmacies]);
   
   const autocompleteSuggestions = useMemo(() => {
-    if (!targetNameInput || !showSuggestions) return [];
+    if (!showSuggestions) return [];
+    if (!targetNameInput) return filteredTargets; // Show all if no input
     return filteredTargets.filter(t =>
       t.name.toLowerCase().includes(targetNameInput.toLowerCase())
     );
@@ -66,6 +67,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     setRegionId(e.target.value);
     setTargetId('');
     setTargetNameInput('');
+    setShowSuggestions(false); // Hide suggestions when region changes
   };
 
   const handleTargetInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
