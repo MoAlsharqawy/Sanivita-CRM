@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -139,10 +140,13 @@ const RepDashboard: React.FC = () => {
     
     let doctorVisits = 0;
     let pharmacyVisits = 0;
+    const workingDays = new Set<string>(); // Stores 'YYYY-MM-DD' for days with visits
 
     recentVisits.forEach(visit => {
         const visitDate = new Date(visit.date);
         if (visitDate >= startOfMonth && visitDate <= today) {
+            const dateStr = visitDate.toISOString().split('T')[0];
+            workingDays.add(dateStr); // Add day to working days set
             if (visit.type === 'DOCTOR_VISIT') {
                 doctorVisits++;
             } else if (visit.type === 'PHARMACY_VISIT') {
@@ -151,7 +155,12 @@ const RepDashboard: React.FC = () => {
         }
     });
 
-    return { doctorVisits, pharmacyVisits };
+    const totalMonthlyVisits = doctorVisits + pharmacyVisits;
+    const numberOfWorkingDays = workingDays.size;
+    const visitsPerWorkingDay = numberOfWorkingDays > 0 ? (totalMonthlyVisits / numberOfWorkingDays) : 0;
+
+
+    return { doctorVisits, pharmacyVisits, visitsPerWorkingDay };
   }, [recentVisits]);
 
   const dailyCounts = useMemo(() => {
@@ -260,8 +269,9 @@ const RepDashboard: React.FC = () => {
           <button 
             onClick={() => {
               const todayIndex = new Date().getDay();
-              const todayRegionId = plan?.plan[todayIndex] ?? null;
-              setInitialRegionForVisit(todayRegionId);
+              const todayPlanForDay = plan?.plan[todayIndex] ?? null;
+              // Fix: Pass only the regionId from the day's plan
+              setInitialRegionForVisit(todayPlanForDay?.regionId ?? null);
               setIsModalOpen(true);
             }}
             className="bg-orange-500 text-white font-bold py-2 px-4 sm:px-6 rounded-lg hover:bg-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
@@ -272,7 +282,7 @@ const RepDashboard: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {/* Monthly Visits Card */}
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 animate-fade-in-up">
             <div className="flex items-center mb-4">
@@ -335,6 +345,23 @@ const RepDashboard: React.FC = () => {
                 {t(totalDailyCount < dailyTarget ? 'keep_progressing' : 'daily_goal_achieved')}
             </p>
           </div>
+        </div>
+
+        {/* Visits per Working Day Card - NEW */}
+        <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+            <div>
+                <div className="flex items-center mb-4">
+                    <div className="bg-purple-500/20 text-purple-700 p-3 rounded-full me-3">
+                        <ChartBarIcon className="w-6 h-6" /> {/* Reusing ChartBarIcon for this new metric */}
+                    </div>
+                    <p className="text-slate-600 text-md font-medium">{t('visits_per_working_day')}</p>
+                </div>
+                <div className="flex justify-center items-center text-center py-2">
+                    <p className="text-5xl font-bold text-purple-800">{monthlyCounts.visitsPerWorkingDay.toFixed(1)}</p>
+                    <p className="text-md font-semibold text-slate-700 ms-2">{t('visit_per_day_label')}</p>
+                </div>
+            </div>
+            <p className="text-xs text-slate-500 text-center mt-4">{t('visits_per_working_day_info')}</p>
         </div>
       </div>
 
@@ -491,4 +518,3 @@ const RepDashboard: React.FC = () => {
 };
 
 export default RepDashboard;
-    

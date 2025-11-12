@@ -1,13 +1,15 @@
-import React, { useState, useMemo } from 'react';
-import { User, VisitReport, SystemSettings, WeeklyPlan, Region } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { User, VisitReport, SystemSettings, WeeklyPlan, Region, Doctor } from '../types';
 import { useLanguage } from '../hooks/useLanguage';
-import { ArrowRightIcon, ChevronRightIcon, ChevronLeftIcon, MapPinIcon } from './icons';
+import { ArrowRightIcon, ChevronRightIcon, ChevronLeftIcon, MapPinIcon, DoctorIcon } from './icons';
+import { api } from '../services/api';
+import Spinner from './Spinner';
 
 interface WeeklyViewProps {
   user: User;
   visits: VisitReport[];
   settings: SystemSettings | null;
-  plan: WeeklyPlan['plan'] | null;
+  plan: WeeklyPlan['plan'] | null; // This is now the new, nested plan structure
   regions: Region[];
   onBack: () => void;
 }
@@ -37,8 +39,27 @@ const toYYYYMMDD = (date: Date): string => {
 const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, regions, onBack }) => {
   const { t } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(true);
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      setLoadingDoctors(true);
+      try {
+        const doctorsData = await api.getAllDoctors();
+        setAllDoctors(doctorsData);
+      } catch (error) {
+        console.error("Failed to fetch all doctors for WeeklyView:", error);
+      } finally {
+        setLoadingDoctors(false);
+      }
+    };
+    fetchDoctors();
+  }, []);
 
   const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
+  const doctorMap = useMemo(() => new Map(allDoctors.map(doc => [doc.id, doc])), [allDoctors]);
+
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
 
@@ -63,6 +84,10 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
   const weekEnd = weekDates[6];
   const weekRangeString = `${weekStart.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long' })} - ${weekEnd.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
+
+  if (loadingDoctors) {
+    return <Spinner />;
+  }
 
   return (
     <div className="container mx-auto">
@@ -102,7 +127,9 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
           const dayName = WEEK_DAYS[dayIndex];
           const isToday = toYYYYMMDD(new Date()) === dateStr;
           
-          const regionId = plan ? plan[dayIndex] : null;
+          const dayPlan = plan ? plan[dayIndex] : null;
+          const regionId = dayPlan?.regionId;
+          const doctorIds = dayPlan?.doctorIds || [];
           const region = regionId ? regions.find(r => r.id === regionId) : null;
 
           const cardClasses = `
@@ -124,8 +151,18 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
                       <span>{region.name}</span>
                   </div>
                 )}
-                {!region && !isOffDay && (
+                {!region && !isOffDay && doctorIds.length === 0 && (
                      <div className="text-xs text-slate-400 italic py-1">{t('no_plan_for_day')}</div>
+                )}
+                 {doctorIds.length > 0 && !isOffDay && (
+                    <div className="mt-2 flex flex-wrap justify-center gap-1">
+                        {doctorIds.map(docId => (
+                            <span key={docId} className="flex items-center text-xs bg-blue-500/20 text-blue-700 px-2 py-0.5 rounded-full">
+                                <DoctorIcon className="w-3 h-3 me-1" />
+                                {doctorMap.get(docId)?.name || t('unknown_doctor')}
+                            </span>
+                        ))}
+                    </div>
                 )}
               </div>
               <div className="text-center mt-auto pt-2">

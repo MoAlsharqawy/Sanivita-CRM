@@ -96,7 +96,10 @@ export interface SystemSettings {
 
 export interface WeeklyPlan {
   plan: {
-    [dayIndex: number]: number | null; // dayIndex (0-6) -> regionId or null
+    [dayIndex: number]: {
+      regionId: number;
+      doctorIds: number[]; // Array of Doctor IDs
+    } | null;
   };
   status: 'draft' | 'pending' | 'approved' | 'rejected';
 }

@@ -1,4 +1,5 @@
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -48,7 +49,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'current_week': 'الأسبوع الحالي', // New
     'current_month': 'الشهر الحالي', // New
     'quick_filters': 'فلاتر سريعة', // New
-
+    'unknown_doctor': 'طبيب غير معروف', // New translation key for unknown doctors
+    'error_fetching_doctors': 'حدث خطأ أثناء جلب الأطباء.', // New translation key for error
+    'visits_per_working_day': 'متوسط الزيارات / يوم عمل', // New
+    'visit_per_day_label': 'زيارة / يوم', // New
+    'visits_per_working_day_info': 'متوسط عدد الزيارات في أيام العمل الفعلية لهذا الشهر.', // New
 
     // Enums
     'MANAGER': 'مدير',
@@ -208,7 +213,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'visit_count_label': 'زيارة',
 
     // Supabase Connect Screen
-    'connect_db_title': 'الاتصال بقاعدة البيانات',
+    'connect_db_title': 'مطلوب إعداد قاعدة البيانات',
     'connect_db_subtitle': 'أدخل تفاصيل مشروع Supabase الخاص بك للبدء.',
     'supabase_url': 'رابط مشروع Supabase',
     'supabase_anon_key': 'مفتاح Supabase العام (Anon)',
@@ -296,7 +301,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'plan_rejected_notice': 'تم رفض خطتك السابقة.',
     'plan_rejected_instructions': 'يرجى تعديل الخطة وإرسالها مرة أخرى للاعتماد.',
     'plan_editor_instructions': 'حدد المنطقة التي ستزورها في كل يوم من أيام الأسبوع.',
+    'plan_editor_instructions_doctors': 'لكل يوم، اختر المنطقة ثم أضف الأطباء الذين تخطط لزيارتهم. لا يمكن تعيين الطبيب لأكثر من يوم واحد في الأسبوع.', // New detailed instructions
     'no_plan_for_this_day': 'لا توجد خطة لهذا اليوم',
+    'add_doctor_to_day': 'إضافة طبيب لليوم', // New translation
+    'remove_doctor': 'إزالة الطبيب {0}', // New translation for removing a doctor
     'plan_submitted_success': 'تم إرسال الخطة للمراجعة بنجاح!',
     'plan_submitted_error': 'حدث خطأ أثناء إرسال الخطة.',
     'submitting_for_approval': 'جاري الإرسال...',
@@ -383,6 +391,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'current_week': 'Current Week', // New
     'current_month': 'Current Month', // New
     'quick_filters': 'Quick Filters', // New
+    'unknown_doctor': 'Unknown Doctor', // New translation key for unknown doctors
+    'error_fetching_doctors': 'Error fetching doctors.', // New translation key for error
+    'visits_per_working_day': 'Visit per day', // New
+    'visit_per_day_label': 'Visit / Day', // New
+    'visits_per_working_day_info': 'Average number of visits on actual working days this month.', // New
 
     // Enums
     'MANAGER': 'Manager',
@@ -629,7 +642,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'plan_rejected_notice': 'Your previous plan was rejected.',
     'plan_rejected_instructions': 'Please modify the plan and submit it again for approval.',
     'plan_editor_instructions': 'Select the region you will visit for each day of the week.',
+    'plan_editor_instructions_doctors': 'For each day, select a region then add the doctors you plan to visit. A doctor cannot be assigned to more than one day in the week.', // New detailed instructions
     'no_plan_for_this_day': 'No plan for this day',
+    'add_doctor_to_day': 'Add Doctor for Day', // New translation
+    'remove_doctor': 'Remove Doctor {0}', // New translation for removing a doctor
     'plan_submitted_success': 'Plan submitted for review successfully!',
     'plan_submitted_error': 'Error submitting plan.',
     'submitting_for_approval': 'Submitting...',

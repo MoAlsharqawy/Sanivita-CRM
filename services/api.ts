@@ -415,7 +415,7 @@ export const api = {
 
   getRepPlan: async (repId: string): Promise<WeeklyPlan> => {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('weekly_plans').select('*').eq('rep_id', repId).maybeSingle();
+    const { data, error } = await supabase.from('weekly_plans').select('plan, status').eq('rep_id', repId).maybeSingle();
     if (error) handleSupabaseError(error, 'getRepPlan');
     return data || { plan: {}, status: 'draft' };
   },
@@ -426,24 +426,23 @@ export const api = {
       rep_id: repId,
       plan: planData,
       status: 'pending',
-    }, { onConflict: 'rep_id' }).select().single();
+    }, { onConflict: 'rep_id' }).select('plan, status').single();
     if (error) handleSupabaseError(error, 'updateRepPlan');
     return data as WeeklyPlan;
   },
 
   reviewRepPlan: async (repId: string, newStatus: 'approved' | 'rejected'): Promise<WeeklyPlan> => {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('weekly_plans').update({ status: newStatus }).eq('rep_id', repId).select().single();
+    const { data, error } = await supabase.from('weekly_plans').update({ status: newStatus }).eq('rep_id', repId).select('plan, status').single();
     if (error) handleSupabaseError(error, 'reviewRepPlan');
     return data as WeeklyPlan;
   },
 
   getAllPlans: async (): Promise<{ [repId: string]: WeeklyPlan }> => {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('weekly_plans').select('*');
+    const { data, error } = await supabase.from('weekly_plans').select('rep_id, plan, status');
     if (error) handleSupabaseError(error, 'getAllPlans');
 
-    // Transform array to object, matching the old data structure for easier frontend integration
     const plansObject: { [repId: string]: WeeklyPlan } = {};
     (data || []).forEach(plan => {
       plansObject[plan.rep_id] = {
@@ -552,7 +551,7 @@ export const api = {
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
-    // NOTE: userMap now uses the 'username' field (which holds the email) for mapping.
+    // NOTE: userMap now uses the 'username' field (which holds the the email) for mapping.
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
     const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pharmacy }[] = [];
@@ -616,4 +615,3 @@ export const api = {
     return result;
   },
 };
-    

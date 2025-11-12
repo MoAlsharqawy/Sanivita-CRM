@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -218,6 +217,11 @@ const Login: React.FC = () => {
             </button>
           </div>
         </form>
+
+        {/* Copyright Notice */}
+        <div className="text-center text-xs text-white/50 pt-4 border-t border-white/25 mt-6">
+          <p>Copyright © 2025 Mizan for SaniVita</p>
+        </div>
       </div>
     </div>
   );

@@ -68,6 +68,8 @@ const ManagerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [allPlans, setAllPlans] = useState<{ [repId: string]: WeeklyPlan }>({});
   const [reviewMessage, setReviewMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [allDoctorsMap, setAllDoctorsMap] = useState<Map<number, Doctor>>(new Map());
+
 
   const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
   const WEEK_DAYS_ORDERED = useMemo(() => [
@@ -120,7 +122,7 @@ const ManagerDashboard: React.FC = () => {
         api.getAllVisitReports(),
         api.getUsers(),
         api.getRegions(),
-        api.getAllDoctors(),
+        api.getAllDoctors(), // Fetch all doctors
         api.getAllPharmacies(),
         api.getOverdueVisits(),
         api.getSystemSettings(),
@@ -140,6 +142,7 @@ const ManagerDashboard: React.FC = () => {
         setLocalHolidays(settingsData.holidays.sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
       }
       setAllPlans(plansData);
+      setAllDoctorsMap(new Map(doctorsData.map(doc => [doc.id, doc]))); // Create doctor map
     } catch (error) {
       console.error("Failed to fetch initial data", error);
     } finally {
@@ -1060,12 +1063,24 @@ const ManagerDashboard: React.FC = () => {
                             <h4 className="font-bold text-lg text-slate-800 mb-3">{item.repName}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
                                 {WEEK_DAYS_ORDERED.map(day => {
-                                    const regionId = item.plan[day.index];
+                                    const dayPlan = item.plan[day.index];
+                                    const regionId = dayPlan?.regionId;
+                                    const doctorIds = dayPlan?.doctorIds || [];
                                     const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day');
+                                    
                                     return (
-                                        <div key={day.index} className="text-center p-2 bg-slate-100 rounded">
+                                        <div key={day.index} className="text-center p-2 bg-slate-100 rounded flex flex-col items-center">
                                             <p className="font-semibold text-sm text-slate-700">{day.name}</p>
                                             <p className={`text-xs ${regionId ? 'text-blue-600' : 'text-slate-500'}`}>{regionName}</p>
+                                            {doctorIds.length > 0 && (
+                                                <div className="mt-1 flex flex-wrap justify-center gap-1">
+                                                    {doctorIds.map(docId => (
+                                                        <span key={docId} className="text-xs bg-blue-500/20 text-blue-700 px-1.5 py-0.5 rounded-full">
+                                                            {allDoctorsMap.get(docId)?.name || t('unknown_doctor')}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -1113,11 +1128,22 @@ const ManagerDashboard: React.FC = () => {
                                         <div className="mt-1">{getPlanStatusBadge(plan.status)}</div>
                                     </td>
                                     {WEEK_DAYS_ORDERED.map(day => {
-                                        const regionId = plan.plan[day.index];
+                                        const dayPlan = plan.plan[day.index];
+                                        const regionId = dayPlan?.regionId;
+                                        const doctorIds = dayPlan?.doctorIds || [];
                                         const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day');
                                         return (
                                             <td key={day.index} className={`px-4 py-4 text-center whitespace-nowrap ${regionId ? 'text-blue-600 font-semibold' : 'text-slate-500'}`} title={regionName}>
                                                 {regionName}
+                                                {doctorIds.length > 0 && (
+                                                    <div className="mt-1 flex flex-wrap justify-center gap-1">
+                                                        {doctorIds.map(docId => (
+                                                            <span key={docId} className="text-xs bg-blue-500/20 text-blue-700 px-1 py-0.5 rounded-full">
+                                                                {allDoctorsMap.get(docId)?.name || t('unknown_doctor')}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </td>
                                         );
                                     })}
