@@ -23,24 +23,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAuthError(null);
     const supabase = getSupabaseClient();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        if (session?.user) {
+    // Check for an active session on initial component load.
+    // This is faster than waiting for onAuthStateChange to fire.
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        try {
           const profile = await api.getUserProfile(session.user.id);
           setUser(profile);
-        } else {
+        } catch (e: any) {
+          console.error("Error fetching initial user profile:", e);
+          setAuthError(e.message === 'rls_error' ? e.message : 'login_error');
           setUser(null);
         }
-      } catch (e: any) {
-        console.error("Error during onAuthStateChange handling:", e);
-        if (e.message === 'rls_error') {
-            // This specific error means the database is misconfigured.
-            // We set an error state for the UI to handle, instead of just logging out.
-            setAuthError(e.message);
+      }
+      setLoading(false);
+    });
+
+    // Listen for any subsequent changes in auth state (e.g., login, logout, token refresh).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        try {
+          const profile = await api.getUserProfile(session.user.id);
+          setUser(profile);
+          setAuthError(null);
+        } catch (e: any) {
+          console.error("Error on auth state change:", e);
+          setAuthError(e.message === 'rls_error' ? e.message : 'login_error');
+          setUser(null);
         }
+      } else {
         setUser(null);
-      } finally {
-        setLoading(false);
       }
     });
 

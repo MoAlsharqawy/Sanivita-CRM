@@ -1,10 +1,9 @@
 
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage, TranslationFunction } from '../hooks/useLanguage';
@@ -98,6 +97,10 @@ const ManagerDashboard: React.FC = () => {
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewingRepClients, setViewingRepClients] = useState<User | null>(null);
+  // New state for reset visits functionality
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [repToReset, setRepToReset] = useState<User | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
 
   // Settings tab local state
@@ -384,6 +387,68 @@ const ManagerDashboard: React.FC = () => {
           setTimeout(() => setReviewMessage(null), 3000);
       }
   };
+
+  const handleRevokeApproval = async (repId: string) => {
+      if (!user || user.role !== UserRole.Manager) {
+          console.warn("Only managers can revoke plan approval.");
+          setReviewMessage({ text: t('error_permission_denied'), type: 'error' }); // Reusing permission denied translation
+          setTimeout(() => setReviewMessage(null), 3000);
+          return;
+      }
+      try {
+          await api.revokePlanApproval(repId);
+           // Optimistic update
+          setAllPlans(prevPlans => ({
+              ...prevPlans,
+              [repId]: { ...prevPlans[repId], status: 'draft' }
+          }));
+
+          const repName = reps.find(r => r.id === repId)?.name || '';
+          setReviewMessage({ text: t('plan_revoked_success', repName), type: 'success' });
+
+      } catch (error) {
+          console.error(`Failed to revoke approval for rep ${repId}`, error);
+          setReviewMessage({ text: t('plan_revoke_error'), type: 'error' });
+      } finally {
+          setTimeout(() => setReviewMessage(null), 3000);
+      }
+  };
+
+  // NEW: Handle reset visits click
+  const handleResetClick = (rep: User) => {
+      if (user?.role !== UserRole.Manager) {
+          setReviewMessage({ text: t('error_permission_denied'), type: 'error' });
+          setTimeout(() => setReviewMessage(null), 3000);
+          return;
+      }
+      setRepToReset(rep);
+      setIsResetModalOpen(true);
+  };
+
+  // NEW: Handle confirmation of reset visits
+  const handleConfirmReset = async () => {
+      if (!repToReset) return;
+
+      setIsResetting(true);
+      try {
+          await api.resetRepData(repToReset.id);
+          setReviewMessage({ text: t('reset_success', repToReset.name), type: 'success' });
+          // Re-fetch all data to reflect the changes
+          await fetchInitialData();
+      } catch (error: any) {
+          console.error("Failed to reset rep data:", error);
+          const errorMessage = error.message.includes('permission denied') 
+                               ? t('error_permission_denied') 
+                               : t('reset_error', repToReset.name);
+          setReviewMessage({ text: errorMessage, type: 'error' });
+      } finally {
+          setIsResetting(false);
+          setIsResetModalOpen(false);
+          setRepToReset(null);
+          setTimeout(() => setReviewMessage(null), 3000);
+      }
+  };
+
 
   const handleResetFilters = () => {
     setSelectedRep('all');
@@ -968,19 +1033,26 @@ const ManagerDashboard: React.FC = () => {
                           </tr>
                       </thead>
                       <tbody>
-                          {reps.map(user => (
-                              <tr key={user.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
-                                  <td className="px-6 py-4 font-medium text-slate-900">{user.name}</td>
-                                  <td className="px-6 py-4">{user.username}</td>
-                                  <td className="px-6 py-4">{t(user.role)}</td>
+                          {reps.map(rep => (
+                              <tr key={rep.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
+                                  <td className="px-6 py-4 font-medium text-slate-900">{rep.name}</td>
+                                  <td className="px-6 py-4">{rep.username}</td>
+                                  <td className="px-6 py-4">{t(rep.role)}</td>
                                   <td className="px-6 py-4">
                                       <div className="flex items-center gap-4">
-                                          <button onClick={() => handleEditUserClick(user)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}>
+                                          <button onClick={() => handleEditUserClick(rep)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}>
                                               <EditIcon className="w-5 h-5"/>
                                           </button>
-                                          <button onClick={() => setDeletingUser(user)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}>
-                                              <TrashIcon className="w-5 h-5"/>
-                                          </button>
+                                          {user?.role === UserRole.Manager && ( // Only Manager can delete and reset
+                                            <>
+                                              <button onClick={() => setDeletingUser(rep)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}>
+                                                  <TrashIcon className="w-5 h-5"/>
+                                              </button>
+                                              <button onClick={() => handleResetClick(rep)} className="text-orange-600 hover:text-orange-800" aria-label={t('reset_rep_visits')}>
+                                                  <ReplyIcon className="w-5 h-5"/> {/* Using ReplyIcon for reset, as it indicates a fresh start */}
+                                              </button>
+                                            </>
+                                          )}
                                       </div>
                                   </td>
                               </tr>
@@ -1107,6 +1179,11 @@ const ManagerDashboard: React.FC = () => {
       {activeTab === 'weeklyPlans' && (
         <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
             <h3 className="text-xl font-semibold mb-6 text-blue-800">{t('weekly_plans_overview')}</h3>
+            {reviewMessage && ( // Display messages also on the weekly plans tab
+                <div className={`p-4 mb-4 text-sm rounded-lg ${reviewMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`} role="alert">
+                    <span className="font-medium">{reviewMessage.text}</span>
+                </div>
+            )}
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-start border-separate border-spacing-0">
                     <thead className="text-xs text-blue-800 uppercase bg-white/50">
@@ -1126,6 +1203,15 @@ const ManagerDashboard: React.FC = () => {
                                     <td className="sticky start-0 px-6 py-4 font-medium text-slate-900 whitespace-nowrap bg-white/20 group-hover:bg-white/40">
                                         <div className="font-semibold">{rep.name}</div>
                                         <div className="mt-1">{getPlanStatusBadge(plan.status)}</div>
+                                        {user?.role === UserRole.Manager && plan.status === 'approved' && (
+                                            <button 
+                                                onClick={() => handleRevokeApproval(rep.id)}
+                                                className="mt-2 flex items-center gap-1.5 text-sm text-yellow-800 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded-md transition-colors shadow-sm"
+                                            >
+                                                <ReplyIcon className="w-4 h-4" />
+                                                {t('revoke_approval')}
+                                            </button>
+                                        )}
                                     </td>
                                     {WEEK_DAYS_ORDERED.map(day => {
                                         const dayPlan = plan.plan[day.index];
@@ -1343,6 +1429,35 @@ const ManagerDashboard: React.FC = () => {
             reps={reps}
             regions={regions}
           />
+        )}
+
+        {/* NEW: Reset Visits Confirmation Modal */}
+        {repToReset && (
+            <Modal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} title={t('confirm_reset_title')}>
+                <div>
+                    <p className="text-slate-700">{t('confirm_reset_message', repToReset.name)}</p>
+                    {reviewMessage && reviewMessage.type === 'error' && (
+                        <p className="text-red-500 text-sm mt-4">{reviewMessage.text}</p>
+                    )}
+                    <div className="flex items-center justify-end space-x-2 space-x-reverse pt-6">
+                        <button
+                            type="button"
+                            onClick={() => setIsResetModalOpen(false)}
+                            className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
+                        >
+                            {t('cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmReset}
+                            disabled={isResetting}
+                            className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors"
+                        >
+                            {isResetting ? t('resetting') : t('confirm_reset')}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         )}
     </div>
   );

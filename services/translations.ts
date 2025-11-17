@@ -1,5 +1,4 @@
 
-
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -54,6 +53,16 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'visits_per_working_day': 'متوسط الزيارات / يوم عمل', // New
     'visit_per_day_label': 'زيارة / يوم', // New
     'visits_per_working_day_info': 'متوسط عدد الزيارات في أيام العمل الفعلية لهذا الشهر.', // New
+    'auth_timeout_error': 'انتهت مهلة عملية المصادقة. يرجى محاولة تحديث الصفحة.', // New
+    'reset_rep_visits': 'إعادة تعيين زيارات المندوب', // NEW
+    'confirm_reset_title': 'تأكيد إعادة تعيين البيانات', // NEW
+    'confirm_reset': 'تأكيد إعادة التعيين', // NEW
+    'confirm_reset_message': 'هل أنت متأكد أنك تريد حذف جميع الزيارات وإعادة تعيين الخطة الأسبوعية لـ {0}؟ لا يمكن التراجع عن هذا الإجراء.', // NEW
+    'resetting': 'جاري إعادة التعيين...', // NEW
+    'reset_success': 'تمت إعادة تعيين بيانات {0} بنجاح.', // NEW
+    'reset_error': 'فشل إعادة تعيين بيانات {0}.', // NEW
+    'confirm_page_refresh': 'هل أنت متأكد من رغبتك في مغادرة هذه الصفحة؟ قد لا يتم حفظ التغييرات التي أجريتها.',
+
 
     // Enums
     'MANAGER': 'مدير',
@@ -163,15 +172,18 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total_visits_recorded': 'إجمالي الزيارات المسجلة',
     'total_unique_clients': 'إجمالي العملاء الفريدين',
     'avg_visits_per_month': 'متوسط الزيارات / شهر',
-    'reps_list': 'قائمة المندوبين',
+    'reps_list': 'قائمة المستخدمين',
     'download_client_lists': 'تحميل قوائم العملاء',
-    'download_reps_list': 'تحميل قائمة المندوبين',
+    'download_reps_list': 'تحميل قائمة المستخدمين',
     'pending_rep_plans': 'خطط المندوبين قيد المراجعة',
     'plan_approved_success': 'تم قبول خطة {0}.',
     'plan_rejected_success': 'تم رفض خطة {0}.',
     'plan_review_error': 'حدث خطأ أثناء مراجعة الخطة.',
     'approve': 'قبول',
     'reject': 'رفض',
+    'revoke_approval': 'إلغاء الاعتماد',
+    'plan_revoked_success': 'تم إلغاء اعتماد خطة {0} وإعادتها كمسودة.',
+    'plan_revoke_error': 'حدث خطأ أثناء إلغاء اعتماد الخطة.',
     'no_new_plans_to_review': 'لا توجد خطط جديدة للمراجعة.',
     'weekly_plans_overview': 'نظرة عامة على الخطط الأسبوعية',
     'rep': 'المندوب',
@@ -200,9 +212,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'you_have_pending_plans': 'لديك {0} خطط بانتظار المراجعة.',
     'view_plans': 'مراجعة الخطط',
     'no_pending_plans': 'لا توجد خطط جديدة للمراجعة. عمل رائع!',
-    'add_rep': 'إضافة مندوب',
+    'add_rep': 'إضافة مستخدم',
     'confirm_delete_title': 'تأكيد الحذف',
-    'confirm_delete_message': 'هل أنت متأكد أنك تريد حذف المندوب {0}؟ لا يمكن التراجع عن هذا الإجراء.',
+    'confirm_delete_message': 'هل أنت متأكد أنك تريد حذف المستخدم {0}؟ لا يمكن التراجع عن هذا الإجراء.',
     'total_visits_this_month': 'إجمالي زيارات هذا الشهر',
     'unique_clients_this_month': 'العملاء الفريدون هذا الشهر',
     'average_visits_per_month_historical': 'متوسط الزيارات الشهري',
@@ -266,14 +278,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'فشل تحديث كلمة المرور. قد تكون صلاحية الجلسة أو الرابط قد انتهت.',
     'error_unexpected': 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
     'save_changes': 'حفظ التغييرات',
-    'edit_rep_info': 'تعديل بيانات المندوب',
-    'add_new_rep': 'إضافة مندوب جديد',
+    'edit_rep_info': 'تعديل بيانات المستخدم',
+    'add_new_rep': 'إضافة مستخدم جديد',
     'leave_blank_to_keep': 'اتركه فارغاً للحفاظ على كلمة المرور الحالية',
     'confirm_password': 'تأكيد كلمة المرور',
     'error_all_fields_required': 'يرجى ملء جميع الحقول المطلوبة.',
     'error_password_required': 'كلمة المرور مطلوبة للمستخدم الجديد.',
     'email_cannot_be_changed': 'لا يمكن تغيير البريد الإلكتروني بعد الإنشاء.', // Updated
-    'email_helper_text': 'هذا هو المعرف الدائم للمندوب (بريد إلكتروني). لا يمكن تغييره لاحقاً.', // Updated
+    'email_helper_text': 'هذا هو المعرف الدائم للمستخدم (بريد إلكتروني). لا يمكن تغييره لاحقاً.', // Updated
     'error_invalid_email_format': 'صيغة البريد الإلكتروني غير صحيحة.', // Added
     'reset_password_title': 'إعادة تعيين كلمة المرور',
     'reset_password_subtitle': 'أدخل كلمة المرور الجديدة لحسابك.',
@@ -285,8 +297,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_db_trigger_failed': 'فشل إنشاء المستخدم. يحدث هذا غالبًا بسبب عدم وجود أو خطأ في "trigger" قاعدة البيانات الذي ينشئ ملف تعريف المستخدم (profiles) عند إضافة مستخدم جديد. يرجى مراجعة سجلات قاعدة البيانات في لوحة تحكم Supabase لمزيد من التفاصيل.', // Updated for clarity
     'error_reauthentication_needed': 'لأسباب أمنية، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى قبل تغيير كلمة المرور.',
     'password_changed_successfully': 'تم تغيير كلمة المرور بنجاح.',
-    'user_added_successfully': 'تمت إضافة المندوب {0} بنجاح.',
-    'user_updated_successfully': 'تم تحديث بيانات المندوب {0} بنجاح.',
+    'user_added_successfully': 'تمت إضافة المستخدم {0} بنجاح.',
+    'user_updated_successfully': 'تم تحديث بيانات المستخدم {0} بنجاح.',
 
     // Weekly View
     'previous_week': 'الأسبوع السابق',
@@ -396,6 +408,15 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'visits_per_working_day': 'Visit per day', // New
     'visit_per_day_label': 'Visit / Day', // New
     'visits_per_working_day_info': 'Average number of visits on actual working days this month.', // New
+    'auth_timeout_error': 'Authentication process timed out. Please try refreshing the page.', // New
+    'reset_rep_visits': 'Reset Representative Visits', // NEW
+    'confirm_reset_title': 'Confirm Data Reset', // NEW
+    'confirm_reset': 'Confirm Reset', // NEW
+    'confirm_reset_message': 'Are you sure you want to delete all visits and reset the weekly plan for {0}? This action cannot be undone.', // NEW
+    'resetting': 'Resetting...', // NEW
+    'reset_success': 'Successfully reset data for {0}.', // NEW
+    'reset_error': 'Failed to reset data for {0}.', // NEW
+    'confirm_page_refresh': 'Are you sure you want to leave this page? Changes you made may not be saved.',
 
     // Enums
     'MANAGER': 'Manager',
@@ -504,15 +525,18 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total_visits_recorded': 'Total Visits Recorded',
     'total_unique_clients': 'Total Unique Clients',
     'avg_visits_per_month': 'Avg. Visits / Month',
-    'reps_list': 'Representatives List',
+    'reps_list': 'Users List',
     'download_client_lists': 'Download Client Lists',
-    'download_reps_list': 'Download Reps List',
+    'download_reps_list': 'Download Users List',
     'pending_rep_plans': 'Pending Rep Plans for Review',
     'plan_approved_success': 'Plan for {0} has been approved.',
     'plan_rejected_success': 'Plan for {0} has been rejected.',
     'plan_review_error': 'An error occurred while reviewing the plan.',
     'approve': 'Approve',
     'reject': 'Reject',
+    'revoke_approval': 'Revoke Approval',
+    'plan_revoked_success': 'Plan for {0} has been un-approved and returned to draft.',
+    'plan_revoke_error': 'An error occurred while revoking the plan approval.',
     'no_new_plans_to_review': 'No new plans to review. Great job!',
     'weekly_plans_overview': 'Weekly Plans Overview',
     'rep': 'Rep',
@@ -541,9 +565,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'you_have_pending_plans': 'You have {0} pending plans to review.',
     'view_plans': 'Review Plans',
     'no_pending_plans': 'No new plans to review. Great job!',
-    'add_rep': 'Add Representative',
+    'add_rep': 'Add User',
     'confirm_delete_title': 'Confirm Deletion',
-    'confirm_delete_message': 'Are you sure you want to delete the representative {0}? This action cannot be undone.',
+    'confirm_delete_message': 'Are you sure you want to delete the user {0}? This action cannot be undone.',
     'total_visits_this_month': 'Total Visits This Month',
     'unique_clients_this_month': 'Unique Clients This Month',
     'average_visits_per_month_historical': 'Historical Avg. Visits/Month',
@@ -607,14 +631,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'Failed to update password. Your session or link may have expired.',
     'error_unexpected': 'An unexpected error occurred. Please try again.',
     'save_changes': 'Save Changes',
-    'edit_rep_info': 'Edit Representative Info',
-    'add_new_rep': 'Add New Representative',
+    'edit_rep_info': 'Edit User Info',
+    'add_new_rep': 'Add New User',
     'leave_blank_to_keep': 'Leave blank to keep current password',
     'confirm_password': 'Confirm Password',
     'error_all_fields_required': 'Please fill all required fields.',
     'error_password_required': 'Password is required for a new user.',
     'email_cannot_be_changed': 'Email address cannot be changed after creation.', // Updated
-    'email_helper_text': 'This is the permanent identifier for the rep (email address). It cannot be changed later.', // Updated
+    'email_helper_text': 'This is the permanent identifier for the user (email address). It cannot be changed later.', // Updated
     'error_invalid_email_format': 'Invalid email format.', // Added
     'reset_password_title': 'Reset Your Password',
     'reset_password_subtitle': 'Enter the new password for your account.',

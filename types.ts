@@ -94,12 +94,15 @@ export interface SystemSettings {
   holidays: string[]; // YYYY-MM-DD
 }
 
+// New interface for the details of a day's plan
+export interface DayPlanDetails {
+  regionId: number;
+  doctorIds: number[]; // Array of Doctor IDs
+}
+
 export interface WeeklyPlan {
   plan: {
-    [dayIndex: number]: {
-      regionId: number;
-      doctorIds: number[]; // Array of Doctor IDs
-    } | null;
+    [dayIndex: number]: DayPlanDetails | null;
   };
   status: 'draft' | 'pending' | 'approved' | 'rejected';
 }

@@ -258,6 +258,20 @@ export const api = {
     // to prevent leaking information about which emails are registered.
   },
 
+  // NEW: Function to reset a representative's visits and plan
+  resetRepData: async (repId: string): Promise<void> => {
+    const supabase = getSupabaseClient();
+    // Call the RPC defined in Supabase to handle the deletion and plan reset
+    const { error } = await supabase.rpc('reset_rep_data', { p_rep_id: repId });
+    if (error) {
+        // Provide specific error feedback if it's a permission issue, otherwise generic.
+        if (error.message.includes('permission denied') || error.message.includes('violates row-level security policy')) {
+            throw new Error('error_permission_denied');
+        }
+        handleSupabaseError(error, 'resetRepData');
+    }
+  },
+
 
   // --- CORE DATA FETCHING ---
 
@@ -435,6 +449,14 @@ export const api = {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('weekly_plans').update({ status: newStatus }).eq('rep_id', repId).select('plan, status').single();
     if (error) handleSupabaseError(error, 'reviewRepPlan');
+    return data as WeeklyPlan;
+  },
+
+  revokePlanApproval: async (repId: string): Promise<WeeklyPlan> => {
+    const supabase = getSupabaseClient();
+    // Setting status back to 'draft' allows the rep to edit and resubmit
+    const { data, error } = await supabase.from('weekly_plans').update({ status: 'draft' }).eq('rep_id', repId).select('plan, status').single();
+    if (error) handleSupabaseError(error, 'revokePlanApproval');
     return data as WeeklyPlan;
   },
 

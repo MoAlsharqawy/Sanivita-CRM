@@ -20,7 +20,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
   const [regionId, setRegionId] = useState<string>(initialRegionId ? String(initialRegionId) : '');
   const [targetId, setTargetId] = useState<string>('');
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
-  const [visitType, setVisitType] = useState<'Coaching' | 'Single' | null>(null);
+  const [visitType, setVisitType] = useState<'Coaching' | 'Single' | null>('Single');
   const [notes, setNotes] = useState('');
   
   const [submitting, setSubmitting] = useState(false);
@@ -59,7 +59,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     setTargetNameInput('');
     setSelectedProductIds([]);
     setNotes('');
-    setVisitType(null);
+    setVisitType('Single');
   };
 
 

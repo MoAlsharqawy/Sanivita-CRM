@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { User, Region, WeeklyPlan, Doctor } from '../types';
+import { User, Region, WeeklyPlan, Doctor, DayPlanDetails } from '../types';
 import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
 import { SaveIcon, ArrowRightIcon, MapPinIcon, DoctorIcon, TrashIcon } from './icons';
@@ -16,7 +16,8 @@ interface PlanEditorProps {
 const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onPlanSaved, onBack }) => {
     const { t } = useLanguage();
     // Initialize planData to match the new structure: { dayIndex: { regionId: number, doctorIds: number[] } | null }
-    const [planData, setPlanData] = useState<WeeklyPlan['plan']>(initialPlan?.plan || {});
+    // Fix: Explicitly cast empty object to WeeklyPlan['plan'] to ensure correct type inference.
+    const [planData, setPlanData] = useState<WeeklyPlan['plan']>(initialPlan?.plan || {} as WeeklyPlan['plan']);
     const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -62,15 +63,22 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
     }, [planData]);
 
     const handleRegionChange = (dayIndex: number, regionIdStr: string) => {
-        const newPlan = { ...planData };
+        // Explicitly type `newPlan` to avoid losing the index signature type after spreading.
+        const newPlan: WeeklyPlan['plan'] = { ...planData };
         const regionId = parseInt(regionIdStr);
 
         if (regionIdStr === 'none' || isNaN(regionId)) {
             newPlan[dayIndex] = null;
         } else {
+            // Safely get existing doctorIds if the dayPlan entry exists and has them.
+            // The existing entry could be null or undefined if no plan existed for this day.
+            // Fix: Explicitly type `existingDayPlanEntry` to `DayPlanDetails | null` to resolve 'unknown' type error.
+            const existingDayPlanEntry: DayPlanDetails | null = newPlan[dayIndex];
             newPlan[dayIndex] = {
                 regionId: regionId,
-                doctorIds: newPlan[dayIndex]?.doctorIds || [], // Keep existing doctors if any
+                // Access doctorIds safely using optional chaining.
+                // The `|| []` ensures doctorIds is always an array if the existing entry was null/undefined or lacked doctorIds.
+                doctorIds: existingDayPlanEntry?.doctorIds || [], 
             };
         }
         setPlanData(newPlan);
@@ -81,19 +89,25 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
         if (isNaN(doctorId) || assignedDoctorIds.has(doctorId)) return; // Prevent adding already assigned doctor or invalid ID
 
         setPlanData(prevPlan => {
-            const newPlan = { ...prevPlan };
-            if (newPlan[dayIndex]) {
-                const currentDoctorIds = newPlan[dayIndex]?.doctorIds || [];
+            // Explicitly type `newPlan` to avoid losing the index signature type after spreading.
+            const newPlan: WeeklyPlan['plan'] = { ...prevPlan };
+            // Fix: Explicitly type `currentDayPlanEntry` to `DayPlanDetails | null` to resolve 'unknown' type error.
+            const currentDayPlanEntry: DayPlanDetails | null = newPlan[dayIndex];
+            if (currentDayPlanEntry) {
+                // Now, currentDayPlanEntry is narrowed to { regionId: number; doctorIds: number[]; }
+                // currentDayPlanEntry.doctorIds is guaranteed to be number[] by the WeeklyPlan type.
+                const currentDoctorIds = currentDayPlanEntry.doctorIds; 
                 if (!currentDoctorIds.includes(doctorId)) {
                     newPlan[dayIndex] = {
-                        ...newPlan[dayIndex]!,
+                        ...currentDayPlanEntry,
                         doctorIds: [...currentDoctorIds, doctorId],
                     };
                 }
             } else {
-                // Should not happen if region is selected, but as a safeguard
-                const regionId = allDoctors.find(d => d.id === doctorId)?.regionId;
-                if (regionId) {
+                // This branch handles the case where newPlan[dayIndex] is null or undefined
+                const doctor = allDoctors.find(d => d.id === doctorId);
+                const regionId = doctor?.regionId; // Safely access regionId
+                if (regionId !== undefined) { // Check for undefined specifically, as regionId could be 0 (valid)
                   newPlan[dayIndex] = { regionId, doctorIds: [doctorId] };
                 }
             }
@@ -103,11 +117,14 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
 
     const handleRemoveDoctor = (dayIndex: number, doctorId: number) => {
         setPlanData(prevPlan => {
-            const newPlan = { ...prevPlan };
-            if (newPlan[dayIndex]) {
+            // Explicitly type `newPlan` to avoid losing the index signature type after spreading.
+            const newPlan: WeeklyPlan['plan'] = { ...prevPlan };
+            // Fix: Explicitly type `currentDayPlanEntry` to `DayPlanDetails | null` to resolve 'unknown' type error.
+            const currentDayPlanEntry: DayPlanDetails | null = newPlan[dayIndex];
+            if (currentDayPlanEntry) {
                 newPlan[dayIndex] = {
-                    ...newPlan[dayIndex]!,
-                    doctorIds: newPlan[dayIndex]!.doctorIds.filter(id => id !== doctorId),
+                    ...currentDayPlanEntry,
+                    doctorIds: currentDayPlanEntry.doctorIds.filter(id => id !== doctorId),
                 };
                 // If no doctors left for the day, set it to null or just region
                 // For simplicity, we'll keep the region if it exists

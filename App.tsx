@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth, AuthProvider } from './hooks/useAuth';
 import Login from './components/Login';
 import ManagerDashboard from './components/ManagerDashboard';
@@ -12,30 +13,64 @@ import { hasSupabaseCredentials, getSupabaseClient } from './services/supabaseCl
 import ResetPassword from './components/ResetPassword';
 import DbErrorScreen from './components/DbErrorScreen';
 
-const AppContent: React.FC = () => {
+// A wrapper for routes that require authentication
+const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { user, loading, authError } = useAuth();
-  const { dir } = useLanguage();
+  const location = useLocation();
+  const { dir, t } = useLanguage();
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // Standard for showing a confirmation dialog.
+      // Most modern browsers show a generic message for security reasons,
+      // but setting returnValue is required for the prompt to appear.
+      event.preventDefault();
+      event.returnValue = t('confirm_page_refresh');
+      return t('confirm_page_refresh');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup the event listener when the component unmounts (e.g., on logout)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [t]); // Dependency on `t` ensures the message language would update if lang changes
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#3a3358] flex items-center justify-center">
+      <div className="min-h-screen bg-[#3a3358] flex items-center justify-center" dir={dir}>
         <Spinner />
       </div>
     );
   }
 
   if (authError) {
-      return <DbErrorScreen error={authError} />;
+    return <DbErrorScreen error={authError} />;
   }
 
+  return user ? children : <Navigate to="/login" state={{ from: location }} replace />;
+};
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#3a3358] text-slate-100" dir={dir}>
-        <Login />
-      </div>
-    );
-  }
+// A wrapper for the login page to handle redirection if a user is already logged in
+const PublicRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
+   const { user, loading } = useAuth();
+   if (loading) {
+       return (
+          <div className="min-h-screen bg-[#3a3358] flex items-center justify-center">
+            <Spinner />
+          </div>
+       );
+   }
+   return user ? <Navigate to="/" replace /> : children;
+}
+
+// The main dashboard content, shown when a user is authenticated
+const Dashboard: React.FC = () => {
+  const { user } = useAuth(); // We know user is not null here due to ProtectedRoute
+  const { dir } = useLanguage();
+  
+  if (!user) return null; // Should not happen, but for type safety
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-violet-100 to-amber-100 text-slate-800 animate-fade-in" dir={dir}>
@@ -47,39 +82,64 @@ const AppContent: React.FC = () => {
   );
 };
 
-const App: React.FC = () => {
-  const [isDbConnected, setIsDbConnected] = useState(hasSupabaseCredentials());
-  const { dir } = useLanguage();
-  const [authMode, setAuthMode] = useState<'default' | 'reset_password'>('default');
+// Component to manage routing logic and side-effects
+const AppRoutes: React.FC = () => {
+    const { dir } = useLanguage();
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    // Only set up the listener if the database is already connected,
-    // otherwise the Supabase client might not be initialized properly.
-    if (isDbConnected) {
+    useEffect(() => {
         const supabase = getSupabaseClient();
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
             if (event === 'PASSWORD_RECOVERY') {
-                setAuthMode('reset_password');
+                // This event fires when the user clicks the password reset link.
+                // We navigate them to the dedicated page to set a new password.
+                navigate('/reset-password');
             }
         });
 
         return () => {
             subscription?.unsubscribe();
         };
-    }
-  }, [isDbConnected]);
+    }, [navigate]);
 
-  if (authMode === 'reset_password') {
-      return (
-          <div className="min-h-screen bg-[#3a3358] text-slate-100" dir={dir}>
-              <ResetPassword onSuccess={() => {
-                  window.location.hash = '';
-                  // A full reload ensures all states are reset and the user is presented with the login screen.
-                  window.location.reload(); 
-              }} />
-          </div>
-      );
-  }
+    return (
+        <Routes>
+            <Route 
+                path="/login" 
+                element={
+                    <PublicRoute>
+                        <div className="min-h-screen bg-[#3a3358] text-slate-100" dir={dir}>
+                            <Login />
+                        </div>
+                    </PublicRoute>
+                } 
+            />
+            <Route 
+                path="/reset-password" 
+                element={
+                    <div className="min-h-screen bg-[#3a3358] text-slate-100" dir={dir}>
+                        <ResetPassword onSuccess={() => navigate('/login', { replace: true })} />
+                    </div>
+                } 
+            />
+            <Route
+                path="/"
+                element={
+                    <ProtectedRoute>
+                        <Dashboard />
+                    </ProtectedRoute>
+                }
+            />
+            {/* Any other unknown path will redirect to the main page */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+    );
+}
+
+// The main App component, now simplified to handle DB connection and provide auth context
+const App: React.FC = () => {
+  const [isDbConnected, setIsDbConnected] = useState(hasSupabaseCredentials());
+  const { dir } = useLanguage();
 
   if (!isDbConnected) {
     return (
@@ -91,10 +151,9 @@ const App: React.FC = () => {
 
   return (
     <AuthProvider>
-      <AppContent />
+        <AppRoutes />
     </AuthProvider>
   );
 };
-
 
 export default App;
