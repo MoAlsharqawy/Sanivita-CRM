@@ -31,10 +31,6 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
   const [targetNameInput, setTargetNameInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // New states for doctor autocomplete
-  const [doctorSearchInput, setDoctorSearchInput] = useState('');
-  const [showDoctorSuggestions, setShowDoctorSuggestions] = useState(false);
-
   // New state for toggling between planned and all doctors
   const [doctorSelectionMode, setDoctorSelectionMode] = useState<'planned' | 'all'>('planned');
 
@@ -57,14 +53,6 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     );
   }, [targetNameInput, filteredTargets, showSuggestions]);
 
-  const doctorAutocompleteSuggestions = useMemo(() => {
-    if (!showDoctorSuggestions || !regionId) return [];
-    if (!doctorSearchInput) return doctorsInSelectedRegion; // Show all in region if no input
-    return doctorsInSelectedRegion.filter(d =>
-      d.name.toLowerCase().includes(doctorSearchInput.toLowerCase())
-    );
-  }, [doctorSearchInput, doctorsInSelectedRegion, showDoctorSuggestions, regionId]);
-
   const handleTargetTypeSwitch = (type: 'doctor' | 'pharmacy') => {
     if (type === visitTargetType) return;
 
@@ -72,8 +60,6 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     setRegionId('');
     setTargetId('');
     setTargetNameInput('');
-    setDoctorSearchInput('');
-    setShowDoctorSuggestions(false);
     setSelectedProductIds([]);
     setNotes('');
     setVisitType(type === 'doctor' ? 'Single' : null);
@@ -86,7 +72,6 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
         // Reset selections when toggling
         setTargetId('');
         setRegionId(initialRegionId && newMode === 'planned' ? String(initialRegionId) : '');
-        setDoctorSearchInput('');
         return newMode;
     });
   };
@@ -102,8 +87,6 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     setTargetId('');
     setTargetNameInput('');
     setShowSuggestions(false); // Hide suggestions when region changes
-    setDoctorSearchInput('');
-    setShowDoctorSuggestions(false);
   };
 
   const handleTargetInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,20 +101,6 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     setTargetId(String(target.id));
     setTargetNameInput(target.name);
     setShowSuggestions(false);
-  };
-
-  const handleDoctorInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDoctorSearchInput(e.target.value);
-    setTargetId(''); // Clear the actual ID when user is typing
-    if (!showDoctorSuggestions) {
-        setShowDoctorSuggestions(true);
-    }
-  };
-
-  const handleDoctorSuggestionClick = (doctor: Doctor) => {
-    setTargetId(String(doctor.id));
-    setDoctorSearchInput(doctor.name);
-    setShowDoctorSuggestions(false);
   };
   
   const handleProductChange = (productId: number) => {
@@ -287,37 +256,12 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
                     {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
                 </div>
-                <div className="relative">
-                    <label htmlFor="doctor-search" className="block mb-2 text-sm font-medium text-slate-800">{t('doctor')}</label>
-                    <input
-                        id="doctor-search"
-                        type="text"
-                        value={doctorSearchInput}
-                        onChange={handleDoctorInputChange}
-                        onFocus={() => setShowDoctorSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowDoctorSuggestions(false), 200)}
-                        required
-                        disabled={!regionId}
-                        className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 disabled:bg-slate-200/50"
-                        placeholder={t('search_for_doctor')}
-                        autoComplete="off"
-                    />
-                    {doctorAutocompleteSuggestions.length > 0 && (
-                        <ul className="absolute z-20 w-full bg-white border border-slate-300/50 rounded-b-lg -mt-1 max-h-48 overflow-y-auto shadow-lg">
-                            {doctorAutocompleteSuggestions.map(doctor => (
-                                <li
-                                    key={doctor.id}
-                                    className="p-2.5 text-sm text-slate-800 hover:bg-blue-100 cursor-pointer"
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        handleDoctorSuggestionClick(doctor);
-                                    }}
-                                >
-                                    {doctor.name}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                <div>
+                    <label htmlFor="doctor" className="block mb-2 text-sm font-medium text-slate-800">{t('doctor')}</label>
+                    <select id="doctor" value={targetId} onChange={(e) => setTargetId(e.target.value)} required disabled={!regionId} className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 disabled:bg-slate-200/50">
+                        <option value="" disabled>{t('choose_doctor')}</option>
+                        {doctorsInSelectedRegion.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
                 </div>
             </div>
           )}
