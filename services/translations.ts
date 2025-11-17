@@ -1,4 +1,5 @@
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -241,6 +242,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'pharmacy_visit': 'زيارة صيدلية',
     'choose_region': 'اختر منطقة',
     'doctor': 'الطبيب',
+    'choose_doctor': 'اختر الطبيب',
     'pharmacy': 'الصيدلية',
     'search_for_doctor': 'ابحث عن طبيب...',
     'search_for_pharmacy': 'ابحث عن صيدلية...', 
@@ -255,7 +257,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_select_product': 'يرجى اختيار منتج واحد على الأقل.',
     'error_select_visit_type': 'يرجى تحديد نوع الزيارة (سينجل أو كوتشينج).',
     'error_saving_visit': 'حدث خطأ أثناء حفظ الزيارة.',
-    
+    'planned_visits_for_today': 'الزيارات المخططة لليوم',
+    'all_planned_visits_completed': 'تم تسجيل جميع الزيارات المخطط لها لهذا اليوم بنجاح!',
+    'all_clients': 'كل العملاء',
+    'show_planned_visits': 'عرض الزيارات المخططة',
+
     // Client Search
     'client_visit_history': 'سجل زيارات: {0}',
     'search_for_a_client': 'البحث عن عميل',
@@ -594,6 +600,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'pharmacy_visit': 'Pharmacy Visit',
     'choose_region': 'Choose a region',
     'doctor': 'Doctor',
+    'choose_doctor': 'Choose a Doctor',
     'pharmacy': 'Pharmacy',
     'search_for_doctor': 'Search for a doctor...',
     'search_for_pharmacy': 'Search for a pharmacy...',
@@ -608,6 +615,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_select_product': 'Please select at least one product.',
     'error_select_visit_type': 'Please select the visit type (Single or Coaching).',
     'error_saving_visit': 'An error occurred while saving the visit.',
+    'planned_visits_for_today': 'Planned Visits for Today',
+    'all_planned_visits_completed': 'All planned visits for today have been successfully logged!',
+    'all_clients': 'All Clients',
+    'show_planned_visits': 'Show Planned Visits',
 
     // Client Search
     'client_visit_history': 'Visit History: {0}',

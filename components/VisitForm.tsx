@@ -10,11 +10,12 @@ interface VisitFormProps {
   pharmacies: Pharmacy[];
   regions: Region[];
   initialRegionId?: number | null;
+  pendingDoctorsForToday?: Doctor[];
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmacies, regions, initialRegionId, onSuccess, onCancel }) => {
+const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmacies, regions, initialRegionId, pendingDoctorsForToday, onSuccess, onCancel }) => {
   const { t } = useLanguage();
   const [visitTargetType, setVisitTargetType] = useState<'doctor' | 'pharmacy'>('doctor');
   const [regionId, setRegionId] = useState<string>(initialRegionId ? String(initialRegionId) : '');
@@ -26,21 +27,23 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // New states for autocomplete
+  // States for pharmacy autocomplete
   const [targetNameInput, setTargetNameInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // New state for toggling between planned and all doctors
+  const [doctorSelectionMode, setDoctorSelectionMode] = useState<'planned' | 'all'>('planned');
+
   const filteredTargets = useMemo(() => {
-    if (!regionId) return [];
+    if (visitTargetType !== 'pharmacy' || !regionId) return [];
     const numericRegionId = parseInt(regionId);
-    if (visitTargetType === 'doctor') {
-      return doctors.filter(d => d.regionId === numericRegionId);
-    }
-    if (visitTargetType === 'pharmacy') {
-      return pharmacies.filter(p => p.regionId === numericRegionId);
-    }
-    return [];
-  }, [regionId, visitTargetType, doctors, pharmacies]);
+    return pharmacies.filter(p => p.regionId === numericRegionId);
+  }, [regionId, visitTargetType, pharmacies]);
+
+  const doctorsInSelectedRegion = useMemo(() => {
+      if (!regionId) return [];
+      return doctors.filter(d => d.regionId === parseInt(regionId));
+  }, [regionId, doctors]);
   
   const autocompleteSuggestions = useMemo(() => {
     if (!showSuggestions) return [];
@@ -59,9 +62,25 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     setTargetNameInput('');
     setSelectedProductIds([]);
     setNotes('');
-    setVisitType('Single');
+    setVisitType(type === 'doctor' ? 'Single' : null);
+    setDoctorSelectionMode('planned'); // Reset to planned view
+  };
+  
+  const toggleDoctorSelectionMode = () => {
+    setDoctorSelectionMode(prev => {
+        const newMode = prev === 'planned' ? 'all' : 'planned';
+        // Reset selections when toggling
+        setTargetId('');
+        setRegionId(initialRegionId && newMode === 'planned' ? String(initialRegionId) : '');
+        return newMode;
+    });
   };
 
+  const handlePlannedDoctorSelect = (doctor: Doctor) => {
+    setTargetId(String(doctor.id));
+    // Automatically set region based on selected doctor
+    setRegionId(String(doctor.regionId));
+  };
 
   const handleRegionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setRegionId(e.target.value);
@@ -78,7 +97,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
     }
   };
 
-  const handleSuggestionClick = (target: Doctor | Pharmacy) => {
+  const handleSuggestionClick = (target: Pharmacy) => {
     setTargetId(String(target.id));
     setTargetNameInput(target.name);
     setShowSuggestions(false);
@@ -185,49 +204,112 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
         </div>
       </div>
       
-      {/* Region Selector */}
-      <div>
-        <label htmlFor="region" className="block mb-2 text-sm font-medium text-slate-800">{t('region')}</label>
-        <select id="region" value={regionId} onChange={handleRegionChange} required className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-2.5">
-          <option value="" disabled>{t('choose_region')}</option>
-          {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
-      </div>
-      
-      {/* Target (Doctor/Pharmacy) Autocomplete */}
-      <div className="relative">
-        <label htmlFor="target" className="block mb-2 text-sm font-medium text-slate-800">{t(visitTargetType === 'doctor' ? 'doctor' : 'pharmacy')}</label>
-        <input
-          id="target"
-          type="text"
-          value={targetNameInput}
-          onChange={handleTargetInputChange}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-          required
-          disabled={!regionId}
-          className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-2.5 disabled:bg-slate-200/50"
-          placeholder={t(visitTargetType === 'doctor' ? 'search_for_doctor' : 'search_for_pharmacy')}
-          autoComplete="off"
-        />
-        {autocompleteSuggestions.length > 0 && (
-          <ul className="absolute z-20 w-full bg-white border border-slate-300/50 rounded-b-lg -mt-1 max-h-48 overflow-y-auto shadow-lg">
-            {autocompleteSuggestions.map(target => (
-              <li
-                key={target.id}
-                className="p-2.5 text-sm text-slate-800 hover:bg-orange-100 cursor-pointer"
-                onMouseDown={(e) => { // Use onMouseDown to prevent blur event from firing before click
-                  e.preventDefault(); 
-                  handleSuggestionClick(target);
-                }}
-              >
-                {target.name}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {visitTargetType === 'doctor' ? (
+        <div>
+          <div className="flex justify-between items-center mb-2">
+             <label className="block text-sm font-medium text-slate-800">
+                {doctorSelectionMode === 'planned' ? t('planned_visits_for_today') : t('all_clients')}
+            </label>
+            <button
+                type="button"
+                onClick={toggleDoctorSelectionMode}
+                className="text-sm font-semibold text-blue-600 hover:text-orange-600 transition-colors"
+            >
+                {doctorSelectionMode === 'planned' ? t('all_clients') : t('show_planned_visits')}
+            </button>
+          </div>
 
+          {doctorSelectionMode === 'planned' ? (
+            <>
+              {pendingDoctorsForToday && pendingDoctorsForToday.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto p-2 bg-slate-100/50 rounded-lg">
+                  {pendingDoctorsForToday.map((doctor) => (
+                    <button
+                      type="button"
+                      key={doctor.id}
+                      onClick={() => handlePlannedDoctorSelect(doctor)}
+                      className={`w-full text-start p-3 rounded-lg border transition-all duration-200 ${
+                        targetId === String(doctor.id)
+                          ? 'bg-blue-600 text-white border-blue-700 shadow-md'
+                          : 'bg-white/50 border-slate-300/50 hover:bg-blue-100/50 hover:border-blue-300'
+                      }`}
+                    >
+                      <p className="font-semibold">{doctor.name}</p>
+                      <p className={`text-xs ${targetId === String(doctor.id) ? 'text-blue-100' : 'text-slate-600'}`}>
+                        {t(doctor.specialization)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-4 bg-slate-100/50 rounded-lg text-slate-600">
+                  <p>{t('all_planned_visits_completed')}</p>
+                </div>
+              )}
+            </>
+          ) : (
+             <div className="space-y-4 p-2 bg-slate-100/50 rounded-lg">
+                <div>
+                    <label htmlFor="region" className="block mb-2 text-sm font-medium text-slate-800">{t('region')}</label>
+                    <select id="region" value={regionId} onChange={handleRegionChange} required className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                    <option value="" disabled>{t('choose_region')}</option>
+                    {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="doctor" className="block mb-2 text-sm font-medium text-slate-800">{t('doctor')}</label>
+                    <select id="doctor" value={targetId} onChange={(e) => setTargetId(e.target.value)} required disabled={!regionId} className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 disabled:bg-slate-200/50">
+                        <option value="" disabled>{t('choose_doctor')}</option>
+                        {doctorsInSelectedRegion.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div>
+            <label htmlFor="region" className="block mb-2 text-sm font-medium text-slate-800">{t('region')}</label>
+            <select id="region" value={regionId} onChange={handleRegionChange} required className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-2.5">
+              <option value="" disabled>{t('choose_region')}</option>
+              {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
+          
+          <div className="relative">
+            <label htmlFor="target" className="block mb-2 text-sm font-medium text-slate-800">{t('pharmacy')}</label>
+            <input
+              id="target"
+              type="text"
+              value={targetNameInput}
+              onChange={handleTargetInputChange}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              required
+              disabled={!regionId}
+              className="bg-white/50 border border-slate-300/50 text-slate-900 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-2.5 disabled:bg-slate-200/50"
+              placeholder={t('search_for_pharmacy')}
+              autoComplete="off"
+            />
+            {autocompleteSuggestions.length > 0 && (
+              <ul className="absolute z-20 w-full bg-white border border-slate-300/50 rounded-b-lg -mt-1 max-h-48 overflow-y-auto shadow-lg">
+                {autocompleteSuggestions.map(target => (
+                  <li
+                    key={target.id}
+                    className="p-2.5 text-sm text-slate-800 hover:bg-orange-100 cursor-pointer"
+                    onMouseDown={(e) => { 
+                      e.preventDefault(); 
+                      handleSuggestionClick(target as Pharmacy);
+                    }}
+                  >
+                    {target.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
 
       {visitTargetType === 'doctor' && (
         <>
@@ -292,7 +374,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
         </button>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || (visitTargetType === 'doctor' && !targetId)}
           className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 transition-colors"
         >
           {submitting ? t('saving') : t('save')}

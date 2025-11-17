@@ -197,6 +197,29 @@ const RepDashboard: React.FC = () => {
       return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{t(textKey)}</span>;
   };
 
+  const doctorNameToIdMap = useMemo(() => new Map(doctors.map(d => [d.name, d.id])), [doctors]);
+
+  const pendingDoctorsForToday = useMemo(() => {
+      if (!plan || !plan.plan) return [];
+
+      const todayStr = new Date().toDateString();
+      const todayIndex = new Date().getDay();
+      
+      const todaysDoctorIds = plan.plan[todayIndex]?.doctorIds || [];
+      if (todaysDoctorIds.length === 0) return [];
+
+      const visitedDoctorIds = new Set(
+          recentVisits
+              .filter(v => new Date(v.date).toDateString() === todayStr && v.type === 'DOCTOR_VISIT')
+              .map(v => doctorNameToIdMap.get(v.targetName))
+              .filter((id): id is number => id !== undefined)
+      );
+
+      const pendingDoctorIds = todaysDoctorIds.filter(id => !visitedDoctorIds.has(id));
+      
+      return doctors.filter(d => pendingDoctorIds.includes(d.id));
+  }, [plan, recentVisits, doctors, doctorNameToIdMap]);
+
   if (loading) {
     return <Spinner />;
   }
@@ -508,6 +531,7 @@ const RepDashboard: React.FC = () => {
               pharmacies={pharmacies}
               regions={regions}
               initialRegionId={initialRegionForVisit}
+              pendingDoctorsForToday={pendingDoctorsForToday}
               onSuccess={handleFormSuccess}
               onCancel={() => setIsModalOpen(false)}
             />
