@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
-import { EyeIcon, EyeOffIcon, LanguageIcon } from './icons';
+import { EyeIcon, EyeOffIcon } from './icons';
 import { Logo } from './Logo';
 import { api } from '../services/api';
 
@@ -15,7 +15,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const { t, toggleLang, lang } = useLanguage();
+  const { t } = useLanguage();
 
   const [authView, setAuthView] = useState<'login' | 'reset'>('login');
   const [resetMessage, setResetMessage] = useState('');
@@ -72,19 +72,7 @@ const Login: React.FC = () => {
   
   if (authView === 'reset') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative">
-         {/* Language Switcher */}
-        <div className="absolute top-4 end-4">
-            <button
-              onClick={toggleLang}
-              className="flex items-center text-white/80 hover:text-white focus:outline-none transition-colors font-medium text-sm"
-              aria-label="Change Language"
-            >
-              <LanguageIcon className="h-5 w-5 me-1" />
-              <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
-            </button>
-        </div>
-
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-sm bg-slate-800/50 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up">
           <Logo className="h-20 mx-auto text-cyan-400" showIcon={false}/>
 
@@ -138,19 +126,7 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative">
-      {/* Language Switcher */}
-      <div className="absolute top-4 end-4">
-          <button
-            onClick={toggleLang}
-            className="flex items-center text-white/80 hover:text-white focus:outline-none transition-colors font-medium text-sm"
-            aria-label="Change Language"
-          >
-            <LanguageIcon className="h-5 w-5 me-1" />
-            <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
-          </button>
-      </div>
-
+    <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-slate-800/50 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up">
         <Logo className="h-20 mx-auto text-cyan-400" showIcon={false}/>
 

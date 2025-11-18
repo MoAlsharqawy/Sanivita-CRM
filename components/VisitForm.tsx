@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Doctor, Pharmacy, User, Product, Region } from '../types';
+import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
-import { useRepMutations } from '../hooks/useMutations';
 
 interface VisitFormProps {
   user: User;
@@ -17,8 +17,6 @@ interface VisitFormProps {
 
 const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmacies, regions, initialRegionId, pendingDoctorsForToday, onSuccess, onCancel }) => {
   const { t } = useLanguage();
-  const { addDoctorVisit, addPharmacyVisit } = useRepMutations(user.id);
-  
   const [visitTargetType, setVisitTargetType] = useState<'doctor' | 'pharmacy'>('doctor');
   const [regionId, setRegionId] = useState<string>(initialRegionId ? String(initialRegionId) : '');
   const [targetId, setTargetId] = useState<string>('');
@@ -26,6 +24,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
   const [visitType, setVisitType] = useState<'Coaching' | 'Single' | null>('Single');
   const [notes, setNotes] = useState('');
   
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   // States for pharmacy autocomplete
@@ -34,8 +33,6 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
 
   // New state for toggling between planned and all doctors
   const [doctorSelectionMode, setDoctorSelectionMode] = useState<'planned' | 'all'>('planned');
-
-  const submitting = addDoctorVisit.isPending || addPharmacyVisit.isPending;
 
   const filteredTargets = useMemo(() => {
     if (visitTargetType !== 'pharmacy' || !regionId) return [];
@@ -142,11 +139,12 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
         return;
     }
 
+    setSubmitting(true);
     setError('');
 
     try {
       if (visitTargetType === 'doctor' && visitType) { // visitType is now guaranteed to be non-null here
-        await addDoctorVisit.mutateAsync({
+        await api.addDoctorVisit({
           doctorId: parseInt(targetId),
           repId: user.id,
           productIds: selectedProductIds,
@@ -155,7 +153,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
           doctorComment: notes
         });
       } else {
-        await addPharmacyVisit.mutateAsync({
+        await api.addPharmacyVisit({
           pharmacyId: parseInt(targetId),
           repId: user.id,
           regionId: parseInt(regionId),
@@ -165,6 +163,8 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
       onSuccess();
     } catch (err) {
       setError(t('error_saving_visit'));
+    } finally {
+      setSubmitting(false);
     }
   };
 

@@ -1,7 +1,7 @@
 {
   "name": "sanivita-crm",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,8 +13,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.24.1",
-    "@supabase/supabase-js": "^2.44.4",
-    "@tanstack/react-query": "^5.28.0"
+    "@supabase/supabase-js": "^2.44.4"
   },
   "devDependencies": {
     "@types/react": "^18.2.79",

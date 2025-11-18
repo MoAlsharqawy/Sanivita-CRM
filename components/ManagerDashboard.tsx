@@ -1,5 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, WeeklyPlan, Specialization } from '../types';
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { api } from '../services/api';
+import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
 import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon } from './icons';
 import Modal from './Modal';
@@ -10,9 +12,7 @@ import Spinner from './Spinner';
 import UserEditModal from './UserEditModal';
 import AnalyticsCharts from './AnalyticsCharts';
 import DailyVisitsDetailModal from './DailyVisitsDetailModal';
-import OverdueClientsDetailModal from './OverdueClientsDetailModal';
-import { useManagerData } from '../hooks/useQueries';
-import { useManagerMutations } from '../hooks/useMutations';
+import OverdueClientsDetailModal from './OverdueClientsDetailModal'; // New import
 
 // Helper functions for dates (YYYY-MM-DD format)
 const toYYYYMMDD = (date: Date): string => {
@@ -55,29 +55,20 @@ const getCurrentMonthDateStrings = (): { start: string; end: string } => {
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const [allReports, setAllReports] = useState<VisitReport[]>([]);
+  const [filteredReports, setFilteredReports] = useState<VisitReport[]>([]);
+  const [reps, setReps] = useState<User[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [totalDoctors, setTotalDoctors] = useState<Doctor[]>([]);
+  const [totalPharmacies, setTotalPharmacies] = useState<Pharmacy[]>([]);
+  const [overdueAlerts, setOverdueAlerts] = useState<ClientAlert[]>([]);
+  const [filteredAlerts, setFilteredAlerts] = useState<ClientAlert[]>([]);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [allPlans, setAllPlans] = useState<{ [repId: string]: WeeklyPlan }>({});
+  const [reviewMessage, setReviewMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [allDoctorsMap, setAllDoctorsMap] = useState<Map<number, Doctor>>(new Map());
 
-  // --- Data Fetching via React Query ---
-  const {
-    allReports,
-    users,
-    regions,
-    totalDoctors,
-    totalPharmacies,
-    overdueAlerts,
-    systemSettings,
-    allPlans,
-    isLoading,
-    reportsQuery,
-    usersQuery,
-    allPlansQuery
-  } = useManagerData(user);
-
-  // --- Mutations ---
-  const { reviewRepPlan, revokePlanApproval, updateSystemSettings, deleteUser, resetRepData } = useManagerMutations();
-
-  // --- Derived State ---
-  const reps = useMemo(() => users.filter(u => u.role === UserRole.Rep), [users]);
-  const allDoctorsMap = useMemo(() => new Map(totalDoctors.map(doc => [doc.id, doc])), [totalDoctors]);
 
   const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
   const WEEK_DAYS_ORDERED = useMemo(() => [
@@ -90,31 +81,34 @@ const ManagerDashboard: React.FC = () => {
     { name: t('friday'), index: 5 },
   ], [t]);
 
-  // --- Local UI State ---
+
   type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport';
 
+
+  // Tab and Modal states
   const [activeTab, setActiveTab] = useState<ManagerTab>('reports');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedRepsForExport, setSelectedRepsForExport] = useState<string[]>([]);
   const [selectedRepForDailyVisits, setSelectedRepForDailyVisits] = useState<string | 'all'>('all');
   const [isDailyVisitsDetailModalOpen, setIsDailyVisitsDetailModalOpen] = useState(false);
-  const [isOverdueClientsDetailModalOpen, setIsOverdueClientsDetailModalOpen] = useState(false);
+  const [isOverdueClientsDetailModalOpen, setIsOverdueClientsDetailModalOpen] = useState(false); // New state for overdue clients detail modal
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewingRepClients, setViewingRepClients] = useState<User | null>(null);
+  // New state for reset visits functionality
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [repToReset, setRepToReset] = useState<User | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [reviewMessage, setReviewMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
 
   // Settings tab local state
   const [localWeekends, setLocalWeekends] = useState<number[]>([]);
   const [localHolidays, setLocalHolidays] = useState<string[]>([]);
   const [newHoliday, setNewHoliday] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false); // New state for settings button
 
   // Filter states
   const [selectedRep, setSelectedRep] = useState<string>('all');
@@ -122,23 +116,61 @@ const ManagerDashboard: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [selectedQuickFilter, setSelectedQuickFilter] = useState<'none' | 'today' | 'currentWeek' | 'currentMonth'>('none');
-  const [filteredReports, setFilteredReports] = useState<VisitReport[]>([]);
-  const [filteredAlerts, setFilteredAlerts] = useState<ClientAlert[]>([]);
 
-  // Sync settings to local state when fetched
-  useEffect(() => {
-    if (systemSettings) {
-      setLocalWeekends(systemSettings.weekends);
-      setLocalHolidays(systemSettings.holidays.sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
+
+  const fetchInitialData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [reportsData, usersData, regionsData, doctorsData, pharmaciesData, alertsData, settingsData, plansData] = await Promise.all([
+        api.getAllVisitReports(),
+        api.getUsers(),
+        api.getRegions(),
+        api.getAllDoctors(), // Fetch all doctors
+        api.getAllPharmacies(),
+        api.getOverdueVisits(),
+        api.getSystemSettings(),
+        api.getAllPlans(),
+      ]);
+      setAllReports(reportsData);
+      setFilteredReports(reportsData);
+      setReps(usersData.filter(u => u.role === UserRole.Rep));
+      setRegions(regionsData);
+      setTotalDoctors(doctorsData);
+      setTotalPharmacies(pharmaciesData);
+      setOverdueAlerts(alertsData);
+      setFilteredAlerts(alertsData);
+      setSystemSettings(settingsData);
+      if (settingsData) {
+        setLocalWeekends(settingsData.weekends);
+        setLocalHolidays(settingsData.holidays.sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
+      }
+      setAllPlans(plansData);
+      setAllDoctorsMap(new Map(doctorsData.map(doc => [doc.id, doc]))); // Create doctor map
+    } catch (error) {
+      console.error("Failed to fetch initial data", error);
+    } finally {
+      setLoading(false);
     }
-  }, [systemSettings]);
+  }, []);
 
-  // Sync filtered reports/alerts when data or filters change
   useEffect(() => {
+    // Fetch data on initial component mount
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  useEffect(() => {
+    // Refetch data whenever the active tab changes to ensure fresh data
+    // This is especially important for tabs where data might have been modified
+    // in another tab (e.g., users after data import).
+    fetchInitialData();
+  }, [activeTab, fetchInitialData]); // Add activeTab as a dependency
+
+  useMemo(() => {
     let reports = allReports;
     let currentStartDate = startDate;
     let currentEndDate = endDate;
 
+    // Apply quick filters if selected, overriding manual inputs
     if (selectedQuickFilter === 'today') {
       const today = getTodayDateString();
       currentStartDate = today;
@@ -163,6 +195,7 @@ const ManagerDashboard: React.FC = () => {
       reports = reports.filter(r => new Date(r.date) >= new Date(currentStartDate));
     }
     if (currentEndDate) {
+      // Add one day to endDate to include visits on the selected end date
       const endOfDay = new Date(currentEndDate);
       endOfDay.setDate(endOfDay.getDate() + 1);
       reports = reports.filter(r => new Date(r.date) < endOfDay);
@@ -178,9 +211,9 @@ const ManagerDashboard: React.FC = () => {
       alerts = alerts.filter(a => a.regionName === selectedRegion);
     }
     setFilteredAlerts(alerts);
-  }, [selectedRep, selectedRegion, startDate, endDate, selectedQuickFilter, allReports, overdueAlerts, t]);
 
-  // --- Computed Stats ---
+  }, [selectedRep, selectedRegion, startDate, endDate, selectedQuickFilter, allReports, overdueAlerts, t]);
+  
   const displayedStats = useMemo(() => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -217,47 +250,89 @@ const ManagerDashboard: React.FC = () => {
 
   const dailyVisitCounts = useMemo(() => {
     const todayStr = new Date().toDateString();
-    const todaysVisits = allReports.filter(report => new Date(report.date).toDateString() === todayStr);
-    const selectedRepObject = selectedRepForDailyVisits !== 'all' ? reps.find(r => r.id === selectedRepForDailyVisits) : null;
-    const filteredByRep = selectedRepForDailyVisits === 'all' ? todaysVisits : todaysVisits.filter(visit => visit.repName === selectedRepObject?.name);
 
-    return { 
-        doctorVisits: filteredByRep.filter(v => v.type === 'DOCTOR_VISIT').length, 
-        pharmacyVisits: filteredByRep.filter(v => v.type === 'PHARMACY_VISIT').length 
-    };
+    const todaysVisits = allReports.filter(report =>
+        new Date(report.date).toDateString() === todayStr
+    );
+    
+    const selectedRepObject = selectedRepForDailyVisits !== 'all' 
+        ? reps.find(r => r.id === selectedRepForDailyVisits)
+        : null;
+
+    const filteredByRep = selectedRepForDailyVisits === 'all'
+        ? todaysVisits
+        : todaysVisits.filter(visit => visit.repName === selectedRepObject?.name);
+
+    const doctorVisits = filteredByRep.filter(v => v.type === 'DOCTOR_VISIT').length;
+    const pharmacyVisits = filteredByRep.filter(v => v.type === 'PHARMACY_VISIT').length;
+
+    return { doctorVisits, pharmacyVisits };
   }, [allReports, selectedRepForDailyVisits, reps]);
 
+
   const monthlySummaryStats = useMemo(() => {
-    const relevantReports = selectedRep === 'all' ? allReports : allReports.filter(r => r.repName === selectedRep);
-    if (relevantReports.length === 0) return { totalVisitsThisMonth: 0, uniqueClientsThisMonth: 0, averageVisitsPerMonth: 0 };
+    const relevantReports = selectedRep === 'all'
+        ? allReports
+        : allReports.filter(r => r.repName === selectedRep);
+    
+    if (relevantReports.length === 0) {
+        return {
+            totalVisitsThisMonth: 0,
+            uniqueClientsThisMonth: 0,
+            averageVisitsPerMonth: 0,
+        };
+    }
 
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const monthlyReports = relevantReports.filter(visit => new Date(visit.date) >= startOfMonth && new Date(visit.date) <= today);
 
+    const monthlyReports = relevantReports.filter(visit => {
+        const visitDate = new Date(visit.date);
+        return visitDate >= startOfMonth && visitDate <= today;
+    });
+
+    const totalVisitsThisMonth = monthlyReports.length;
+    const uniqueClientsThisMonth = new Set(monthlyReports.map(r => r.targetName)).size;
+    
     const visitDates = relevantReports.map(r => new Date(r.date));
     const earliestDate = new Date(Math.min(...visitDates.map(d => d.getTime())));
     const latestDate = new Date(Math.max(...visitDates.map(d => d.getTime())));
+
     const monthDifference = (latestDate.getFullYear() - earliestDate.getFullYear()) * 12 + (latestDate.getMonth() - earliestDate.getMonth()) + 1;
     
+    const averageVisitsPerMonth = relevantReports.length / (monthDifference || 1);
+
     return {
-        totalVisitsThisMonth: monthlyReports.length,
-        uniqueClientsThisMonth: new Set(monthlyReports.map(r => r.targetName)).size,
-        averageVisitsPerMonth: parseFloat((relevantReports.length / (monthDifference || 1)).toFixed(1)),
+        totalVisitsThisMonth,
+        uniqueClientsThisMonth,
+        averageVisitsPerMonth: parseFloat(averageVisitsPerMonth.toFixed(1)),
     };
   }, [allReports, selectedRep]);
 
   const userManagementStats = useMemo(() => {
-    if (allReports.length === 0) return { totalVisits: 0, totalUniqueClients: 0, averageVisitsPerMonth: 0 };
+    if (allReports.length === 0) {
+      return {
+        totalVisits: 0,
+        totalUniqueClients: 0,
+        averageVisitsPerMonth: 0,
+      };
+    }
+
+    const totalVisits = allReports.length;
+    const totalUniqueClients = new Set(allReports.map(r => r.targetName)).size;
+
     const visitDates = allReports.map(r => new Date(r.date));
     const earliestDate = new Date(Math.min(...visitDates.map(d => d.getTime())));
     const latestDate = new Date(Math.max(...visitDates.map(d => d.getTime())));
+
     const monthDifference = (latestDate.getFullYear() - earliestDate.getFullYear()) * 12 + (latestDate.getMonth() - earliestDate.getMonth()) + 1;
+    
+    const averageVisitsPerMonth = totalVisits / (monthDifference || 1);
 
     return {
-      totalVisits: allReports.length,
-      totalUniqueClients: new Set(allReports.map(r => r.targetName)).size,
-      averageVisitsPerMonth: parseFloat((allReports.length / (monthDifference || 1)).toFixed(1)),
+      totalVisits,
+      totalUniqueClients,
+      averageVisitsPerMonth: parseFloat(averageVisitsPerMonth.toFixed(1)),
     };
   }, [allReports]);
   
@@ -275,10 +350,12 @@ const ManagerDashboard: React.FC = () => {
     return reps.map(rep => {
       const repDoctors = totalDoctors.filter(d => d.repId === rep.id);
       const repPharmacies = totalPharmacies.filter(p => p.repId === rep.id);
+
       const specializationCounts = repDoctors.reduce((acc, doctor) => {
-        acc[doctor.specialization] = (acc[doctor.specialization] || 0) + 1;
+        const spec = doctor.specialization;
+        acc[spec] = (acc[spec] || 0) + 1;
         return acc;
-      }, {} as any);
+      }, {} as Record<Specialization.Pediatrics | Specialization.Pulmonology, number>);
 
       return {
         rep,
@@ -290,41 +367,54 @@ const ManagerDashboard: React.FC = () => {
     });
   }, [reps, totalDoctors, totalPharmacies]);
 
-  // --- Handlers ---
-  const handleReviewPlan = (repId: string, status: 'approved' | 'rejected') => {
-      reviewRepPlan.mutate({ repId, status }, {
-        onSuccess: () => {
+  const handleReviewPlan = async (repId: string, status: 'approved' | 'rejected') => {
+      try {
+          await api.reviewRepPlan(repId, status);
+           // Optimistic update
+          setAllPlans(prevPlans => ({
+              ...prevPlans,
+              [repId]: { ...prevPlans[repId], status: status }
+          }));
+
           const repName = reps.find(r => r.id === repId)?.name || '';
           const messageKey = status === 'approved' ? 'plan_approved_success' : 'plan_rejected_success';
           setReviewMessage({ text: t(messageKey, repName), type: 'success' });
+
+      } catch (error) {
+          console.error(`Failed to ${status} plan for rep ${repId}`, error);
+          setReviewMessage({ text: t('plan_review_error'), type: 'error' });
+      } finally {
           setTimeout(() => setReviewMessage(null), 3000);
-        },
-        onError: () => {
-           setReviewMessage({ text: t('plan_review_error'), type: 'error' });
-           setTimeout(() => setReviewMessage(null), 3000);
-        }
-      });
+      }
   };
 
-  const handleRevokeApproval = (repId: string) => {
+  const handleRevokeApproval = async (repId: string) => {
       if (!user || user.role !== UserRole.Manager) {
-          setReviewMessage({ text: t('error_permission_denied'), type: 'error' });
+          console.warn("Only managers can revoke plan approval.");
+          setReviewMessage({ text: t('error_permission_denied'), type: 'error' }); // Reusing permission denied translation
           setTimeout(() => setReviewMessage(null), 3000);
           return;
       }
-      revokePlanApproval.mutate(repId, {
-        onSuccess: () => {
+      try {
+          await api.revokePlanApproval(repId);
+           // Optimistic update
+          setAllPlans(prevPlans => ({
+              ...prevPlans,
+              [repId]: { ...prevPlans[repId], status: 'draft' }
+          }));
+
           const repName = reps.find(r => r.id === repId)?.name || '';
           setReviewMessage({ text: t('plan_revoked_success', repName), type: 'success' });
+
+      } catch (error) {
+          console.error(`Failed to revoke approval for rep ${repId}`, error);
+          setReviewMessage({ text: t('plan_revoke_error'), type: 'error' });
+      } finally {
           setTimeout(() => setReviewMessage(null), 3000);
-        },
-        onError: () => {
-           setReviewMessage({ text: t('plan_revoke_error'), type: 'error' });
-           setTimeout(() => setReviewMessage(null), 3000);
-        }
-      });
+      }
   };
 
+  // NEW: Handle reset visits click
   const handleResetClick = (rep: User) => {
       if (user?.role !== UserRole.Manager) {
           setReviewMessage({ text: t('error_permission_denied'), type: 'error' });
@@ -335,27 +425,30 @@ const ManagerDashboard: React.FC = () => {
       setIsResetModalOpen(true);
   };
 
-  const handleConfirmReset = () => {
+  // NEW: Handle confirmation of reset visits
+  const handleConfirmReset = async () => {
       if (!repToReset) return;
+
       setIsResetting(true);
-      resetRepData.mutate(repToReset.id, {
-        onSuccess: () => {
-           setReviewMessage({ text: t('reset_success', repToReset.name), type: 'success' });
-           setIsResetting(false);
-           setIsResetModalOpen(false);
-           setRepToReset(null);
-           setTimeout(() => setReviewMessage(null), 3000);
-        },
-        onError: (error: any) => {
-           const errorMessage = error.message.includes('permission denied') 
+      try {
+          await api.resetRepData(repToReset.id);
+          setReviewMessage({ text: t('reset_success', repToReset.name), type: 'success' });
+          // Re-fetch all data to reflect the changes
+          await fetchInitialData();
+      } catch (error: any) {
+          console.error("Failed to reset rep data:", error);
+          const errorMessage = error.message.includes('permission denied') 
                                ? t('error_permission_denied') 
                                : t('reset_error', repToReset.name);
           setReviewMessage({ text: errorMessage, type: 'error' });
+      } finally {
           setIsResetting(false);
+          setIsResetModalOpen(false);
+          setRepToReset(null);
           setTimeout(() => setReviewMessage(null), 3000);
-        }
-      });
+      }
   };
+
 
   const handleResetFilters = () => {
     setSelectedRep('all');
@@ -382,21 +475,102 @@ const ManagerDashboard: React.FC = () => {
     setSelectedQuickFilter(filter);
   };
 
-  const handleSaveSettings = () => {
-      setIsSavingSettings(true);
-      setSettingsMessage('');
-      updateSystemSettings.mutate({ weekends: localWeekends, holidays: localHolidays }, {
-        onSuccess: () => {
-           setSettingsMessage(t('settings_saved_success'));
-           setIsSavingSettings(false);
-           setTimeout(() => setSettingsMessage(''), 3000);
-        },
-        onError: (error: any) => {
-           setSettingsMessage(error.message ? t(error.message) : t('settings_saved_error'));
-           setIsSavingSettings(false);
-           setTimeout(() => setSettingsMessage(''), 5000);
-        }
-      });
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+    setSelectedQuickFilter('none'); // Clear quick filter if manual date is set
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+    setSelectedQuickFilter('none'); // Clear quick filter if manual date is set
+  };
+
+  const handleExportUsers = () => {
+    exportUsersToExcel(reps, 'representatives_list', t);
+  };
+
+  const handleRepSelectionChange = (repId: string) => {
+    setSelectedRepsForExport(prev => 
+      prev.includes(repId) ? prev.filter(id => id !== repId) : [...prev, repId]
+    );
+  };
+
+  const handleSelectAllReps = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedRepsForExport(reps.map(r => r.id));
+    } else {
+      setSelectedRepsForExport([]);
+    }
+  };
+
+  const handleConfirmClientListExport = () => {
+    if (selectedRepsForExport.length === 0) return;
+    
+    const selectedDoctors = totalDoctors.filter(d => selectedRepsForExport.includes(d.repId));
+    const selectedPharmacies = totalPharmacies.filter(p => selectedRepsForExport.includes(p.repId));
+    
+    exportMultipleRepClientsToExcel(
+      selectedDoctors,
+      selectedPharmacies,
+      regions,
+      reps,
+      'reps_client_lists',
+      t
+    );
+    
+    setIsExportModalOpen(false);
+    setSelectedRepsForExport([]);
+  };
+
+  const handleWeekendChange = (dayIndex: number) => {
+    setLocalWeekends(prev =>
+        prev.includes(dayIndex)
+            ? prev.filter(d => d !== dayIndex)
+            : [...prev, dayIndex]
+    );
+  };
+
+  const handleAddHoliday = () => {
+      if (newHoliday && !localHolidays.includes(newHoliday)) {
+          setLocalHolidays(prev => [...prev, newHoliday].sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
+          setNewHoliday('');
+      }
+  };
+
+  const handleRemoveHoliday = (holiday: string) => {
+      setLocalHolidays(prev => prev.filter(h => h !== holiday));
+  };
+
+  const handleSaveSettings = async () => {
+      console.log('handleSaveSettings triggered');
+      setIsSavingSettings(true); // Start saving
+      console.log('isSavingSettings set to true');
+
+      setSettingsMessage(''); // Clear previous messages
+
+      if (!systemSettings) {
+          console.error('System settings are null when trying to save.');
+          setSettingsMessage(t('settings_saved_error')); // Provide specific error feedback
+          setIsSavingSettings(false); // Ensure button is re-enabled
+          return;
+      }
+      const newSettings = { weekends: localWeekends, holidays: localHolidays };
+      try {
+          console.log('Attempting to update system settings with:', newSettings);
+          await api.updateSystemSettings(newSettings);
+          setSystemSettings(newSettings); // Update local state with potentially new settings from DB
+          setSettingsMessage(t('settings_saved_success'));
+          console.log('Settings saved successfully.');
+          setTimeout(() => setSettingsMessage(''), 3000);
+      } catch (error: any) {
+          console.error("Failed to save settings:", error);
+          // Ensure the error message from API is displayed if available, otherwise generic.
+          setSettingsMessage(error.message ? t(error.message) : t('settings_saved_error'));
+          setTimeout(() => setSettingsMessage(''), 5000); // Give user more time to read error
+      } finally {
+          setIsSavingSettings(false); // End saving
+          console.log('isSavingSettings set to false (finally block)');
+      }
   };
 
   const handleAddUserClick = () => {
@@ -412,22 +586,21 @@ const ManagerDashboard: React.FC = () => {
   const handleUserModalSuccess = () => {
     setIsUserModalOpen(false);
     setEditingUser(null);
-    // Invalidate queries handled in useMutations
+    fetchInitialData(); // Refetch all data including users after successful user add/edit
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingUser) return;
     setIsDeleting(true);
-    deleteUser.mutate(deletingUser.id, {
-      onSuccess: () => {
-        setDeletingUser(null);
-        setIsDeleting(false);
-      },
-      onError: (error) => {
-        console.error("Failed to delete", error);
-        setIsDeleting(false);
-      }
-    });
+    try {
+      await api.deleteUser(deletingUser.id);
+      setDeletingUser(null);
+      fetchInitialData(); // Refetch all data including users after successful user deletion
+    } catch (error) {
+      console.error("Failed to delete user", error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
     const getPlanStatusBadge = (status: WeeklyPlan['status']) => {
@@ -442,36 +615,8 @@ const ManagerDashboard: React.FC = () => {
         return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{t(textKey)}</span>;
     };
 
-  // Handlers for exports
-  const handleExportUsers = () => exportUsersToExcel(reps, 'representatives_list', t);
-  const handleRepSelectionChange = (repId: string) => {
-    setSelectedRepsForExport(prev => prev.includes(repId) ? prev.filter(id => id !== repId) : [...prev, repId]);
-  };
-  const handleSelectAllReps = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedRepsForExport(e.target.checked ? reps.map(r => r.id) : []);
-  };
-  const handleConfirmClientListExport = () => {
-    if (selectedRepsForExport.length === 0) return;
-    const selectedDoctors = totalDoctors.filter(d => selectedRepsForExport.includes(d.repId));
-    const selectedPharmacies = totalPharmacies.filter(p => selectedRepsForExport.includes(p.repId));
-    exportMultipleRepClientsToExcel(selectedDoctors, selectedPharmacies, regions, reps, 'reps_client_lists', t);
-    setIsExportModalOpen(false);
-    setSelectedRepsForExport([]);
-  };
-  const handleWeekendChange = (dayIndex: number) => {
-    setLocalWeekends(prev => prev.includes(dayIndex) ? prev.filter(d => d !== dayIndex) : [...prev, dayIndex]);
-  };
-  const handleAddHoliday = () => {
-    if (newHoliday && !localHolidays.includes(newHoliday)) {
-        setLocalHolidays(prev => [...prev, newHoliday].sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
-        setNewHoliday('');
-    }
-  };
-  const handleRemoveHoliday = (holiday: string) => {
-      setLocalHolidays(prev => prev.filter(h => h !== holiday));
-  };
 
-  if (isLoading) {
+  if (loading) {
     return <Spinner />;
   }
   
@@ -489,43 +634,71 @@ const ManagerDashboard: React.FC = () => {
       <div className="mb-6 border-b border-gray-200/80">
           <ul className="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
               <li className="me-2">
-                  <button onClick={() => setActiveTab('reports')} className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'reports' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}>
-                      <ChartBarIcon className="w-5 h-5 me-2" />{t('reports')}
+                  <button 
+                      onClick={() => setActiveTab('reports')}
+                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'reports' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                  >
+                      <ChartBarIcon className="w-5 h-5 me-2" />
+                      {t('reports')}
                   </button>
               </li>
               {user?.role === UserRole.Manager && (
                 <>
                   <li className="me-2">
-                      <button onClick={() => setActiveTab('users')} className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'users' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}>
-                          <UsersIcon className="w-5 h-5 me-2" />{t('user_management')}
+                      <button 
+                          onClick={() => setActiveTab('users')}
+                          className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'users' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                      >
+                          <UsersIcon className="w-5 h-5 me-2" />
+                          {t('user_management')}
                       </button>
                   </li>
                    <li className="me-2">
-                        <button onClick={() => setActiveTab('clients')} className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'clients' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}>
-                            <UserGroupIcon className="w-5 h-5 me-2" />{t('client_management')}
+                        <button 
+                            onClick={() => setActiveTab('clients')}
+                            className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'clients' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                        >
+                            <UserGroupIcon className="w-5 h-5 me-2" />
+                            {t('client_management')}
                         </button>
                     </li>
                   <li className="me-2">
-                      <button onClick={() => setActiveTab('dataImport')} className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'dataImport' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}>
-                          <UploadIcon className="w-5 h-5 me-2" />{t('data_import')}
+                      <button 
+                          onClick={() => setActiveTab('dataImport')}
+                          className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'dataImport' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                      >
+                          <UploadIcon className="w-5 h-5 me-2" />
+                          {t('data_import')}
                       </button>
                   </li>
                 </>
               )}
                <li className="me-2">
-                  <button onClick={() => setActiveTab('approvals')} className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'approvals' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}>
-                      <MapPinIcon className="w-5 h-5 me-2" />{t('plan_approvals')} {pendingPlans.length > 0 && <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ms-2">{pendingPlans.length}</span>}
+                  <button 
+                      onClick={() => setActiveTab('approvals')}
+                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'approvals' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                  >
+                      <MapPinIcon className="w-5 h-5 me-2" />
+                      {t('plan_approvals')} {pendingPlans.length > 0 && <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ms-2">{pendingPlans.length}</span>}
                   </button>
               </li>
               <li className="me-2">
-                  <button onClick={() => setActiveTab('weeklyPlans')} className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'weeklyPlans' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}>
-                      <CalendarIcon className="w-5 h-5 me-2" />{t('view_weekly_plans')}
+                  <button 
+                      onClick={() => setActiveTab('weeklyPlans')}
+                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'weeklyPlans' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                  >
+                      <CalendarIcon className="w-5 h-5 me-2" />
+                      {t('view_weekly_plans')}
                   </button>
               </li>
               {user?.role === UserRole.Manager && (
                 <li className="me-2">
-                    <button onClick={() => setActiveTab('settings')} className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'settings' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}>
-                        <CogIcon className="w-5 h-5 me-2" />{t('system_settings')}
+                    <button 
+                        onClick={() => setActiveTab('settings')}
+                        className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'settings' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                    >
+                        <CogIcon className="w-5 h-5 me-2" />
+                        {t('system_settings')}
                     </button>
                 </li>
               )}
@@ -543,7 +716,10 @@ const ManagerDashboard: React.FC = () => {
               {pendingPlansCount > 0 ? (
                   <div className="text-center bg-white/10 p-3 rounded-lg">
                       <p className="font-semibold">{t('you_have_pending_plans', pendingPlansCount)}</p>
-                      <button onClick={() => setActiveTab('approvals')} className="mt-2 bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">
+                      <button
+                          onClick={() => setActiveTab('approvals')}
+                          className="mt-2 bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+                      >
                           {t('view_plans')}
                       </button>
                   </div>
@@ -555,16 +731,31 @@ const ManagerDashboard: React.FC = () => {
           {/* Monthly Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
-              <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4"><ChartBarIcon className="w-8 h-8" /></div>
-              <div><p className="text-slate-600 text-sm font-medium">{t('total_visits_this_month')}</p><p className="text-4xl font-bold text-purple-800">{monthlySummaryStats.totalVisitsThisMonth}</p></div>
+              <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4">
+                <ChartBarIcon className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-slate-600 text-sm font-medium">{t('total_visits_this_month')}</p>
+                <p className="text-4xl font-bold text-purple-800">{monthlySummaryStats.totalVisitsThisMonth}</p>
+              </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
-              <div className="bg-teal-500/20 text-teal-700 p-4 rounded-full me-4"><UserGroupIcon className="w-8 h-8" /></div>
-              <div><p className="text-slate-600 text-sm font-medium">{t('unique_clients_this_month')}</p><p className="text-4xl font-bold text-teal-800">{monthlySummaryStats.uniqueClientsThisMonth}</p></div>
+              <div className="bg-teal-500/20 text-teal-700 p-4 rounded-full me-4">
+                <UserGroupIcon className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-slate-600 text-sm font-medium">{t('unique_clients_this_month')}</p>
+                <p className="text-4xl font-bold text-teal-800">{monthlySummaryStats.uniqueClientsThisMonth}</p>
+              </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
-              <div className="bg-sky-500/20 text-sky-700 p-4 rounded-full me-4"><GraphIcon className="w-8 h-8" /></div>
-              <div><p className="text-slate-600 text-sm font-medium">{t('average_visits_per_month_historical')}</p><p className="text-4xl font-bold text-sky-800">{monthlySummaryStats.averageVisitsPerMonth}</p></div>
+              <div className="bg-sky-500/20 text-sky-700 p-4 rounded-full me-4">
+                <GraphIcon className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-slate-600 text-sm font-medium">{t('average_visits_per_month_historical')}</p>
+                <p className="text-4xl font-bold text-sky-800">{monthlySummaryStats.averageVisitsPerMonth}</p>
+              </div>
             </div>
           </div>
 
@@ -572,25 +763,46 @@ const ManagerDashboard: React.FC = () => {
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
                 <h3 className="text-xl font-semibold mb-4 text-blue-700">{t('daily_visits')}</h3>
                 <div className="flex border-b border-slate-300/50 mb-4 overflow-x-auto pb-1 no-scrollbar">
-                    <button onClick={() => setSelectedRepForDailyVisits('all')} className={`px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${selectedRepForDailyVisits === 'all' ? 'bg-white/50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:bg-slate-200/50 border-b-2 border-transparent'}`}>{t('all')}</button>
+                    <button
+                        onClick={() => setSelectedRepForDailyVisits('all')}
+                        className={`px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${selectedRepForDailyVisits === 'all' ? 'bg-white/50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:bg-slate-200/50 border-b-2 border-transparent'}`}
+                    >
+                        {t('all')}
+                    </button>
                     {reps.map(rep => (
-                        <button key={rep.id} onClick={() => setSelectedRepForDailyVisits(rep.id)} className={`px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${selectedRepForDailyVisits === rep.id ? 'bg-white/50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:bg-slate-200/50 border-b-2 border-transparent'}`}>{rep.name}</button>
+                        <button
+                            key={rep.id}
+                            onClick={() => setSelectedRepForDailyVisits(rep.id)}
+                            className={`px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${selectedRepForDailyVisits === rep.id ? 'bg-white/50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-600 hover:bg-slate-200/50 border-b-2 border-transparent'}`}
+                        >
+                            {rep.name}
+                        </button>
                     ))}
                 </div>
                 <div className="flex justify-around items-center text-center">
                     <div>
                         <p className="text-5xl font-bold text-blue-800">{dailyVisitCounts.doctorVisits}</p>
-                        <p className="text-md font-semibold text-slate-700 flex items-center justify-center gap-1 mt-1"><DoctorIcon className="w-5 h-5 text-blue-600"/><span>{t('doctors')}</span></p>
+                        <p className="text-md font-semibold text-slate-700 flex items-center justify-center gap-1 mt-1">
+                          <DoctorIcon className="w-5 h-5 text-blue-600"/>
+                          <span>{t('doctors')}</span>
+                        </p>
                     </div>
-                    <div className="h-16 w-px bg-slate-300"></div> 
+                    <div className="h-16 w-px bg-slate-300"></div> {/* Divider */}
                     <div>
                         <p className="text-5xl font-bold text-orange-800">{dailyVisitCounts.pharmacyVisits}</p>
-                        <p className="text-md font-semibold text-slate-700 flex items-center justify-center gap-1 mt-1"><PharmacyIcon className="w-5 h-5 text-orange-600"/><span>{t('pharmacies')}</span></p>
+                        <p className="text-md font-semibold text-slate-700 flex items-center justify-center gap-1 mt-1">
+                          <PharmacyIcon className="w-5 h-5 text-orange-600"/>
+                          <span>{t('pharmacies')}</span>
+                        </p>
                     </div>
                 </div>
                 <div>
-                    <button onClick={() => setIsDailyVisitsDetailModalOpen(true)} className="mt-4 w-full bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors flex items-center justify-center gap-2">
-                        <EyeIcon className="w-5 h-5"/>{t('view_details')}
+                    <button
+                        onClick={() => setIsDailyVisitsDetailModalOpen(true)}
+                        className="mt-4 w-full bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <EyeIcon className="w-5 h-5"/>
+                        {t('view_details')}
                     </button>
                 </div>
             </div>
@@ -598,23 +810,44 @@ const ManagerDashboard: React.FC = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-                <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4"><CalendarIcon className="w-8 h-8" /></div>
-                <div><p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_monthly_visits' : 'monthly_visits_for', selectedRep)}</p><p className="text-4xl font-bold text-blue-800">{displayedStats.visitsThisMonth}</p></div>
+                <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4">
+                    <CalendarIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_monthly_visits' : 'monthly_visits_for', selectedRep)}</p>
+                    <p className="text-4xl font-bold text-blue-800">{displayedStats.visitsThisMonth}</p>
+                </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-                <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4"><DoctorIcon className="w-8 h-8" /></div>
-                <div><p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_doctors' : 'doctors_of', selectedRep)}</p><p className="text-4xl font-bold text-green-800">{displayedStats.doctorCount}</p></div>
+                <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4">
+                    <DoctorIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_doctors' : 'doctors_of', selectedRep)}</p>
+                    <p className="text-4xl font-bold text-green-800">{displayedStats.doctorCount}</p>
+                </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '500ms' }}>
-                <div className="bg-orange-500/20 text-orange-700 p-4 rounded-full me-4"><PharmacyIcon className="w-8 h-8" /></div>
-                <div><p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_pharmacies' : 'pharmacies_of', selectedRep)}</p><p className="text-4xl font-bold text-orange-800">{displayedStats.pharmacyCount}</p></div>
+                <div className="bg-orange-500/20 text-orange-700 p-4 rounded-full me-4">
+                    <PharmacyIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_pharmacies' : 'pharmacies_of', selectedRep)}</p>
+                    <p className="text-4xl font-bold text-orange-800">{displayedStats.pharmacyCount}</p>
+                </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '600ms' }}>
-                <div className="bg-red-500/20 text-red-700 p-4 rounded-full me-4"><WarningIcon className="w-8 h-8" /></div>
-                <div><p className="text-slate-600 text-sm font-medium">{t('overdue_visits')}</p><p className="text-4xl font-bold text-red-800">{filteredAlerts.length}</p></div>
+                <div className="bg-red-500/20 text-red-700 p-4 rounded-full me-4">
+                    <WarningIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <p className="text-slate-600 text-sm font-medium">{t('overdue_visits')}</p>
+                    <p className="text-4xl font-bold text-red-800">{filteredAlerts.length}</p>
+                </div>
             </div>
           </div>
 
+          {/* Analytics Charts */}
           <AnalyticsCharts reports={filteredReports} />
 
           {/* Filters Section */}
@@ -629,26 +862,51 @@ const ManagerDashboard: React.FC = () => {
                 <option value="all">{t('all_regions')}</option>
                 {regions.map(region => <option key={region.id} value={region.name}>{region.name}</option>)}
               </select>
-              <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setSelectedQuickFilter('none'); }} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('from_date')} />
-              <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setSelectedQuickFilter('none'); }} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('to_date')} />
+              <input type="date" value={startDate} onChange={handleStartDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('from_date')} />
+              <input type="date" value={endDate} onChange={handleEndDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('to_date')} />
               <button onClick={handleResetFilters} className="w-full bg-slate-500 text-white p-2 rounded-md hover:bg-slate-600 transition-colors">{t('reset')}</button>
             </div>
             <div className="mt-4 pt-4 border-t border-slate-300/50">
                 <h4 className="text-md font-semibold mb-2 text-slate-700">{t('quick_filters')}</h4>
                 <div className="flex flex-wrap gap-2">
-                    <button onClick={() => handleQuickFilterClick('today')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>{t('today')}</button>
-                    <button onClick={() => handleQuickFilterClick('currentWeek')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentWeek' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>{t('current_week')}</button>
-                    <button onClick={() => handleQuickFilterClick('currentMonth')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentMonth' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>{t('current_month')}</button>
+                    <button 
+                        onClick={() => handleQuickFilterClick('today')} 
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                    >
+                        {t('today')}
+                    </button>
+                    <button 
+                        onClick={() => handleQuickFilterClick('currentWeek')} 
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentWeek' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                    >
+                        {t('current_week')}
+                    </button>
+                    <button 
+                        onClick={() => handleQuickFilterClick('currentMonth')} 
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentMonth' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                    >
+                        {t('current_month')}
+                    </button>
                 </div>
             </div>
           </div>
 
-          {/* Alerts Table */}
+          {/* Alerts Table - Modified to show only title and button */}
           {filteredAlerts.length > 0 && (
             <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden mb-8">
-              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50"><WarningIcon className="w-6 h-6 me-3"/>{t('overdue_visits_alerts_table')} ({filteredAlerts.length})</h3>
+              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50">
+                <WarningIcon className="w-6 h-6 me-3"/>
+                {t('overdue_visits_alerts_table')} ({filteredAlerts.length})
+              </h3>
+              {/* Removed the table content here. It will now be displayed in the modal. */}
               <div className="flex justify-center p-4">
-                <button onClick={() => setIsOverdueClientsDetailModalOpen(true)} className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-all shadow-lg flex items-center gap-2"><EyeIcon className="w-5 h-5" />{t('view_details')}</button>
+                <button
+                    onClick={() => setIsOverdueClientsDetailModalOpen(true)}
+                    className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-all shadow-lg flex items-center gap-2"
+                >
+                    <EyeIcon className="w-5 h-5" />
+                    {t('view_details')}
+                </button>
             </div>
             </div>
           )}
@@ -656,8 +914,12 @@ const ManagerDashboard: React.FC = () => {
           {/* Export Buttons */}
           <div className="flex flex-col sm:flex-row justify-end items-center mb-4 gap-3">
                 <span className="text-slate-700 font-medium">{t('export_reports', filteredReports.length)}</span>
-                <button onClick={() => exportToExcel(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"><DownloadIcon className="w-5 h-5 me-2"/> Excel</button>
-                <button onClick={() => exportToPdf(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition-colors"><DownloadIcon className="w-5 h-5 me-2"/> PDF</button>
+                <button onClick={() => exportToExcel(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                    <DownloadIcon className="w-5 h-5 me-2"/> Excel
+                </button>
+                <button onClick={() => exportToPdf(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition-colors">
+                    <DownloadIcon className="w-5 h-5 me-2"/> PDF
+                </button>
             </div>
 
           {/* Reports Table */}
@@ -704,25 +966,60 @@ const ManagerDashboard: React.FC = () => {
           {/* User Management Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up">
-                <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4"><CalendarIcon className="w-8 h-8" /></div>
-                <div><p className="text-slate-600 text-sm font-medium">{t('total_visits_recorded')}</p><p className="text-4xl font-bold text-blue-800">{userManagementStats.totalVisits}</p></div>
+                <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4">
+                    <CalendarIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <p className="text-slate-600 text-sm font-medium">{t('total_visits_recorded')}</p>
+                    <p className="text-4xl font-bold text-blue-800">{userManagementStats.totalVisits}</p>
+                </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '150ms' }}>
-                <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4"><UsersIcon className="w-8 h-8" /></div>
-                <div><p className="text-slate-600 text-sm font-medium">{t('total_unique_clients')}</p><p className="text-4xl font-bold text-green-800">{userManagementStats.totalUniqueClients}</p></div>
+                <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4">
+                    <UsersIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <p className="text-slate-600 text-sm font-medium">{t('total_unique_clients')}</p>
+                    <p className="text-4xl font-bold text-green-800">{userManagementStats.totalUniqueClients}</p>
+                </div>
             </div>
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-                <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4"><ChartBarIcon className="w-8 h-8" /></div>
-                <div><p className="text-slate-600 text-sm font-medium">{t('avg_visits_per_month')}</p><p className="text-4xl font-bold text-purple-800">{userManagementStats.averageVisitsPerMonth}</p></div>
+                <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4">
+                    <ChartBarIcon className="w-8 h-8" />
+                </div>
+                <div>
+                    <p className="text-slate-600 text-sm font-medium">{t('avg_visits_per_month')}</p>
+                    <p className="text-4xl font-bold text-purple-800">{userManagementStats.averageVisitsPerMonth}</p>
+                </div>
             </div>
           </div>
           <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden">
               <div className="flex flex-wrap justify-between items-center p-4 bg-white/50 border-b border-white/30 gap-4">
-                <h3 className="text-xl font-semibold flex items-center text-blue-800"><UsersIcon className="w-6 h-6 me-3"/>{t('reps_list')}</h3>
+                <h3 className="text-xl font-semibold flex items-center text-blue-800">
+                    <UsersIcon className="w-6 h-6 me-3"/>
+                    {t('reps_list')}
+                </h3>
                 <div className="flex items-center gap-3">
-                  <button onClick={handleAddUserClick} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-all shadow flex items-center gap-2"><PlusIcon className="w-5 h-5"/><span>{t('add_rep')}</span></button>
-                  <button onClick={() => { setSelectedRepsForExport([]); setIsExportModalOpen(true); }} disabled={reps.length === 0} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition-all shadow flex items-center gap-2 disabled:bg-teal-300 disabled:cursor-not-allowed"><DownloadIcon className="w-5 h-5"/><span className="hidden sm:inline">{t('download_client_lists')}</span></button>
-                  <button onClick={handleExportUsers} disabled={reps.length === 0} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2 disabled:bg-green-300 disabled:cursor-not-allowed"><DownloadIcon className="w-5 h-5"/><span className="hidden sm:inline">{t('download_reps_list')}</span></button>
+                  <button onClick={handleAddUserClick} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-all shadow flex items-center gap-2">
+                    <PlusIcon className="w-5 h-5"/>
+                    <span>{t('add_rep')}</span>
+                  </button>
+                  <button
+                      onClick={() => { setSelectedRepsForExport([]); setIsExportModalOpen(true); }}
+                      disabled={reps.length === 0}
+                      className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition-all shadow flex items-center gap-2 disabled:bg-teal-300 disabled:cursor-not-allowed"
+                  >
+                      <DownloadIcon className="w-5 h-5"/>
+                      <span className="hidden sm:inline">{t('download_client_lists')}</span>
+                  </button>
+                  <button
+                      onClick={handleExportUsers}
+                      disabled={reps.length === 0}
+                      className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2 disabled:bg-green-300 disabled:cursor-not-allowed"
+                  >
+                      <DownloadIcon className="w-5 h-5"/>
+                      <span className="hidden sm:inline">{t('download_reps_list')}</span>
+                  </button>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -743,11 +1040,17 @@ const ManagerDashboard: React.FC = () => {
                                   <td className="px-6 py-4">{t(rep.role)}</td>
                                   <td className="px-6 py-4">
                                       <div className="flex items-center gap-4">
-                                          <button onClick={() => handleEditUserClick(rep)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}><EditIcon className="w-5 h-5"/></button>
-                                          {user?.role === UserRole.Manager && (
+                                          <button onClick={() => handleEditUserClick(rep)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}>
+                                              <EditIcon className="w-5 h-5"/>
+                                          </button>
+                                          {user?.role === UserRole.Manager && ( // Only Manager can delete and reset
                                             <>
-                                              <button onClick={() => setDeletingUser(rep)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}><TrashIcon className="w-5 h-5"/></button>
-                                              <button onClick={() => handleResetClick(rep)} className="text-orange-600 hover:text-orange-800" aria-label={t('reset_rep_visits')}><ReplyIcon className="w-5 h-5"/></button>
+                                              <button onClick={() => setDeletingUser(rep)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}>
+                                                  <TrashIcon className="w-5 h-5"/>
+                                              </button>
+                                              <button onClick={() => handleResetClick(rep)} className="text-orange-600 hover:text-orange-800" aria-label={t('reset_rep_visits')}>
+                                                  <ReplyIcon className="w-5 h-5"/> {/* Using ReplyIcon for reset, as it indicates a fresh start */}
+                                              </button>
                                             </>
                                           )}
                                       </div>
@@ -893,7 +1196,7 @@ const ManagerDashboard: React.FC = () => {
                     <tbody>
                         {reps.map(rep => {
                             const plan = allPlans[rep.id];
-                            if (!plan) return null;
+                            if (!plan) return null; // Should not happen due to data hydration
 
                             return (
                                 <tr key={rep.id} className="group bg-white/20 border-b border-white/30 hover:bg-white/40">
@@ -988,7 +1291,7 @@ const ManagerDashboard: React.FC = () => {
                 </div>
                 <button 
                     onClick={handleSaveSettings} 
-                    disabled={isSavingSettings}
+                    disabled={isSavingSettings} // Disable button while saving
                     className="bg-orange-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:bg-orange-300 flex items-center justify-center"
                 >
                     {isSavingSettings ? (
@@ -1005,26 +1308,62 @@ const ManagerDashboard: React.FC = () => {
       )}
 
       {isExportModalOpen && (
-        <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title={t('download_rep_client_lists')}>
+        <Modal 
+          isOpen={isExportModalOpen} 
+          onClose={() => setIsExportModalOpen(false)} 
+          title={t('download_rep_client_lists')}
+        >
           <div className="space-y-4">
             <p className="text-sm text-slate-700">{t('select_reps_to_download')}</p>
+            
             <div className="border border-slate-300/50 rounded-lg">
                 <div className="flex items-center p-3 bg-slate-100/50 rounded-t-lg border-b border-slate-300/50">
-                    <input type="checkbox" id="selectAllReps" onChange={handleSelectAllReps} checked={reps.length > 0 && selectedRepsForExport.length === reps.length} className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3" />
-                    <label htmlFor="selectAllReps" className="text-sm font-medium text-slate-800 cursor-pointer">{t('select_all')}</label>
+                    <input
+                        type="checkbox"
+                        id="selectAllReps"
+                        onChange={handleSelectAllReps}
+                        checked={reps.length > 0 && selectedRepsForExport.length === reps.length}
+                        className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3"
+                    />
+                    <label htmlFor="selectAllReps" className="text-sm font-medium text-slate-800 cursor-pointer">
+                        {t('select_all')}
+                    </label>
                 </div>
                 <div className="max-h-60 overflow-y-auto p-3 space-y-2">
                     {reps.map(rep => (
                         <div key={rep.id} className="flex items-center">
-                            <input type="checkbox" id={`rep-${rep.id}`} value={rep.id} checked={selectedRepsForExport.includes(rep.id)} onChange={() => handleRepSelectionChange(rep.id)} className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3" />
-                            <label htmlFor={`rep-${rep.id}`} className="text-sm text-slate-800 cursor-pointer">{rep.name}</label>
+                            <input
+                                type="checkbox"
+                                id={`rep-${rep.id}`}
+                                value={rep.id}
+                                checked={selectedRepsForExport.includes(rep.id)}
+                                onChange={() => handleRepSelectionChange(rep.id)}
+                                className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3"
+                            />
+                            <label htmlFor={`rep-${rep.id}`} className="text-sm text-slate-800 cursor-pointer">
+                                {rep.name}
+                            </label>
                         </div>
                     ))}
                 </div>
             </div>
+            
             <div className="flex items-center justify-end space-x-2 space-x-reverse pt-4 border-t border-slate-300/50">
-              <button type="button" onClick={() => setIsExportModalOpen(false)} className="text-slate-700 bg-transparent hover:bg-slate-200/50 focus:ring-4 focus:outline-none focus:ring-slate-300 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 hover:text-slate-900 focus:z-10 transition-colors">{t('cancel')}</button>
-              <button type="button" onClick={handleConfirmClientListExport} disabled={selectedRepsForExport.length === 0} className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors">{t('download_count', selectedRepsForExport.length)}</button>
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="text-slate-700 bg-transparent hover:bg-slate-200/50 focus:ring-4 focus:outline-none focus:ring-slate-300 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 hover:text-slate-900 focus:z-10 transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClientListExport}
+                disabled={selectedRepsForExport.length === 0}
+                className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {t('download_count', selectedRepsForExport.length)}
+              </button>
             </div>
           </div>
         </Modal>
@@ -1042,17 +1381,57 @@ const ManagerDashboard: React.FC = () => {
                 <div>
                     <p className="text-slate-700">{t('confirm_delete_message', deletingUser.name)}</p>
                     <div className="flex items-center justify-end space-x-2 space-x-reverse pt-6">
-                        <button type="button" onClick={() => setDeletingUser(null)} className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors">{t('cancel')}</button>
-                        <button type="button" onClick={handleConfirmDelete} disabled={isDeleting} className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors">{isDeleting ? t('deleting') : t('confirm')}</button>
+                        <button
+                            type="button"
+                            onClick={() => setDeletingUser(null)}
+                            className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
+                        >
+                            {t('cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmDelete}
+                            disabled={isDeleting}
+                            className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors"
+                        >
+                            {isDeleting ? t('deleting') : t('confirm')}
+                        </button>
                     </div>
                 </div>
             </Modal>
         )}
         
-        {viewingRepClients && <ClientListModal rep={viewingRepClients} onClose={() => setViewingRepClients(null)} totalDoctors={totalDoctors} totalPharmacies={totalPharmacies} regions={regions} />}
-        {isDailyVisitsDetailModalOpen && <DailyVisitsDetailModal isOpen={isDailyVisitsDetailModalOpen} onClose={() => setIsDailyVisitsDetailModalOpen(false)} reports={allReports} reps={reps} selectedRepId={selectedRepForDailyVisits} />}
-        {isOverdueClientsDetailModalOpen && <OverdueClientsDetailModal isOpen={isOverdueClientsDetailModalOpen} onClose={() => setIsOverdueClientsDetailModalOpen(false)} alerts={overdueAlerts} reps={reps} regions={regions} />}
+        {viewingRepClients && 
+            <ClientListModal 
+                rep={viewingRepClients} 
+                onClose={() => setViewingRepClients(null)} 
+                totalDoctors={totalDoctors}
+                totalPharmacies={totalPharmacies}
+                regions={regions}
+            />
+        }
 
+        {isDailyVisitsDetailModalOpen && (
+            <DailyVisitsDetailModal
+                isOpen={isDailyVisitsDetailModalOpen}
+                onClose={() => setIsDailyVisitsDetailModalOpen(false)}
+                reports={allReports}
+                reps={reps}
+                selectedRepId={selectedRepForDailyVisits}
+            />
+        )}
+
+        {isOverdueClientsDetailModalOpen && (
+          <OverdueClientsDetailModal
+            isOpen={isOverdueClientsDetailModalOpen}
+            onClose={() => setIsOverdueClientsDetailModalOpen(false)}
+            alerts={overdueAlerts} // Pass the full list of overdue alerts
+            reps={reps}
+            regions={regions}
+          />
+        )}
+
+        {/* NEW: Reset Visits Confirmation Modal */}
         {repToReset && (
             <Modal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} title={t('confirm_reset_title')}>
                 <div>
@@ -1061,8 +1440,21 @@ const ManagerDashboard: React.FC = () => {
                         <p className="text-red-500 text-sm mt-4">{reviewMessage.text}</p>
                     )}
                     <div className="flex items-center justify-end space-x-2 space-x-reverse pt-6">
-                        <button type="button" onClick={() => setIsResetModalOpen(false)} className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors">{t('cancel')}</button>
-                        <button type="button" onClick={handleConfirmReset} disabled={isResetting} className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors">{isResetting ? t('resetting') : t('confirm_reset')}</button>
+                        <button
+                            type="button"
+                            onClick={() => setIsResetModalOpen(false)}
+                            className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
+                        >
+                            {t('cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmReset}
+                            disabled={isResetting}
+                            className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors"
+                        >
+                            {isResetting ? t('resetting') : t('confirm_reset')}
+                        </button>
                     </div>
                 </div>
             </Modal>
@@ -1071,13 +1463,24 @@ const ManagerDashboard: React.FC = () => {
   );
 };
 
-// Sub-components remain largely the same, just ensuring props match
-const ClientListModal: React.FC<{ rep: User; onClose: () => void; totalDoctors: Doctor[]; totalPharmacies: Pharmacy[]; regions: Region[]; }> = ({ rep, onClose, totalDoctors, totalPharmacies, regions }) => {
+
+// A sub-component for the client list modal to keep the main component cleaner
+interface ClientListModalProps {
+    rep: User;
+    onClose: () => void;
+    totalDoctors: Doctor[]; // Explicitly passed
+    totalPharmacies: Pharmacy[]; // Explicitly passed
+    regions: Region[]; // Explicitly passed
+}
+
+const ClientListModal: React.FC<ClientListModalProps> = ({ rep, onClose, totalDoctors, totalPharmacies, regions }) => {
     const { t } = useLanguage();
+
     const [activeModalTab, setActiveModalTab] = useState<'doctors' | 'pharmacies'>('doctors');
     const repDoctors = useMemo(() => totalDoctors.filter((d: Doctor) => d.repId === rep.id), [rep.id, totalDoctors]);
     const repPharmacies = useMemo(() => totalPharmacies.filter((p: Pharmacy) => p.repId === rep.id), [rep.id, totalPharmacies]);
     const regionMap = useMemo(() => new Map(regions.map((r: Region) => [r.id, r.name])), [regions]);
+
 
     const handleExport = () => {
         exportClientsToExcel(repDoctors, repPharmacies, regions, `clients_${rep.username}`, t);
@@ -1096,7 +1499,8 @@ const ClientListModal: React.FC<{ rep: User; onClose: () => void; totalDoctors: 
                       </button>
                   </div>
                   <button onClick={handleExport} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2">
-                      <DownloadIcon className="w-5 h-5"/><span>{t('download_list')}</span>
+                      <DownloadIcon className="w-5 h-5"/>
+                      <span>{t('download_list')}</span>
                   </button>
               </div>
 
@@ -1147,5 +1551,6 @@ const ClientListModal: React.FC<{ rep: User; onClose: () => void; totalDoctors: 
       </Modal>
     );
 }
+
 
 export default ManagerDashboard;

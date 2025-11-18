@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import { User, Region, WeeklyPlan, DayPlanDetails } from '../types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { User, Region, WeeklyPlan, Doctor, DayPlanDetails } from '../types';
+import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
 import { SaveIcon, ArrowRightIcon, MapPinIcon, DoctorIcon, TrashIcon } from './icons';
 import Spinner from './Spinner';
-import { useAllDoctors } from '../hooks/useQueries';
-import { useRepMutations } from '../hooks/useMutations';
 
 interface PlanEditorProps {
   user: User;
@@ -17,12 +16,28 @@ interface PlanEditorProps {
 const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onPlanSaved, onBack }) => {
     const { t } = useLanguage();
     // Initialize planData to match the new structure: { dayIndex: { regionId: number, doctorIds: number[] } | null }
+    // Fix: Explicitly cast empty object to WeeklyPlan['plan'] to ensure correct type inference.
     const [planData, setPlanData] = useState<WeeklyPlan['plan']>(initialPlan?.plan || {} as WeeklyPlan['plan']);
-    
-    const { data: allDoctors = [], isLoading: loadingDoctors } = useAllDoctors();
-    const { updatePlan } = useRepMutations(user.id);
-    
+    const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
+
+    useEffect(() => {
+      const fetchDoctors = async () => {
+        setLoading(true);
+        try {
+          const doctorsData = await api.getAllDoctors();
+          setAllDoctors(doctorsData);
+        } catch (error) {
+          console.error("Failed to fetch doctors:", error);
+          setMessage(t('error_fetching_doctors')); // Add this translation key
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchDoctors();
+    }, [t]);
 
     const WORK_WEEK_DAYS = useMemo(() => [
         { name: t('saturday'), index: 6 },
@@ -39,7 +54,7 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
     // Get all doctor IDs that are already assigned to any day in the plan
     const assignedDoctorIds = useMemo(() => {
       const assigned = new Set<number>();
-      (Object.values(planData) as (DayPlanDetails | null)[]).forEach(dayPlan => {
+      Object.values(planData).forEach(dayPlan => {
         if (dayPlan && dayPlan.doctorIds) {
           dayPlan.doctorIds.forEach(docId => assigned.add(docId));
         }
@@ -48,15 +63,21 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
     }, [planData]);
 
     const handleRegionChange = (dayIndex: number, regionIdStr: string) => {
+        // Explicitly type `newPlan` to avoid losing the index signature type after spreading.
         const newPlan: WeeklyPlan['plan'] = { ...planData };
         const regionId = parseInt(regionIdStr);
 
         if (regionIdStr === 'none' || isNaN(regionId)) {
             newPlan[dayIndex] = null;
         } else {
+            // Safely get existing doctorIds if the dayPlan entry exists and has them.
+            // The existing entry could be null or undefined if no plan existed for this day.
+            // Fix: Explicitly type `existingDayPlanEntry` to `DayPlanDetails | null` to resolve 'unknown' type error.
             const existingDayPlanEntry: DayPlanDetails | null = newPlan[dayIndex];
             newPlan[dayIndex] = {
                 regionId: regionId,
+                // Access doctorIds safely using optional chaining.
+                // The `|| []` ensures doctorIds is always an array if the existing entry was null/undefined or lacked doctorIds.
                 doctorIds: existingDayPlanEntry?.doctorIds || [], 
             };
         }
@@ -65,12 +86,16 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
     
     const handleAddDoctor = (dayIndex: number, doctorIdStr: string) => {
         const doctorId = parseInt(doctorIdStr);
-        if (isNaN(doctorId) || assignedDoctorIds.has(doctorId)) return;
+        if (isNaN(doctorId) || assignedDoctorIds.has(doctorId)) return; // Prevent adding already assigned doctor or invalid ID
 
         setPlanData(prevPlan => {
+            // Explicitly type `newPlan` to avoid losing the index signature type after spreading.
             const newPlan: WeeklyPlan['plan'] = { ...prevPlan };
+            // Fix: Explicitly type `currentDayPlanEntry` to `DayPlanDetails | null` to resolve 'unknown' type error.
             const currentDayPlanEntry: DayPlanDetails | null = newPlan[dayIndex];
             if (currentDayPlanEntry) {
+                // Now, currentDayPlanEntry is narrowed to { regionId: number; doctorIds: number[]; }
+                // currentDayPlanEntry.doctorIds is guaranteed to be number[] by the WeeklyPlan type.
                 const currentDoctorIds = currentDayPlanEntry.doctorIds; 
                 if (!currentDoctorIds.includes(doctorId)) {
                     newPlan[dayIndex] = {
@@ -79,9 +104,10 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
                     };
                 }
             } else {
+                // This branch handles the case where newPlan[dayIndex] is null or undefined
                 const doctor = allDoctors.find(d => d.id === doctorId);
-                const regionId = doctor?.regionId;
-                if (regionId !== undefined) {
+                const regionId = doctor?.regionId; // Safely access regionId
+                if (regionId !== undefined) { // Check for undefined specifically, as regionId could be 0 (valid)
                   newPlan[dayIndex] = { regionId, doctorIds: [doctorId] };
                 }
             }
@@ -91,22 +117,32 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
 
     const handleRemoveDoctor = (dayIndex: number, doctorId: number) => {
         setPlanData(prevPlan => {
+            // Explicitly type `newPlan` to avoid losing the index signature type after spreading.
             const newPlan: WeeklyPlan['plan'] = { ...prevPlan };
+            // Fix: Explicitly type `currentDayPlanEntry` to `DayPlanDetails | null` to resolve 'unknown' type error.
             const currentDayPlanEntry: DayPlanDetails | null = newPlan[dayIndex];
             if (currentDayPlanEntry) {
                 newPlan[dayIndex] = {
                     ...currentDayPlanEntry,
                     doctorIds: currentDayPlanEntry.doctorIds.filter(id => id !== doctorId),
                 };
+                // If no doctors left for the day, set it to null or just region
+                // For simplicity, we'll keep the region if it exists
+                if (newPlan[dayIndex]?.doctorIds.length === 0) {
+                    // Option 1: remove the whole day plan if no doctors
+                    // newPlan[dayIndex] = null;
+                    // Option 2: keep region but no doctors
+                }
             }
             return newPlan;
         });
     };
 
     const handleSave = async () => {
+        setSaving(true);
         setMessage('');
         try {
-            const updatedPlan = await updatePlan.mutateAsync(planData);
+            const updatedPlan = await api.updateRepPlan(user.id, planData);
             setMessage(t('plan_submitted_success'));
             setTimeout(() => {
                 onPlanSaved(updatedPlan);
@@ -115,10 +151,12 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
             setMessage(t('plan_submitted_error'));
             console.error(error);
             setTimeout(() => setMessage(''), 4000);
+        } finally {
+            setSaving(false);
         }
     };
 
-    if (loadingDoctors) {
+    if (loading) {
       return <Spinner />;
     }
 
@@ -226,11 +264,11 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
                      {message && <p className="text-green-700 me-4 font-semibold">{message}</p>}
                     <button 
                         onClick={handleSave}
-                        disabled={updatePlan.isPending}
+                        disabled={saving}
                         className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600 transition-all shadow-lg flex items-center gap-2 disabled:bg-orange-300"
                     >
                         <SaveIcon className="w-5 h-5"/>
-                        {updatePlan.isPending ? t('submitting_for_approval') : t('submit_for_approval')}
+                        {saving ? t('submitting_for_approval') : t('submit_for_approval')}
                     </button>
                 </div>
             </div>
