@@ -26,9 +26,7 @@ const RepDashboard: React.FC = () => {
     alerts, 
     systemSettings, 
     plan, 
-    isLoading,
-    visitsQuery,
-    planQuery
+    isLoading
   } = useRepData(user);
 
   // --- Local UI State ---
@@ -90,9 +88,6 @@ const RepDashboard: React.FC = () => {
   
   const handleFormSuccess = () => {
     setIsModalOpen(false);
-    // React Query automatically handles invalidation via mutations, 
-    // but we can explicitly refetch if needed. 
-    visitsQuery.refetch(); 
   }
 
   const handleExportClients = () => {
@@ -180,7 +175,6 @@ const RepDashboard: React.FC = () => {
         regions={regions}
         initialPlan={plan}
         onPlanSaved={() => {
-            planQuery.refetch();
             setView('dashboard');
         }}
         onBack={() => setView('dashboard')}

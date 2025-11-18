@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Doctor, Pharmacy, VisitReport, User } from '../types';
-import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
 import { SearchIcon, DoctorIcon, PharmacyIcon, ArrowRightIcon } from './icons';
+import { useRepData } from '../hooks/useQueries';
 
 interface ClientSearchProps {
   user: User;
@@ -13,36 +13,15 @@ type Client = (Doctor & { clientType: 'doctor' }) | (Pharmacy & { clientType: 'p
 
 const ClientSearch: React.FC<ClientSearchProps> = ({ user, onBack }) => {
   const { t } = useLanguage();
-  const [loading, setLoading] = useState(true);
+  const { doctors, pharmacies, recentVisits, isLoading } = useRepData(user);
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [allClients, setAllClients] = useState<Client[]>([]);
-  const [allVisits, setAllVisits] = useState<VisitReport[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [doctors, pharmacies, visits] = await Promise.all([
-          api.getDoctorsForRep(user.id),
-          api.getPharmaciesForRep(user.id),
-          api.getVisitReportsForRep(user.id),
-        ]);
-        
-        const combinedClients: Client[] = [
-            ...doctors.map(d => ({...d, clientType: 'doctor' as const})), 
-            ...pharmacies.map(p => ({...p, clientType: 'pharmacy' as const}))
-        ];
-        setAllClients(combinedClients);
-        setAllVisits(visits);
-      } catch (e) {
-        console.error("Error fetching data for client search", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [user.id]);
+  const allClients: Client[] = useMemo(() => [
+      ...doctors.map(d => ({...d, clientType: 'doctor' as const})), 
+      ...pharmacies.map(p => ({...p, clientType: 'pharmacy' as const}))
+  ], [doctors, pharmacies]);
 
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
@@ -57,11 +36,11 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ user, onBack }) => {
     const twoMonthsAgo = new Date();
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
 
-    return allVisits
+    return recentVisits
       .filter(visit => visit.targetName === selectedClient.name)
       .filter(visit => new Date(visit.date) >= twoMonthsAgo)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [selectedClient, allVisits]);
+  }, [selectedClient, recentVisits]);
 
   const handleSelectClient = (client: Client) => {
     setSelectedClient(client);
@@ -72,7 +51,7 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ user, onBack }) => {
     setSelectedClient(null);
   };
 
-  if (loading) {
+  if (isLoading) {
     return <div className="text-center p-8">{t('loading')}</div>;
   }
 

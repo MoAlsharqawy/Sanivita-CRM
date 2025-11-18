@@ -1,15 +1,15 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { User, VisitReport, SystemSettings, WeeklyPlan, Region, Doctor } from '../types';
+import React, { useState, useMemo } from 'react';
+import { User, VisitReport, SystemSettings, WeeklyPlan, Region } from '../types';
 import { useLanguage } from '../hooks/useLanguage';
 import { ArrowRightIcon, ChevronRightIcon, ChevronLeftIcon, MapPinIcon, DoctorIcon } from './icons';
-import { api } from '../services/api';
 import Spinner from './Spinner';
+import { useAllDoctors } from '../hooks/useQueries';
 
 interface WeeklyViewProps {
   user: User;
   visits: VisitReport[];
   settings: SystemSettings | null;
-  plan: WeeklyPlan['plan'] | null; // This is now the new, nested plan structure
+  plan: WeeklyPlan['plan'] | null;
   regions: Region[];
   onBack: () => void;
 }
@@ -39,23 +39,7 @@ const toYYYYMMDD = (date: Date): string => {
 const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, regions, onBack }) => {
   const { t } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
-  const [loadingDoctors, setLoadingDoctors] = useState(true);
-
-  useEffect(() => {
-    const fetchDoctors = async () => {
-      setLoadingDoctors(true);
-      try {
-        const doctorsData = await api.getAllDoctors();
-        setAllDoctors(doctorsData);
-      } catch (error) {
-        console.error("Failed to fetch all doctors for WeeklyView:", error);
-      } finally {
-        setLoadingDoctors(false);
-      }
-    };
-    fetchDoctors();
-  }, []);
+  const { data: allDoctors = [], isLoading: loadingDoctors } = useAllDoctors();
 
   const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
   const doctorMap = useMemo(() => new Map(allDoctors.map(doc => [doc.id, doc])), [allDoctors]);
