@@ -54,7 +54,7 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
     // Get all doctor IDs that are already assigned to any day in the plan
     const assignedDoctorIds = useMemo(() => {
       const assigned = new Set<number>();
-      Object.values(planData).forEach(dayPlan => {
+      (Object.values(planData) as (DayPlanDetails | null)[]).forEach(dayPlan => {
         if (dayPlan && dayPlan.doctorIds) {
           dayPlan.doctorIds.forEach(docId => assigned.add(docId));
         }

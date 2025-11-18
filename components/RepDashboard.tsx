@@ -1,11 +1,7 @@
-
-
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
-import { api } from '../services/api';
-import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon } from './icons';
+import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, ChartBarIcon } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -13,189 +9,50 @@ import { exportClientsToExcel } from '../services/exportService';
 import WeeklyView from './WeeklyView';
 import PlanEditor from './PlanEditor';
 import Spinner from './Spinner';
+import { useRepData } from '../hooks/useQueries';
+import { calculateDailyStats, calculateMonthlyStats } from '../utils/analytics';
 
 const RepDashboard: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [recentVisits, setRecentVisits] = useState<VisitReport[]>([]);
-  const [alerts, setAlerts] = useState<ClientAlert[]>([]);
-  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const [plan, setPlan] = useState<WeeklyPlan | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // --- Data Fetching via React Query ---
+  const { 
+    doctors, 
+    pharmacies, 
+    products, 
+    regions, 
+    recentVisits, 
+    alerts, 
+    systemSettings, 
+    plan, 
+    isLoading,
+    visitsQuery,
+    planQuery
+  } = useRepData(user);
+
+  // --- Local UI State ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [view, setView] = useState<'dashboard' | 'search' | 'weekly' | 'plan'>('dashboard');
   const [showClientLists, setShowClientLists] = useState(false);
   const [initialRegionForVisit, setInitialRegionForVisit] = useState<number | null>(null);
 
-  // State for drag and drop visual feedback
+  // --- Drag and Drop State (Visual only) ---
+  // Note: In a real persistent implementation, this would update the DB order, 
+  // but here it's just local reordering for the session or just visual fun.
+  const [localVisits, setLocalVisits] = React.useState(recentVisits);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const draggedItemIndex = useRef<number | null>(null);
   const dragOverItemIndex = useRef<number | null>(null);
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const [doctorsData, pharmaciesData, productsData, visitsData, regionsData, overdueData, settingsData, planData] = await Promise.all([
-        api.getDoctorsForRep(user.id),
-        api.getPharmaciesForRep(user.id),
-        api.getProducts(),
-        api.getVisitReportsForRep(user.id),
-        api.getRegions(),
-        api.getOverdueVisits(),
-        api.getSystemSettings(),
-        api.getRepPlan(user.id)
-      ]);
-      setDoctors(doctorsData);
-      setPharmacies(pharmaciesData);
-      setProducts(productsData);
-      setRecentVisits(visitsData);
-      setRegions(regionsData);
-      setAlerts(overdueData.filter(a => a.repId === user.id));
-      setSystemSettings(settingsData);
-      setPlan(planData);
-    } catch (error) {
-      console.error("Failed to fetch data", error); // Keep general error logging
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const getGreeting = useCallback(() => {
-    if (!user) return '';
-    const hour = new Date().getHours();
-    if (hour < 12) return t('good_morning', user.name);
-    if (hour < 18) return t('good_afternoon', user.name);
-    return t('good_evening', user.name);
-  }, [t, user]);
-  
-  const handleFormSuccess = () => {
-    setIsModalOpen(false);
-    fetchData(); // Refresh all data to show the new visit in history
-  }
-
-  const handleExportClients = () => {
-    if (user) {
-      exportClientsToExcel(doctors, pharmacies, regions, `clients_${user.username}`, t);
-    }
-  };
-  
-  const handleWeeklyPlanClick = () => {
-    const isThursday = new Date().getDay() === 4; // 0:Sun, 1:Mon, ..., 4:Thu
-    const canEdit = !plan || plan.status !== 'approved' || isThursday;
-
-    if (canEdit) {
-        setView('plan');
-    } else {
-        setView('weekly');
-    }
-  };
-
-
-  // Drag and Drop Handlers
-  const handleDragStart = (index: number) => {
-    draggedItemIndex.current = index;
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnter = (index: number) => {
-    if (draggedItemIndex.current !== null && draggedItemIndex.current !== index) {
-      dragOverItemIndex.current = index;
-    }
-  };
-
-  const handleDrop = () => {
-    if (draggedItemIndex.current === null || dragOverItemIndex.current === null || draggedItemIndex.current === dragOverItemIndex.current) {
-        return;
-    }
-    
-    const newVisits = [...recentVisits];
-    const draggedItem = newVisits.splice(draggedItemIndex.current, 1)[0];
-    newVisits.splice(dragOverItemIndex.current, 0, draggedItem);
-    
-    setRecentVisits(newVisits);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    draggedItemIndex.current = null;
-    dragOverItemIndex.current = null;
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-  
-  const monthlyCounts = useMemo(() => {
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    let doctorVisits = 0;
-    let pharmacyVisits = 0;
-    const workingDays = new Set<string>(); // Stores 'YYYY-MM-DD' for days with visits
-
-    recentVisits.forEach(visit => {
-        const visitDate = new Date(visit.date);
-        if (visitDate >= startOfMonth && visitDate <= today) {
-            const dateStr = visitDate.toISOString().split('T')[0];
-            workingDays.add(dateStr); // Add day to working days set
-            if (visit.type === 'DOCTOR_VISIT') {
-                doctorVisits++;
-            } else if (visit.type === 'PHARMACY_VISIT') {
-                pharmacyVisits++;
-            }
-        }
-    });
-
-    const totalMonthlyVisits = doctorVisits + pharmacyVisits;
-    const numberOfWorkingDays = workingDays.size;
-    const visitsPerWorkingDay = numberOfWorkingDays > 0 ? (totalMonthlyVisits / numberOfWorkingDays) : 0;
-
-
-    return { doctorVisits, pharmacyVisits, visitsPerWorkingDay };
+  // Sync local visits when new data arrives from query
+  React.useEffect(() => {
+    setLocalVisits(recentVisits);
   }, [recentVisits]);
 
-  const dailyCounts = useMemo(() => {
-    const todayStr = new Date().toDateString();
-    
-    let doctorVisits = 0;
-    let pharmacyVisits = 0;
-
-    recentVisits.forEach(visit => {
-        const visitDateStr = new Date(visit.date).toDateString();
-        if (visitDateStr === todayStr) {
-            if (visit.type === 'DOCTOR_VISIT') {
-                doctorVisits++;
-            } else if (visit.type === 'PHARMACY_VISIT') {
-                pharmacyVisits++;
-            }
-        }
-    });
-
-    return { doctorVisits, pharmacyVisits };
-  }, [recentVisits]);
-
-  const getPlanStatusBadge = () => {
-      if (!plan) return null;
-
-      const statusMap = {
-          draft: { textKey: 'plan_status_draft', color: 'bg-blue-100 text-blue-800' },
-          pending: { textKey: 'plan_status_pending', color: 'bg-yellow-100 text-yellow-800' },
-          approved: { textKey: 'plan_status_approved', color: 'bg-green-100 text-green-800' },
-          rejected: { textKey: 'plan_status_rejected', color: 'bg-red-100 text-red-800' },
-      };
-
-      const { textKey, color } = statusMap[plan.status];
-      return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{t(textKey)}</span>;
-  };
+  // --- Analytics & Computed Data ---
+  const monthlyCounts = useMemo(() => calculateMonthlyStats(recentVisits), [recentVisits]);
+  const dailyCounts = useMemo(() => calculateDailyStats(recentVisits), [recentVisits]);
 
   const doctorNameToIdMap = useMemo(() => new Map(doctors.map(d => [d.name, d.id])), [doctors]);
 
@@ -220,7 +77,81 @@ const RepDashboard: React.FC = () => {
       return doctors.filter(d => pendingDoctorIds.includes(d.id));
   }, [plan, recentVisits, doctors, doctorNameToIdMap]);
 
-  if (loading) {
+
+  // --- Handlers ---
+
+  const getGreeting = () => {
+    if (!user) return '';
+    const hour = new Date().getHours();
+    if (hour < 12) return t('good_morning', user.name);
+    if (hour < 18) return t('good_afternoon', user.name);
+    return t('good_evening', user.name);
+  };
+  
+  const handleFormSuccess = () => {
+    setIsModalOpen(false);
+    // React Query automatically handles invalidation via mutations, 
+    // but we can explicitly refetch if needed. 
+    visitsQuery.refetch(); 
+  }
+
+  const handleExportClients = () => {
+    if (user) {
+      exportClientsToExcel(doctors, pharmacies, regions, `clients_${user.username}`, t);
+    }
+  };
+  
+  const handleWeeklyPlanClick = () => {
+    const isThursday = new Date().getDay() === 4; // 0:Sun, 1:Mon, ..., 4:Thu
+    const canEdit = !plan || plan.status !== 'approved' || isThursday;
+    setView(canEdit ? 'plan' : 'weekly');
+  };
+
+  // Drag and Drop Logic
+  const handleDragStart = (index: number) => {
+    draggedItemIndex.current = index;
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnter = (index: number) => {
+    if (draggedItemIndex.current !== null && draggedItemIndex.current !== index) {
+      dragOverItemIndex.current = index;
+    }
+  };
+
+  const handleDrop = () => {
+    if (draggedItemIndex.current === null || dragOverItemIndex.current === null || draggedItemIndex.current === dragOverItemIndex.current) {
+        return;
+    }
+    const newVisits = [...localVisits];
+    const draggedItem = newVisits.splice(draggedItemIndex.current, 1)[0];
+    newVisits.splice(dragOverItemIndex.current, 0, draggedItem);
+    setLocalVisits(newVisits);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    draggedItemIndex.current = null;
+    dragOverItemIndex.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+  
+  const getPlanStatusBadge = () => {
+      if (!plan) return null;
+      const statusMap = {
+          draft: { textKey: 'plan_status_draft', color: 'bg-blue-100 text-blue-800' },
+          pending: { textKey: 'plan_status_pending', color: 'bg-yellow-100 text-yellow-800' },
+          approved: { textKey: 'plan_status_approved', color: 'bg-green-100 text-green-800' },
+          rejected: { textKey: 'plan_status_rejected', color: 'bg-red-100 text-red-800' },
+      };
+      const { textKey, color } = statusMap[plan.status];
+      return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{t(textKey)}</span>;
+  };
+
+  if (isLoading) {
     return <Spinner />;
   }
   
@@ -248,20 +179,21 @@ const RepDashboard: React.FC = () => {
         user={user}
         regions={regions}
         initialPlan={plan}
-        onPlanSaved={(newPlan) => {
-            setPlan(newPlan);
+        onPlanSaved={() => {
+            planQuery.refetch();
             setView('dashboard');
         }}
         onBack={() => setView('dashboard')}
     />;
   }
   
-  const totalDailyCount = dailyCounts.doctorVisits + dailyCounts.pharmacyVisits;
-  const dailyTarget = 12; // An arbitrary target for visual effect
+  const totalDailyCount = dailyCounts.totalToday;
+  const dailyTarget = 12;
   const dailyProgress = Math.min((totalDailyCount / dailyTarget) * 100, 100);
 
   return (
     <div className="container mx-auto">
+      {/* Header Section */}
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h2 className="text-3xl font-bold text-blue-800">{getGreeting()}</h2>
         <div className="flex gap-2 sm:gap-4 flex-wrap justify-center items-start">
@@ -293,7 +225,6 @@ const RepDashboard: React.FC = () => {
             onClick={() => {
               const todayIndex = new Date().getDay();
               const todayPlanForDay = plan?.plan[todayIndex] ?? null;
-              // Fix: Pass only the regionId from the day's plan
               setInitialRegionForVisit(todayPlanForDay?.regionId ?? null);
               setIsModalOpen(true);
             }}
@@ -306,7 +237,7 @@ const RepDashboard: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {/* Monthly Visits Card */}
+        {/* Monthly Visits */}
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 animate-fade-in-up">
             <div className="flex items-center mb-4">
                 <div className="bg-blue-500/20 text-blue-700 p-3 rounded-full me-3">
@@ -322,7 +253,7 @@ const RepDashboard: React.FC = () => {
                       <span>Dr</span>
                     </p>
                 </div>
-                <div className="h-12 w-px bg-slate-300"></div> {/* Divider */}
+                <div className="h-12 w-px bg-slate-300"></div>
                 <div>
                     <p className="text-4xl font-bold text-orange-800">{monthlyCounts.pharmacyVisits}</p>
                     <p className="text-sm font-semibold text-slate-700 flex items-center justify-center gap-1">
@@ -333,7 +264,7 @@ const RepDashboard: React.FC = () => {
             </div>
         </div>
         
-        {/* Daily Visits Card */}
+        {/* Daily Visits */}
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: '150ms' }}>
           <div>
             <div className="flex items-center mb-4">
@@ -350,7 +281,7 @@ const RepDashboard: React.FC = () => {
                       <span>Dr</span>
                     </p>
                 </div>
-                <div className="h-12 w-px bg-slate-300"></div> {/* Divider */}
+                <div className="h-12 w-px bg-slate-300"></div>
                 <div>
                     <p className="text-4xl font-bold text-orange-800">{dailyCounts.pharmacyVisits}</p>
                     <p className="text-sm font-semibold text-slate-700 flex items-center justify-center gap-1">
@@ -370,12 +301,12 @@ const RepDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Visits per Working Day Card - NEW */}
+        {/* Visits per Working Day */}
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: '300ms' }}>
             <div>
                 <div className="flex items-center mb-4">
                     <div className="bg-purple-500/20 text-purple-700 p-3 rounded-full me-3">
-                        <ChartBarIcon className="w-6 h-6" /> {/* Reusing ChartBarIcon for this new metric */}
+                        <ChartBarIcon className="w-6 h-6" />
                     </div>
                     <p className="text-slate-600 text-md font-medium">{t('visits_per_working_day')}</p>
                 </div>
@@ -413,7 +344,7 @@ const RepDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Client Lists Toggle Button - NEW LOCATION */}
+      {/* Client Lists Toggle */}
       <div className="flex justify-center mb-8">
         <button 
           onClick={() => setShowClientLists(!showClientLists)}
@@ -425,10 +356,10 @@ const RepDashboard: React.FC = () => {
         </button>
       </div>
 
-
+      {/* Client Lists Panel */}
       <div className={`transition-all duration-500 ease-in-out overflow-hidden ${showClientLists ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Doctors List */}
+          {/* Doctors */}
           <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50">
             <h3 className="text-xl font-semibold mb-4 flex items-center text-blue-700">
               <DoctorIcon className="w-6 h-6 me-2" />
@@ -444,7 +375,7 @@ const RepDashboard: React.FC = () => {
             </ul>
           </div>
 
-          {/* Pharmacies List */}
+          {/* Pharmacies */}
           <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50">
             <h3 className="text-xl font-semibold mb-4 flex items-center text-orange-700">
               <PharmacyIcon className="w-6 h-6 me-2" />
@@ -461,20 +392,20 @@ const RepDashboard: React.FC = () => {
         </div>
       </div>
       
-      {/* Recent Visits History */}
+      {/* Recent Visits Log */}
       <div className="mt-8">
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50">
           <h3 className="text-xl font-semibold mb-4 flex items-center text-blue-700">
             {t('recent_visits_log')}
           </h3>
           <div className="max-h-96 overflow-y-auto ps-2">
-            {recentVisits.length > 0 ? (
+            {localVisits.length > 0 ? (
               <ul 
                 className="space-y-3"
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
               >
-                {recentVisits.map((visit, index) => (
+                {localVisits.map((visit, index) => (
                   <li 
                     key={visit.id} 
                     className={`p-4 bg-white/30 rounded-lg hover:bg-white/50 transition-all duration-300 cursor-move animate-fade-in-up ${draggedIndex === index ? 'opacity-50' : ''}`}
