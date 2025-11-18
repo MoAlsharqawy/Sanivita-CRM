@@ -1,5 +1,4 @@
 {
-  "installCommand": "echo 'Skipping installation'",
   "rewrites": [
     {
       "source": "/(.*)",
