@@ -17,25 +17,7 @@ import DbErrorScreen from './components/DbErrorScreen';
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { user, loading, authError } = useAuth();
   const location = useLocation();
-  const { dir, t } = useLanguage();
-
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      // Standard for showing a confirmation dialog.
-      // Most modern browsers show a generic message for security reasons,
-      // but setting returnValue is required for the prompt to appear.
-      event.preventDefault();
-      event.returnValue = t('confirm_page_refresh');
-      return t('confirm_page_refresh');
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // Cleanup the event listener when the component unmounts (e.g., on logout)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [t]); // Dependency on `t` ensures the message language would update if lang changes
+  const { dir } = useLanguage();
 
   if (loading) {
     return (
