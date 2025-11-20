@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, Region, WeeklyPlan, Doctor } from '../types';
+import { User, Region, WeeklyPlan, Doctor, DayPlanDetails } from '../types';
 import { api } from '../services/api';
 import { useLanguage } from '../hooks/useLanguage';
 import { SaveIcon, ArrowRightIcon, MapPinIcon, DoctorIcon, TrashIcon } from './icons';
@@ -15,8 +15,12 @@ interface PlanEditorProps {
 
 const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onPlanSaved, onBack }) => {
     const { t } = useLanguage();
-    // Initialize planData to match the structure.
-    const [planData, setPlanData] = useState<WeeklyPlan['plan']>(initialPlan?.plan || {} as WeeklyPlan['plan']);
+    
+    // Robustly initialize planData. Fallback to empty object if initialPlan.plan is undefined/null
+    const [planData, setPlanData] = useState<WeeklyPlan['plan']>(() => {
+        return initialPlan?.plan ? { ...initialPlan.plan } : {};
+    });
+
     const [allDoctors, setAllDoctors] = useState<Doctor[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -53,37 +57,48 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
     // Get all doctor IDs that are already assigned to any day in the plan
     const assignedDoctorIds = useMemo(() => {
       const assigned = new Set<number>();
-      // Iterate over keys to ensure proper type access
-      Object.keys(planData).forEach(dayIndexStr => {
-        const dayPlan = planData[Number(dayIndexStr)];
-        if (dayPlan && dayPlan.doctorIds) {
-          dayPlan.doctorIds.forEach(docId => assigned.add(docId));
-        }
-      });
+      if (!planData) return assigned;
+
+      try {
+        Object.values(planData).forEach(dayPlan => {
+            // Explicitly cast/check dayPlan
+            const details = dayPlan as DayPlanDetails | null;
+            if (details && Array.isArray(details.doctorIds)) {
+                details.doctorIds.forEach(docId => {
+                     if (typeof docId === 'number') assigned.add(docId);
+                });
+            }
+        });
+      } catch (e) {
+        console.error("Error calculating assigned doctors:", e);
+      }
       return assigned;
     }, [planData]);
 
     const handleRegionChange = (dayIndex: number, regionIdStr: string) => {
-        // Create a shallow copy with explicit type to preserve index signature
-        const newPlan: WeeklyPlan['plan'] = { ...planData };
-        const regionId = parseInt(regionIdStr);
+        setPlanData(prevPlan => {
+            // Ensure we work with a safe object
+            const newPlan: WeeklyPlan['plan'] = { ...(prevPlan || {}) };
+            const regionId = parseInt(regionIdStr);
 
-        if (regionIdStr === 'none' || isNaN(regionId)) {
-            newPlan[dayIndex] = null;
-        } else {
-            const existingDayPlanEntry = newPlan[dayIndex];
-            // If the region has changed, clear the doctors list as they likely don't belong to the new region.
-            // If it's the same region, preserve existing doctors.
-            const doctorIds = (existingDayPlanEntry?.regionId === regionId) 
-                ? (existingDayPlanEntry?.doctorIds || []) 
-                : [];
+            if (regionIdStr === 'none' || isNaN(regionId)) {
+                newPlan[dayIndex] = null;
+            } else {
+                const existingDayPlanEntry = newPlan[dayIndex] as DayPlanDetails | null | undefined;
+                
+                // If the region has changed, clear the doctors list as they likely don't belong to the new region.
+                // If it's the same region, preserve existing doctors.
+                const doctorIds = (existingDayPlanEntry?.regionId === regionId) 
+                    ? (existingDayPlanEntry?.doctorIds || []) 
+                    : [];
 
-            newPlan[dayIndex] = {
-                regionId: regionId,
-                doctorIds: doctorIds, 
-            };
-        }
-        setPlanData(newPlan);
+                newPlan[dayIndex] = {
+                    regionId: regionId,
+                    doctorIds: doctorIds, 
+                };
+            }
+            return newPlan;
+        });
     };
     
     const handleAddDoctor = (dayIndex: number, doctorIdStr: string) => {
@@ -91,10 +106,11 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
         if (isNaN(doctorId) || assignedDoctorIds.has(doctorId)) return; // Prevent adding already assigned doctor or invalid ID
 
         setPlanData(prevPlan => {
-            const newPlan: WeeklyPlan['plan'] = { ...prevPlan };
-            const currentDayPlanEntry = newPlan[dayIndex];
+            const newPlan: WeeklyPlan['plan'] = { ...(prevPlan || {}) };
+            const currentDayPlanEntry = newPlan[dayIndex] as DayPlanDetails | null | undefined;
+
             if (currentDayPlanEntry) {
-                const currentDoctorIds = currentDayPlanEntry.doctorIds; 
+                const currentDoctorIds = currentDayPlanEntry.doctorIds || []; 
                 if (!currentDoctorIds.includes(doctorId)) {
                     newPlan[dayIndex] = {
                         ...currentDayPlanEntry,
@@ -102,9 +118,11 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
                     };
                 }
             } else {
-                // Handle case where day plan doesn't exist yet (should be rare as region is selected first)
+                // Handle case where day plan doesn't exist yet
+                // We need to find the region from the doctor, as the day plan is empty
                 const doctor = allDoctors.find(d => d.id === doctorId);
                 const regionId = doctor?.regionId;
+                
                 if (regionId !== undefined) {
                   newPlan[dayIndex] = { regionId, doctorIds: [doctorId] };
                 }
@@ -115,9 +133,10 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
 
     const handleRemoveDoctor = (dayIndex: number, doctorId: number) => {
         setPlanData(prevPlan => {
-            const newPlan: WeeklyPlan['plan'] = { ...prevPlan };
-            const currentDayPlanEntry = newPlan[dayIndex];
-            if (currentDayPlanEntry) {
+            const newPlan: WeeklyPlan['plan'] = { ...(prevPlan || {}) };
+            const currentDayPlanEntry = newPlan[dayIndex] as DayPlanDetails | null | undefined;
+            
+            if (currentDayPlanEntry && currentDayPlanEntry.doctorIds) {
                 newPlan[dayIndex] = {
                     ...currentDayPlanEntry,
                     doctorIds: currentDayPlanEntry.doctorIds.filter(id => id !== doctorId),
@@ -131,7 +150,18 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
         setSaving(true);
         setMessage('');
         try {
-            const updatedPlan = await api.updateRepPlan(user.id, planData);
+            // Clean up plan data before sending
+            const cleanedPlan: WeeklyPlan['plan'] = {};
+            WORK_WEEK_DAYS.forEach(day => {
+                const dayPlan = planData[day.index];
+                if (dayPlan) {
+                    cleanedPlan[day.index] = dayPlan;
+                } else {
+                    cleanedPlan[day.index] = null;
+                }
+            });
+
+            const updatedPlan = await api.updateRepPlan(user.id, cleanedPlan);
             setMessage(t('plan_submitted_success'));
             setTimeout(() => {
                 onPlanSaved(updatedPlan);
@@ -173,7 +203,7 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
                 <p className="mb-6 text-slate-700">{t('plan_editor_instructions_doctors')}</p>
                 <div className="space-y-4">
                     {WORK_WEEK_DAYS.map(day => {
-                        const dayPlan = planData[day.index];
+                        const dayPlan = planData[day.index] as DayPlanDetails | null | undefined;
                         const selectedRegionId = dayPlan?.regionId;
                         const doctorsForDay = dayPlan?.doctorIds || [];
                         const availableDoctorsInRegion = allDoctors.filter(doc => 

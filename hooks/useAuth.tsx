@@ -19,65 +19,83 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     setLoading(true);
     setAuthError(null);
     const supabase = getSupabaseClient();
 
-    // Check for an active session on initial component load.
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-          if (!session?.user) {
-              // No user, resolve with null to stop the chain.
-              return Promise.resolve(null);
-          }
-          // User exists, continue the chain by fetching profile.
-          return api.getUserProfile(session.user.id);
-      })
-      .then(profile => {
-          // `profile` is either the user profile object or null.
-          setUser(profile);
-      })
-      .catch(error => {
-          console.error("Error during session check/profile fetch:", error);
-          const errorMessage = error.message;
-          // Only block the app with DbErrorScreen if it's explicitly an RLS or configuration error.
-          // For other errors (e.g. network, missing profile row), we treat it as 'not logged in'
-          // so the user is redirected to the login page to try again.
-          if (errorMessage === 'rls_error') {
-            setAuthError('rls_error');
-          } else {
-            setAuthError(null);
-          }
-          setUser(null);
-      })
-      .finally(() => {
-          setLoading(false);
-      });
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+            throw sessionError;
+        }
 
+        if (!session?.user) {
+          if (mounted) setUser(null);
+          return;
+        }
 
-    // Listen for any subsequent changes in auth state (e.g., login, logout, token refresh).
+        // User exists, fetch profile
+        const profile = await api.getUserProfile(session.user.id);
+        if (mounted) {
+            setUser(profile);
+        }
+      } catch (error: any) {
+        console.error("Error during session check/profile fetch:", error);
+        const errorMessage = error?.message || String(error);
+        
+        if (mounted) {
+            if (errorMessage === 'rls_error') {
+                setAuthError('rls_error');
+            } else {
+                // For other errors (network, etc), we clear auth error to avoid stuck error screens,
+                // but user will be null (logged out state effectively)
+                setAuthError(null);
+            }
+            setUser(null);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    initAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      
       if (session?.user) {
         try {
+          // We re-fetch profile on auth change to ensure we have fresh role data
+          // or to handle sign-in after initial load
           const profile = await api.getUserProfile(session.user.id);
-          setUser(profile);
-          setAuthError(null);
-        } catch (e: any) {
-          console.error("Error on auth state change:", e);
-          // Apply same logic: only set authError for critical RLS/DB config issues
-          if (e.message === 'rls_error') {
-            setAuthError('rls_error');
-          } else {
+          if (mounted) {
+            setUser(profile);
             setAuthError(null);
           }
-          setUser(null);
+        } catch (e: any) {
+          console.error("Error on auth state change:", e);
+          const errorMessage = e?.message || String(e);
+          if (mounted) {
+            if (errorMessage === 'rls_error') {
+                setAuthError('rls_error');
+            } else {
+                setAuthError(null);
+            }
+            setUser(null);
+          }
         }
       } else {
-        setUser(null);
+        if (mounted) {
+            setUser(null);
+        }
       }
     });
 
     return () => {
+      mounted = false;
       subscription?.unsubscribe();
     };
   }, []);

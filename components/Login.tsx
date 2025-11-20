@@ -220,7 +220,7 @@ const Login: React.FC = () => {
 
         {/* Copyright Notice */}
         <div className="text-center text-xs text-white/50 pt-4 border-t border-white/25 mt-6">
-          <p>Copyright © 2025 Mizan for SaniVita</p>
+          <p>Copyright © 2025 Mizan for SaniVita-Pharma </p>
         </div>
       </div>
     </div>
