@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
 import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon } from './icons';
+import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -262,6 +262,34 @@ const RepDashboard: React.FC = () => {
       return doctors.filter(d => pendingDoctorIds.includes(d.id));
   }, [plan, recentVisits, doctors, doctorNameToIdMap]);
 
+  const visitFrequency = useMemo(() => {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const visitCounts: Record<string, number> = {};
+    
+    recentVisits.forEach(visit => {
+        const visitDate = new Date(visit.date);
+        // Filter for current month and Doctor visits only
+        if (visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT') {
+            const key = visit.targetName;
+            visitCounts[key] = (visitCounts[key] || 0) + 1;
+        }
+    });
+
+    let freq1 = 0;
+    let freq2 = 0;
+    let freq3 = 0;
+
+    Object.values(visitCounts).forEach(count => {
+        if (count === 1) freq1++;
+        else if (count === 2) freq2++;
+        else if (count >= 3) freq3++;
+    });
+
+    return { freq1, freq2, freq3 };
+  }, [recentVisits]);
+
   if (loading) {
     return <Spinner />;
   }
@@ -342,7 +370,6 @@ const RepDashboard: React.FC = () => {
             onClick={() => {
               const todayIndex = new Date().getDay();
               const todayPlanForDay = plan?.plan[todayIndex] ?? null;
-              // Fix: Pass only the regionId from the day's plan
               setInitialRegionForVisit(todayPlanForDay?.regionId ?? null);
               setIsModalOpen(true);
             }}
@@ -354,7 +381,7 @@ const RepDashboard: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Monthly Visits Card */}
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 animate-fade-in-up">
             <div className="flex items-center mb-4">
@@ -419,12 +446,39 @@ const RepDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Visits per Working Day Card - NEW */}
+        {/* Visits Frequency Card - NEW */}
+        <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: '250ms' }}>
+            <div>
+                <div className="flex items-center mb-4">
+                    <div className="bg-indigo-500/20 text-indigo-700 p-3 rounded-full me-3">
+                        <GraphIcon className="w-6 h-6" />
+                    </div>
+                    <p className="text-slate-600 text-md font-medium">{t('visit_frequency_monthly')}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="flex flex-col items-center">
+                         <p className="text-2xl font-bold text-slate-800">{visitFrequency.freq1}</p>
+                         <p className="text-xs text-slate-600 font-semibold">{t('freq_1_mo')}</p>
+                    </div>
+                    <div className="flex flex-col items-center border-x border-slate-300/50">
+                         <p className="text-2xl font-bold text-blue-800">{visitFrequency.freq2}</p>
+                         <p className="text-xs text-slate-600 font-semibold">{t('freq_2_mo')}</p>
+                    </div>
+                    <div className="flex flex-col items-center">
+                         <p className="text-2xl font-bold text-green-800">{visitFrequency.freq3}</p>
+                         <p className="text-xs text-slate-600 font-semibold">{t('freq_3_mo')}</p>
+                    </div>
+                </div>
+            </div>
+            <p className="text-[10px] text-slate-500 text-center mt-4">{t('doctors_visits_count_info')}</p>
+        </div>
+
+        {/* Visits per Working Day Card */}
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: '300ms' }}>
             <div>
                 <div className="flex items-center mb-4">
                     <div className="bg-purple-500/20 text-purple-700 p-3 rounded-full me-3">
-                        <ChartBarIcon className="w-6 h-6" /> {/* Reusing ChartBarIcon for this new metric */}
+                        <ChartBarIcon className="w-6 h-6" />
                     </div>
                     <p className="text-slate-600 text-md font-medium">{t('visits_per_working_day')}</p>
                 </div>

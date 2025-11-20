@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
@@ -366,6 +367,39 @@ const ManagerDashboard: React.FC = () => {
       };
     });
   }, [reps, totalDoctors, totalPharmacies]);
+
+  const visitFrequency = useMemo(() => {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const visitCounts: Record<string, number> = {};
+    
+    // Filter based on selected Rep for consistent stats
+    const relevantReports = selectedRep === 'all'
+        ? allReports
+        : allReports.filter(r => r.repName === selectedRep);
+
+    relevantReports.forEach(visit => {
+        const visitDate = new Date(visit.date);
+        // Filter for current month and Doctor visits only
+        if (visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT') {
+            const key = visit.targetName;
+            visitCounts[key] = (visitCounts[key] || 0) + 1;
+        }
+    });
+
+    let freq1 = 0;
+    let freq2 = 0;
+    let freq3 = 0;
+
+    Object.values(visitCounts).forEach(count => {
+        if (count === 1) freq1++;
+        else if (count === 2) freq2++;
+        else if (count >= 3) freq3++;
+    });
+
+    return { freq1, freq2, freq3 };
+  }, [allReports, selectedRep]);
 
   const handleReviewPlan = async (repId: string, status: 'approved' | 'rejected') => {
       try {
@@ -846,6 +880,30 @@ const ManagerDashboard: React.FC = () => {
                 </div>
             </div>
           </div>
+
+          {/* Visits Frequency Card - NEW */}
+          <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '650ms' }}>
+                <div className="flex items-center mb-4">
+                    <div className="bg-indigo-500/20 text-indigo-700 p-3 rounded-full me-3">
+                        <GraphIcon className="w-6 h-6" />
+                    </div>
+                    <p className="text-slate-600 text-md font-medium">{t('visit_frequency_monthly')} {selectedRep !== 'all' ? `(${selectedRep})` : ''}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="flex flex-col items-center">
+                         <p className="text-3xl font-bold text-slate-800">{visitFrequency.freq1}</p>
+                         <p className="text-sm text-slate-600 font-semibold mt-1">{t('freq_1_mo')}</p>
+                    </div>
+                    <div className="flex flex-col items-center border-x border-slate-300/50">
+                         <p className="text-3xl font-bold text-blue-800">{visitFrequency.freq2}</p>
+                         <p className="text-sm text-slate-600 font-semibold mt-1">{t('freq_2_mo')}</p>
+                    </div>
+                    <div className="flex flex-col items-center">
+                         <p className="text-3xl font-bold text-green-800">{visitFrequency.freq3}</p>
+                         <p className="text-sm text-slate-600 font-semibold mt-1">{t('freq_3_mo')}</p>
+                    </div>
+                </div>
+            </div>
 
           {/* Analytics Charts */}
           <AnalyticsCharts reports={filteredReports} />
