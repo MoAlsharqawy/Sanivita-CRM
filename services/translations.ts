@@ -63,6 +63,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'reset_success': 'تمت إعادة تعيين بيانات {0} بنجاح.', // NEW
     'reset_error': 'فشل إعادة تعيين بيانات {0}.', // NEW
     'confirm_page_refresh': 'هل أنت متأكد من رغبتك في مغادرة هذه الصفحة؟ قد لا يتم حفظ التغييرات التي أجريتها.',
+    'export_visits': 'تصدير الزيارات',
+    'select_date_range': 'حدد الفترة الزمنية',
+    'export': 'تصدير',
+    'yesterday': 'أمس',
+    'show_today_yesterday_only': 'عرض زيارات اليوم وأمس فقط',
 
 
     // Enums
@@ -119,7 +124,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'hide_client_list': 'إخفاء قائمة العملاء',
     'doctors_list': 'قائمة الأطباء',
     'pharmacies_list': 'قائمة الصيدليات',
-    'recent_visits_log': 'سجل الزيارات الأخيرة',
+    'recent_visits_log': 'سجل الزيارات (اليوم وأمس)',
     'products_label': 'المنتجات:',
     'no_visits_yet': 'لا توجد زيارات مسجلة بعد.',
     'plan_status_draft': 'مسودة',
@@ -423,6 +428,12 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'reset_success': 'Successfully reset data for {0}.', // NEW
     'reset_error': 'Failed to reset data for {0}.', // NEW
     'confirm_page_refresh': 'Are you sure you want to leave this page? Changes you made may not be saved.',
+    'export_visits': 'Export Visits',
+    'select_date_range': 'Select Date Range',
+    'export': 'Export',
+    'yesterday': 'Yesterday',
+    'show_today_yesterday_only': 'Showing today and yesterday visits only',
+
 
     // Enums
     'MANAGER': 'Manager',
@@ -477,7 +488,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'hide_client_list': 'Hide Client List',
     'doctors_list': 'Doctors List',
     'pharmacies_list': 'Pharmacies List',
-    'recent_visits_log': 'Recent Visits Log',
+    'recent_visits_log': 'Recent Visits Log (Today & Yesterday)',
     'products_label': 'Products:',
     'no_visits_yet': 'No visits recorded yet.',
     'plan_status_draft': 'Draft',

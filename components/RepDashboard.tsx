@@ -9,7 +9,7 @@ import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGr
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
-import { exportClientsToExcel } from '../services/exportService';
+import { exportClientsToExcel, exportToExcel } from '../services/exportService';
 import WeeklyView from './WeeklyView';
 import PlanEditor from './PlanEditor';
 import Spinner from './Spinner';
@@ -30,6 +30,11 @@ const RepDashboard: React.FC = () => {
   const [view, setView] = useState<'dashboard' | 'search' | 'weekly' | 'plan'>('dashboard');
   const [showClientLists, setShowClientLists] = useState(false);
   const [initialRegionForVisit, setInitialRegionForVisit] = useState<number | null>(null);
+
+  // Export Modal State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
 
   // State for drag and drop visual feedback
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -99,6 +104,32 @@ const RepDashboard: React.FC = () => {
     }
   };
 
+  const handleExportVisitsClick = () => {
+      // Set default dates (e.g., current month)
+      const today = new Date();
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      setExportStartDate(firstDay.toISOString().split('T')[0]);
+      setExportEndDate(today.toISOString().split('T')[0]);
+      setIsExportModalOpen(true);
+  };
+
+  const handleConfirmExportVisits = () => {
+      if (!user) return;
+      
+      const start = new Date(exportStartDate);
+      const end = new Date(exportEndDate);
+      // Add one day to end date to include the selected day (since time is 00:00:00)
+      end.setDate(end.getDate() + 1);
+
+      const filteredVisits = recentVisits.filter(v => {
+          const vDate = new Date(v.date);
+          return vDate >= start && vDate < end;
+      });
+
+      exportToExcel(filteredVisits, `visits_${user.username}_${exportStartDate}_to_${exportEndDate}`, t);
+      setIsExportModalOpen(false);
+  };
+
 
   // Drag and Drop Handlers
   const handleDragStart = (index: number) => {
@@ -113,15 +144,10 @@ const RepDashboard: React.FC = () => {
   };
 
   const handleDrop = () => {
-    if (draggedItemIndex.current === null || dragOverItemIndex.current === null || draggedItemIndex.current === dragOverItemIndex.current) {
-        return;
-    }
-    
-    const newVisits = [...recentVisits];
-    const draggedItem = newVisits.splice(draggedItemIndex.current, 1)[0];
-    newVisits.splice(dragOverItemIndex.current, 0, draggedItem);
-    
-    setRecentVisits(newVisits);
+    // Re-ordering logic is purely visual here since we are filtering the view.
+    // If re-ordering is required for "Today/Yesterday" view, we need a separate state for it.
+    // For now, disabling reorder on the filtered list to avoid confusion or complex state sync.
+    return; 
   };
 
   const handleDragEnd = () => {
@@ -134,6 +160,22 @@ const RepDashboard: React.FC = () => {
     e.preventDefault();
   };
   
+  // Filtered list for display (Today and Yesterday only)
+  const displayVisits = useMemo(() => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      return recentVisits.filter(visit => {
+          const visitDate = new Date(visit.date);
+          visitDate.setHours(0, 0, 0, 0);
+          return visitDate.getTime() >= yesterday.getTime();
+      });
+  }, [recentVisits]);
+
+
   const monthlyCounts = useMemo(() => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -288,6 +330,13 @@ const RepDashboard: React.FC = () => {
           >
             <DownloadIcon className="w-5 h-5"/>
             <span className="hidden sm:inline">{t('download_list')}</span>
+          </button>
+          <button 
+            onClick={handleExportVisitsClick}
+            className="bg-teal-600 text-white font-bold py-2 px-4 sm:px-6 rounded-lg hover:bg-teal-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+          >
+            <DownloadIcon className="w-5 h-5"/>
+            <span className="hidden sm:inline">{t('export_visits')}</span>
           </button>
           <button 
             onClick={() => {
@@ -464,25 +513,32 @@ const RepDashboard: React.FC = () => {
       {/* Recent Visits History */}
       <div className="mt-8">
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50">
-          <h3 className="text-xl font-semibold mb-4 flex items-center text-blue-700">
-            {t('recent_visits_log')}
-          </h3>
+          <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold flex items-center text-blue-700">
+                {t('recent_visits_log')}
+              </h3>
+              <span className="text-xs text-slate-600 bg-slate-200 px-3 py-1 rounded-full">
+                {t('show_today_yesterday_only')}
+              </span>
+          </div>
           <div className="max-h-96 overflow-y-auto ps-2">
-            {recentVisits.length > 0 ? (
+            {displayVisits.length > 0 ? (
               <ul 
                 className="space-y-3"
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
               >
-                {recentVisits.map((visit, index) => (
+                {displayVisits.map((visit, index) => {
+                  const visitDate = new Date(visit.date);
+                  const today = new Date();
+                  const isToday = visitDate.toDateString() === today.toDateString();
+                  const yesterday = new Date(today);
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  const isYesterday = visitDate.toDateString() === yesterday.toDateString();
+
+                  return (
                   <li 
                     key={visit.id} 
-                    className={`p-4 bg-white/30 rounded-lg hover:bg-white/50 transition-all duration-300 cursor-move animate-fade-in-up ${draggedIndex === index ? 'opacity-50' : ''}`}
+                    className={`p-4 bg-white/30 rounded-lg hover:bg-white/50 transition-all duration-300 animate-fade-in-up`}
                     style={{ animationDelay: `${Math.min(index * 100, 1000)}ms` }}
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragEnter={() => handleDragEnter(index)}
-                    onDragEnd={handleDragEnd}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center">
@@ -497,7 +553,11 @@ const RepDashboard: React.FC = () => {
                                 <span className="text-xs bg-purple-100 text-purple-800 font-semibold px-2 py-0.5 rounded-full ms-2">{t(visit.visitType)}</span>
                              )}
                           </p>
-                          <p className="text-xs text-slate-600">{new Date(visit.date).toLocaleString(t('locale'), { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                          <p className="text-xs text-slate-600 flex items-center gap-2">
+                              {new Date(visit.date).toLocaleString(t('locale'), { dateStyle: 'medium', timeStyle: 'short' })}
+                              {isToday && <span className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0.5 rounded">{t('today')}</span>}
+                              {isYesterday && <span className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded">{t('yesterday')}</span>}
+                          </p>
                         </div>
                       </div>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${visit.type === 'DOCTOR_VISIT' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>{t(visit.type)}</span>
@@ -509,7 +569,7 @@ const RepDashboard: React.FC = () => {
                       </p>
                     )}
                   </li>
-                ))}
+                )})}
               </ul>
             ) : (
               <p className="text-center text-slate-600 py-8 text-lg">{t('no_visits_yet')}</p>
@@ -536,6 +596,51 @@ const RepDashboard: React.FC = () => {
               onCancel={() => setIsModalOpen(false)}
             />
         </Modal>
+      )}
+
+      {isExportModalOpen && (
+          <Modal
+              isOpen={isExportModalOpen}
+              onClose={() => setIsExportModalOpen(false)}
+              title={t('select_date_range')}
+          >
+              <div className="space-y-4">
+                  <div>
+                      <label className="block text-sm font-medium text-slate-800 mb-1">{t('from_date')}</label>
+                      <input
+                          type="date"
+                          value={exportStartDate}
+                          onChange={(e) => setExportStartDate(e.target.value)}
+                          className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-slate-800 mb-1">{t('to_date')}</label>
+                      <input
+                          type="date"
+                          value={exportEndDate}
+                          onChange={(e) => setExportEndDate(e.target.value)}
+                          className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      />
+                  </div>
+                  <div className="flex justify-end space-x-2 space-x-reverse pt-4">
+                      <button
+                          onClick={() => setIsExportModalOpen(false)}
+                          className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
+                      >
+                          {t('cancel')}
+                      </button>
+                      <button
+                          onClick={handleConfirmExportVisits}
+                          disabled={!exportStartDate || !exportEndDate}
+                          className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 disabled:bg-blue-300 transition-colors flex items-center gap-2"
+                      >
+                          <DownloadIcon className="w-4 h-4" />
+                          {t('export')}
+                      </button>
+                  </div>
+              </div>
+          </Modal>
       )}
     </div>
   );
