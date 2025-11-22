@@ -26,9 +26,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const supabase = getSupabaseClient();
 
     const initAuth = async () => {
-      // Create a promise that rejects after 5 seconds to prevent hanging on stuck sessions
+      // Create a promise that rejects after 7 seconds (increased from 5) to prevent hanging on stuck sessions
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('auth_timeout')), 5000)
+        setTimeout(() => reject(new Error('auth_timeout')), 7000)
       );
 
       // Wrapper for the actual fetch logic
@@ -61,7 +61,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
              if (error.message === 'auth_timeout') {
                  console.warn("Auth initialization timed out. Clearing potentially stale session.");
                  // Force sign out to clear local storage which might be causing the hang
-                 // We try to sign out, but even if it fails, we show the error screen
                  try {
                     await supabase.auth.signOut();
                  } catch (e) {
@@ -99,16 +98,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = await api.getUserProfile(session.user.id);
           if (mounted) {
             setUser(profile);
-            setAuthError(null);
+            // Only clear auth error if it wasn't a timeout error that just happened
+            setAuthError(prev => prev === 'auth_timeout_error' ? prev : null);
           }
         } catch (e: any) {
           console.error("Error on auth state change:", e);
           const errorMessage = e?.message || String(e);
           if (mounted) {
             if (errorMessage === 'rls_error') {
-                setAuthError('rls_error');
+                // Prevent overwriting a timeout error with an RLS error to avoid screen flickering/confusion
+                setAuthError(prev => prev === 'auth_timeout_error' ? prev : 'rls_error');
             } else {
-                setAuthError(null);
+                setAuthError(prev => prev === 'auth_timeout_error' ? prev : null);
             }
             setUser(null);
           }
@@ -116,6 +117,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         if (mounted) {
             setUser(null);
+            // Do not clear auth error here, so if we signed out due to timeout, the error screen persists
         }
       }
     });
