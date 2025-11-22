@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
-import { EyeIcon, EyeOffIcon } from './icons';
+import { EyeIcon, EyeOffIcon, WarningIcon } from './icons';
 import { Logo } from './Logo';
 import { api } from '../services/api';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 
 
 const Login: React.FC = () => {
@@ -130,6 +131,16 @@ const Login: React.FC = () => {
       <div className="w-full max-w-sm bg-slate-800/50 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up">
         <Logo className="h-20 mx-auto text-cyan-400" showIcon={false}/>
 
+        {!isSupabaseConfigured && (
+            <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-4 mb-4 flex items-start gap-3">
+                 <WarningIcon className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                 <div className="text-sm text-amber-200">
+                    <p className="font-bold">Setup Required</p>
+                    <p>Supabase API keys are missing. Login is disabled.</p>
+                 </div>
+            </div>
+        )}
+
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-white">{t('welcome_back')}</h1>
@@ -210,8 +221,8 @@ const Login: React.FC = () => {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg hover:opacity-90 active:opacity-80 transition-opacity disabled:opacity-50"
+              disabled={loading || !isSupabaseConfigured}
+              className="w-full py-3 px-4 font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg hover:opacity-90 active:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? t('signing_in') : t('sign_in')}
             </button>

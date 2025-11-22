@@ -2,7 +2,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { supabase } from '../services/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface AuthContextType {
   user: User | null;
@@ -30,6 +30,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
 
     const initAuth = async () => {
+      if (!isSupabaseConfigured) {
+          if (mounted) setLoading(false);
+          return;
+      }
+
       // Timeout promise to reject if Supabase hangs (e.g., stale local storage token)
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('auth_timeout')), 7000)
