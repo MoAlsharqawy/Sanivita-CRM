@@ -1,5 +1,4 @@
 
-
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -68,13 +67,23 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'plan_status_pending': 'قيد المراجعة',
     'plan_status_approved': 'تمت الموافقة',
     'plan_status_rejected': 'مرفوضة',
-    // ... other existing keys ...
     // Export related
     'export_visits': 'تصدير الزيارات',
     'select_date_range': 'تحديد الفترة الزمنية',
     'from_date': 'من تاريخ',
     'to_date': 'إلى تاريخ',
     'export': 'تصدير',
+    // DB Error Screen
+    'db_error_title': 'خطأ في الاتصال بقاعدة البيانات',
+    'db_error_rls_explanation_1': 'تعذر الوصول إلى ملف تعريف المستخدم الخاص بك.',
+    'db_error_rls_explanation_2': 'قد يكون هذا بسبب قيود الأمان (RLS) أو عدم اكتمال إعداد قاعدة البيانات.',
+    'db_error_rls_solution': 'للمطورين: يرجى التحقق من سياسات RLS في Supabase:',
+    'copy_sql': 'نسخ كود SQL',
+    'copied': 'تم النسخ',
+    'try_again': 'إعادة المحاولة',
+    'session_timeout_title': 'مهلة الاتصال',
+    'session_timeout_message': 'استغرق الاتصال وقتًا أطول من المعتاد. يرجى تسجيل الدخول مرة أخرى.',
+    'relogin': 'تسجيل الدخول',
   },
   en: {
     'hello': 'Hello, {0}',
@@ -146,5 +155,16 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'from_date': 'From Date',
     'to_date': 'To Date',
     'export': 'Export',
+    // DB Error Screen
+    'db_error_title': 'Database Connection Error',
+    'db_error_rls_explanation_1': 'Unable to access your user profile.',
+    'db_error_rls_explanation_2': 'This might be due to Row Level Security (RLS) policies or incomplete setup.',
+    'db_error_rls_solution': 'For Developers: Please check RLS policies in Supabase:',
+    'copy_sql': 'Copy SQL',
+    'copied': 'Copied',
+    'try_again': 'Try Again',
+    'session_timeout_title': 'Connection Timeout',
+    'session_timeout_message': 'The connection took too long. Please log in again.',
+    'relogin': 'Log In',
   }
 };

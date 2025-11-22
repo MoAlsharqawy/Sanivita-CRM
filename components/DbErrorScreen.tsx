@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import { Logo } from './Logo';
-import { WarningIcon, CopyIcon } from './icons';
+import { WarningIcon, CopyIcon, LogoutIcon } from './icons';
+import { useAuth } from '../hooks/useAuth';
 
 interface DbErrorScreenProps {
     error: string;
@@ -9,7 +11,10 @@ interface DbErrorScreenProps {
 
 const DbErrorScreen: React.FC<DbErrorScreenProps> = ({ error }) => {
     const { t } = useLanguage();
+    const { logout } = useAuth();
     const [copyButtonText, setCopyButtonText] = useState(t('copy_sql'));
+
+    const isTimeout = error === 'auth_timeout_error';
 
     const rlsPolicySQL = 
 `-- Step 1: Enable Row Level Security on the profiles table (if not already enabled)
@@ -33,8 +38,14 @@ USING (auth.uid() = id);
         });
     };
 
-    const handleRetry = () => {
-        window.location.reload();
+    const handleRetry = async () => {
+        if (isTimeout) {
+            await logout();
+            // Force reload to clear any persistent state issues
+            window.location.reload();
+        } else {
+            window.location.reload();
+        }
     };
 
     return (
@@ -44,38 +55,51 @@ USING (auth.uid() = id);
                 
                 <div className="text-center space-y-2 flex flex-col items-center">
                     <WarningIcon className="h-16 w-16 text-yellow-400 mb-4" />
-                    <h1 className="text-3xl font-bold text-white">{t('db_error_title')}</h1>
+                    <h1 className="text-3xl font-bold text-white">
+                        {t(isTimeout ? 'session_timeout_title' : 'db_error_title')}
+                    </h1>
                 </div>
 
                 <div className="text-white/80 space-y-4 text-center">
-                    <p>{t('db_error_rls_explanation_1')}</p>
-                    <p>{t('db_error_rls_explanation_2')}</p>
+                    <p>
+                        {t(isTimeout ? 'session_timeout_message' : 'db_error_rls_explanation_1')}
+                    </p>
+                    {!isTimeout && <p>{t('db_error_rls_explanation_2')}</p>}
                 </div>
 
-                <div className="space-y-3">
-                    <p className="text-white/90 text-center font-semibold">{t('db_error_rls_solution')}</p>
-                    <div className="relative bg-slate-900/70 rounded-lg p-4 border border-slate-600">
-                        <pre className="text-slate-300 text-xs whitespace-pre-wrap overflow-x-auto no-scrollbar">
-                            <code>
-                                {rlsPolicySQL}
-                            </code>
-                        </pre>
-                        <button 
-                            onClick={handleCopy}
-                            className="absolute top-2 end-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-2 transition-colors"
-                        >
-                            <CopyIcon className="w-4 h-4" />
-                            {copyButtonText}
-                        </button>
+                {!isTimeout && (
+                    <div className="space-y-3">
+                        <p className="text-white/90 text-center font-semibold">{t('db_error_rls_solution')}</p>
+                        <div className="relative bg-slate-900/70 rounded-lg p-4 border border-slate-600">
+                            <pre className="text-slate-300 text-xs whitespace-pre-wrap overflow-x-auto no-scrollbar">
+                                <code>
+                                    {rlsPolicySQL}
+                                </code>
+                            </pre>
+                            <button 
+                                onClick={handleCopy}
+                                className="absolute top-2 end-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-2 transition-colors"
+                            >
+                                <CopyIcon className="w-4 h-4" />
+                                {copyButtonText}
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div>
                     <button
                         onClick={handleRetry}
-                        className="w-full py-3 px-4 font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg hover:opacity-90 active:opacity-80 transition-opacity"
+                        className="w-full py-3 px-4 font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg hover:opacity-90 active:opacity-80 transition-opacity flex items-center justify-center gap-2"
                     >
-                        {t('try_again')}
+                        {isTimeout ? (
+                            <>
+                                <LogoutIcon className="w-5 h-5" />
+                                {t('relogin')}
+                            </>
+                        ) : (
+                            t('try_again')
+                        )}
                     </button>
                 </div>
             </div>

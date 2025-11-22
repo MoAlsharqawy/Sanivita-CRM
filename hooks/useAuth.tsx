@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
   authError: string | null;
 }
 
@@ -26,9 +26,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const supabase = getSupabaseClient();
 
     const initAuth = async () => {
-      // Create a promise that rejects after 7 seconds to prevent hanging on stuck sessions
+      // Create a promise that rejects after 5 seconds to prevent hanging on stuck sessions
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('auth_timeout')), 7000)
+        setTimeout(() => reject(new Error('auth_timeout')), 5000)
       );
 
       // Wrapper for the actual fetch logic
@@ -61,7 +61,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
              if (error.message === 'auth_timeout') {
                  console.warn("Auth initialization timed out. Clearing potentially stale session.");
                  // Force sign out to clear local storage which might be causing the hang
-                 supabase.auth.signOut().catch(e => console.error("Sign out error:", e));
+                 // We try to sign out, but even if it fails, we show the error screen
+                 try {
+                    await supabase.auth.signOut();
+                 } catch (e) {
+                    console.error("Sign out error during timeout handling:", e);
+                 }
                  setUser(null);
                  setAuthError('auth_timeout_error');
              } else {
