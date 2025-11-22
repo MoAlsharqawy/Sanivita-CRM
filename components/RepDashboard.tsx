@@ -1,11 +1,12 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
 import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon } from './icons';
+import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -40,6 +41,33 @@ const RepDashboard: React.FC = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const draggedItemIndex = useRef<number | null>(null);
   const dragOverItemIndex = useRef<number | null>(null);
+
+  // Calculate Planning Time Logic
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 (Sun) to 6 (Sat)
+  // Planning time is Thursday (4) and Friday (5)
+  const isPlanningTime = dayOfWeek === 4 || dayOfWeek === 5;
+
+  // Calculate the start date of the plan week
+  // If it's planning time, we plan for the NEXT week (starting next Saturday).
+  // Otherwise, we are viewing the CURRENT week (started last Saturday).
+  const planStartDate = useMemo(() => {
+      const d = new Date();
+      const currentDay = d.getDay();
+      
+      if (isPlanningTime) {
+          // If Thu(4), next Sat is +2. If Fri(5), next Sat is +1.
+          const daysUntilNextSaturday = (6 - currentDay + 7) % 7;
+          d.setDate(d.getDate() + (daysUntilNextSaturday === 0 ? 7 : daysUntilNextSaturday));
+      } else {
+          // Current week started on the most recent Saturday (or today if Sat)
+          // Sat(6)->0, Sun(0)->1 ... Wed(3)->4
+          const daysSinceSaturday = (currentDay + 1) % 7;
+          d.setDate(d.getDate() - daysSinceSaturday);
+      }
+      return d;
+  }, [isPlanningTime]);
+
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -94,8 +122,7 @@ const RepDashboard: React.FC = () => {
   };
   
   const handleWeeklyPlanClick = () => {
-    const isThursday = new Date().getDay() === 4; // 0:Sun, 1:Mon, ..., 4:Thu
-    const canEdit = !plan || plan.status !== 'approved' || isThursday;
+    const canEdit = (!plan || plan.status !== 'approved') || isPlanningTime;
 
     if (canEdit) {
         setView('plan');
@@ -318,6 +345,7 @@ const RepDashboard: React.FC = () => {
         user={user}
         regions={regions}
         initialPlan={plan}
+        startDate={planStartDate}
         onPlanSaved={(newPlan) => {
             setPlan(newPlan);
             setView('dashboard');
@@ -332,6 +360,27 @@ const RepDashboard: React.FC = () => {
 
   return (
     <div className="container mx-auto">
+       {/* Planning Motivation Banner */}
+      {isPlanningTime && (
+        <div className="mb-6 animate-fade-in bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-4 shadow-xl text-white flex items-center justify-between border border-white/20">
+            <div className="flex items-center gap-3">
+                <div className="bg-white/20 p-2 rounded-full">
+                     <CalendarPlusIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                    <p className="font-bold text-lg">{t('planning_time_message')}</p>
+                    <p className="text-sm opacity-90">{t('planning_for_week_starting', planStartDate.toLocaleDateString(t('locale')))}</p>
+                </div>
+            </div>
+            <button 
+                onClick={handleWeeklyPlanClick}
+                className="bg-white text-purple-700 font-bold py-2 px-4 rounded-lg shadow hover:bg-gray-100 transition-all text-sm whitespace-nowrap"
+            >
+                {t('create_next_week_plan')}
+            </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h2 className="text-3xl font-bold text-blue-800">{getGreeting()}</h2>
         <div className="flex gap-2 sm:gap-4 flex-wrap justify-center items-start">
@@ -345,12 +394,12 @@ const RepDashboard: React.FC = () => {
           <div className="flex flex-col items-center">
             <button 
               onClick={handleWeeklyPlanClick}
-              className="bg-purple-600 text-white font-bold py-2 px-4 sm:px-6 rounded-lg hover:bg-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+              className={`text-white font-bold py-2 px-4 sm:px-6 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2 ${isPlanningTime ? 'bg-purple-600 hover:bg-purple-700 ring-2 ring-purple-300' : 'bg-purple-600 hover:bg-purple-700'}`}
             >
               <CalendarIcon className="w-5 h-5"/>
-              <span className="hidden sm:inline">{t('weekly_plan')}</span>
+              <span className="hidden sm:inline">{t(isPlanningTime ? 'create_next_week_plan' : 'weekly_plan')}</span>
             </button>
-            {plan && <div className="mt-2">{getPlanStatusBadge()}</div>}
+            {plan && !isPlanningTime && <div className="mt-2">{getPlanStatusBadge()}</div>}
           </div>
           <button 
             onClick={handleExportClients}

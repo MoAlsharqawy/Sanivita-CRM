@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Region, WeeklyPlan, Doctor, DayPlanDetails } from '../types';
 import { api } from '../services/api';
@@ -9,11 +10,12 @@ interface PlanEditorProps {
   user: User;
   regions: Region[];
   initialPlan: WeeklyPlan | null;
+  startDate?: Date; // Optional, defaults to current logic if not provided
   onPlanSaved: (newPlan: WeeklyPlan) => void;
   onBack: () => void;
 }
 
-const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onPlanSaved, onBack }) => {
+const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, startDate, onPlanSaved, onBack }) => {
     const { t } = useLanguage();
     
     // Robustly initialize planData. Fallback to empty object if initialPlan.plan is undefined/null
@@ -41,6 +43,24 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
       };
       fetchDoctors();
     }, [t]);
+
+    // Helper to get the specific date for a day index
+    const getDayDateLabel = (dayIndex: number) => {
+        if (!startDate) return '';
+        const d = new Date(startDate);
+        // startDate is expected to be Saturday.
+        // Day indices: 6(Sat), 0(Sun), 1(Mon), 2(Tue), 3(Wed), 4(Thu), 5(Fri)
+        // Offset logic: 
+        // If dayIndex is 6 (Sat), offset is 0.
+        // If dayIndex is 0 (Sun), offset is 1.
+        // ... 
+        // If dayIndex is 5 (Fri), offset is 6.
+        
+        const offset = dayIndex === 6 ? 0 : dayIndex + 1;
+        d.setDate(d.getDate() + offset);
+        return d.toLocaleDateString(t('locale'), { day: 'numeric', month: 'numeric' });
+    };
+
 
     const WORK_WEEK_DAYS = useMemo(() => [
         { name: t('saturday'), index: 6 },
@@ -182,7 +202,14 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
     return (
         <div className="container mx-auto">
              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold text-blue-800">{t('setup_weekly_plan')}</h2>
+                <div className="flex flex-col">
+                    <h2 className="text-3xl font-bold text-blue-800">{t('setup_weekly_plan')}</h2>
+                    {startDate && (
+                         <p className="text-sm text-slate-600 mt-1">
+                             {t('planning_for_week_starting', startDate.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long', year: 'numeric' }))}
+                         </p>
+                    )}
+                </div>
                 <button
                     onClick={onBack}
                     className="flex items-center text-slate-600 hover:text-orange-600 focus:outline-none focus:ring-colors"
@@ -213,7 +240,14 @@ const PlanEditor: React.FC<PlanEditorProps> = ({ user, regions, initialPlan, onP
                         
                         return (
                             <div key={day.index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white/30 rounded-lg">
-                                <label className="font-bold text-lg text-slate-800 sm:mb-0 mb-2 min-w-[100px]">{day.name}</label>
+                                <div className="sm:mb-0 mb-2 min-w-[120px]">
+                                    <label className="font-bold text-lg text-slate-800 block">{day.name}</label>
+                                    {startDate && (
+                                        <span className="text-xs text-slate-500 bg-white/60 px-2 py-0.5 rounded-full mt-1 inline-block">
+                                            {getDayDateLabel(day.index)}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="flex flex-col sm:flex-row flex-grow items-stretch sm:items-center gap-3 w-full">
                                     {/* Region Selector */}
                                     <div className="relative w-full sm:w-1/2">
