@@ -1,5 +1,5 @@
 
-import { getSupabaseClient, initializeSupabase } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole } from '../types';
 
 // Helper to handle Supabase errors
@@ -13,9 +13,7 @@ export const api = {
   // --- CONNECTION TEST ---
   testSupabaseConnection: async (): Promise<boolean> => {
     try {
-      const supabase = getSupabaseClient();
       // A lightweight query to check if keys are valid and table exists.
-      // We're checking 'regions' table as it's fundamental for the app.
       const { error } = await supabase.from('regions').select('id', { count: 'exact', head: true });
       if (error) {
         console.error("Supabase connection test failed:", error.message);
@@ -26,7 +24,7 @@ export const api = {
       }
       return true;
     } catch (e: any) {
-      console.error("Supabase client initialization error:", e.message);
+      console.error("Supabase connection error:", e.message);
       throw new Error(e.message || "Connection failed: Please check the Supabase URL format.");
     }
   },
@@ -35,7 +33,6 @@ export const api = {
   // --- AUTH & USER PROFILE ---
 
   login: async (username: string, password: string): Promise<User> => {
-    const supabase = getSupabaseClient();
     // The 'username' field is now always treated as the user's email address.
     const email = username;
 
@@ -68,13 +65,11 @@ export const api = {
   },
 
   logout: async (): Promise<void> => {
-    const supabase = getSupabaseClient();
     const { error } = await supabase.auth.signOut();
     if (error) handleSupabaseError(error, 'logout');
   },
 
   getUserProfile: async (userId: string): Promise<User> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -99,7 +94,6 @@ export const api = {
   },
 
   updateUserPassword: async (newPassword: string): Promise<boolean> => {
-    const supabase = getSupabaseClient();
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
       handleSupabaseError(error, 'updateUserPassword');
@@ -111,14 +105,12 @@ export const api = {
   // --- USER MANAGEMENT (MANAGER) ---
 
   getUsers: async (): Promise<User[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('profiles').select('*');
     if (error) handleSupabaseError(error, 'getUsers');
     return (data || []).map(u => ({ ...u, password: '' }));
   },
 
   addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
-    const supabase = getSupabaseClient();
     // The 'username' field from the UI is now always treated as the user's email address.
     const email = userData.username;
 
@@ -193,7 +185,6 @@ export const api = {
   },
 
   updateUser: async (userId: string, updates: Partial<Pick<User, 'name' | 'role'>>): Promise<User | null> => {
-    const supabase = getSupabaseClient();
     // NOTE: Updating another user's username (email) or password requires admin privileges
     // and should ideally be a server-side operation for security reasons.
     // In this client-side demo, we're preventing email changes for existing users via the UI.
@@ -224,7 +215,6 @@ export const api = {
     // This functionality will NOT work with just the anon key unless an RPC is configured with 'security definer'.
     // For a secure, production-ready solution, consider calling a serverless function.
     console.warn("Attempting to delete user. This typically requires admin privileges or an RPC in Supabase.");
-    const supabase = getSupabaseClient();
     // Example of an RPC call if you have a custom function to delete:
     // const { error: rpcError } = await supabase.rpc('delete_user_and_profile', { p_user_id: userId });
     // if (rpcError) handleSupabaseError(rpcError, 'deleteUser RPC');
@@ -240,7 +230,6 @@ export const api = {
   },
 
   sendPasswordResetEmail: async (username: string): Promise<void> => {
-    const supabase = getSupabaseClient();
     // The 'username' field is now always treated as the user's email address.
     const email = username;
 
@@ -260,7 +249,6 @@ export const api = {
 
   // NEW: Function to reset a representative's visits and plan
   resetRepData: async (repId: string): Promise<void> => {
-    const supabase = getSupabaseClient();
     // Call the RPC defined in Supabase to handle the deletion and plan reset
     const { error } = await supabase.rpc('reset_rep_data', { p_rep_id: repId });
     if (error) {
@@ -276,14 +264,12 @@ export const api = {
   // --- CORE DATA FETCHING ---
 
   getRegions: async (): Promise<Region[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('regions').select('*');
     if (error) handleSupabaseError(error, 'getRegions');
     return data || [];
   },
 
   addRegion: async (regionName: string): Promise<Region> => {
-    const supabase = getSupabaseClient();
     if (!regionName) {
       throw new Error("Region name cannot be empty.");
     }
@@ -313,21 +299,18 @@ export const api = {
   },
 
   getProducts: async (): Promise<Product[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('products').select('*');
     if (error) handleSupabaseError(error, 'getProducts');
     return data || [];
   },
 
   getAllDoctors: async (): Promise<Doctor[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('doctors').select('*');
     if (error) handleSupabaseError(error, 'getAllDoctors');
     return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
   },
 
   getDoctorsForRep: async (repId: string): Promise<Doctor[]> => {
-    const supabase = getSupabaseClient();
     console.log(`API: Fetching doctors for repId: ${repId}`);
     const { data, error } = await supabase.from('doctors').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getDoctorsForRep');
@@ -336,14 +319,12 @@ export const api = {
   },
 
   getAllPharmacies: async (): Promise<Pharmacy[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('pharmacies').select('*');
     if (error) handleSupabaseError(error, 'getAllPharmacies');
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
   },
 
   getPharmaciesForRep: async (repId: string): Promise<Pharmacy[]> => {
-    const supabase = getSupabaseClient();
     console.log(`API: Fetching pharmacies for repId: ${repId}`);
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
@@ -354,7 +335,6 @@ export const api = {
 
   // --- VISITS & REPORTS (using RPC) ---
   addDoctorVisit: async (visit: Omit<DoctorVisit, 'id' | 'date'>): Promise<DoctorVisit> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('add_doctor_visit_with_products', {
       p_doctor_id: visit.doctorId,
       p_rep_id: visit.repId,
@@ -375,7 +355,6 @@ export const api = {
   },
 
   addPharmacyVisit: async (visit: Omit<PharmacyVisit, 'id' | 'date'>): Promise<PharmacyVisit> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('pharmacy_visits').insert({
       pharmacy_id: visit.pharmacyId,
       rep_id: visit.repId,
@@ -387,7 +366,6 @@ export const api = {
   },
 
   getVisitReportsForRep: async (repId: string): Promise<VisitReport[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('get_visit_reports', { p_rep_id: repId });
     if (error) {
       // Specific error handling for the 'UNION types' issue
@@ -403,7 +381,6 @@ export const api = {
   },
 
   getAllVisitReports: async (): Promise<VisitReport[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('get_visit_reports');
     if (error) {
       // Apply the same specific error handling for all reports as well.
@@ -419,7 +396,6 @@ export const api = {
   },
 
   getOverdueVisits: async (): Promise<ClientAlert[]> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.rpc('get_overdue_visits');
     if (error) handleSupabaseError(error, 'getOverdueVisits');
     return data || [];
@@ -428,14 +404,12 @@ export const api = {
   // --- WEEKLY PLANS ---
 
   getRepPlan: async (repId: string): Promise<WeeklyPlan> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('weekly_plans').select('plan, status').eq('rep_id', repId).maybeSingle();
     if (error) handleSupabaseError(error, 'getRepPlan');
     return data || { plan: {}, status: 'draft' };
   },
 
   updateRepPlan: async (repId: string, planData: WeeklyPlan['plan']): Promise<WeeklyPlan> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('weekly_plans').upsert({
       rep_id: repId,
       plan: planData,
@@ -446,14 +420,12 @@ export const api = {
   },
 
   reviewRepPlan: async (repId: string, newStatus: 'approved' | 'rejected'): Promise<WeeklyPlan> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('weekly_plans').update({ status: newStatus }).eq('rep_id', repId).select('plan, status').single();
     if (error) handleSupabaseError(error, 'reviewRepPlan');
     return data as WeeklyPlan;
   },
 
   revokePlanApproval: async (repId: string): Promise<WeeklyPlan> => {
-    const supabase = getSupabaseClient();
     // Setting status back to 'draft' allows the rep to edit and resubmit
     const { data, error } = await supabase.from('weekly_plans').update({ status: 'draft' }).eq('rep_id', repId).select('plan, status').single();
     if (error) handleSupabaseError(error, 'revokePlanApproval');
@@ -461,7 +433,6 @@ export const api = {
   },
 
   getAllPlans: async (): Promise<{ [repId: string]: WeeklyPlan }> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('weekly_plans').select('rep_id, plan, status');
     if (error) handleSupabaseError(error, 'getAllPlans');
 
@@ -478,14 +449,12 @@ export const api = {
   // --- SYSTEM SETTINGS ---
 
   getSystemSettings: async (): Promise<SystemSettings> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('system_settings').select('*').eq('id', 1).single();
     if (error) handleSupabaseError(error, 'getSystemSettings');
     return data || { weekends: [], holidays: [] };
   },
 
   updateSystemSettings: async (settings: SystemSettings): Promise<SystemSettings> => {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from('system_settings').update({
       weekends: settings.weekends,
       holidays: settings.holidays,
@@ -496,7 +465,6 @@ export const api = {
 
   // --- BATCH IMPORTS ---
   addDoctorsBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<{ success: number, failed: number, errors: string[] }> => {
-    const supabase = getSupabaseClient();
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
@@ -569,7 +537,6 @@ export const api = {
   },
 
   addPharmaciesBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<{ success: number, failed: number, errors: string[] }> => {
-    const supabase = getSupabaseClient();
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));

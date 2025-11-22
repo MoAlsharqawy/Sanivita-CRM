@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth, AuthProvider } from './hooks/useAuth';
 import Login from './components/Login';
@@ -8,10 +9,9 @@ import { UserRole } from './types';
 import { Header } from './components/Header';
 import { useLanguage } from './hooks/useLanguage';
 import Spinner from './components/Spinner';
-import SupabaseConnect from './components/SupabaseConnect';
-import { hasSupabaseCredentials, getSupabaseClient } from './services/supabaseClient';
 import ResetPassword from './components/ResetPassword';
 import DbErrorScreen from './components/DbErrorScreen';
+import { supabase } from './services/supabaseClient';
 
 // A wrapper for routes that require authentication
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -70,7 +70,6 @@ const AppRoutes: React.FC = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const supabase = getSupabaseClient();
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
             if (event === 'PASSWORD_RECOVERY') {
                 // This event fires when the user clicks the password reset link.
@@ -118,19 +117,8 @@ const AppRoutes: React.FC = () => {
     );
 }
 
-// The main App component, now simplified to handle DB connection and provide auth context
+// The main App component, now simplified to provide auth context directly
 const App: React.FC = () => {
-  const [isDbConnected, setIsDbConnected] = useState(hasSupabaseCredentials());
-  const { dir } = useLanguage();
-
-  if (!isDbConnected) {
-    return (
-        <div className="min-h-screen bg-[#3a3358] text-slate-100" dir={dir}>
-            <SupabaseConnect onSuccess={() => setIsDbConnected(true)} />
-        </div>
-    );
-  }
-
   return (
     <AuthProvider>
         <AppRoutes />

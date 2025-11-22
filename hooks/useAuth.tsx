@@ -2,7 +2,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { getSupabaseClient } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 
 interface AuthContextType {
   user: User | null;
@@ -23,10 +23,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let mounted = true;
     setLoading(true);
     setAuthError(null);
-    const supabase = getSupabaseClient();
 
     const initAuth = async () => {
-      // Create a promise that rejects after 7 seconds (increased from 5) to prevent hanging on stuck sessions
+      // Create a promise that rejects after 7 seconds to prevent hanging on stuck sessions
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('auth_timeout')), 7000)
       );
