@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
 import { supabase } from '../services/supabaseClient';
@@ -18,66 +18,56 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  
+  // Ref to track initialization status to prevent double-execution in React Strict Mode
+  const isInitialized = useRef(false);
 
   useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
     let mounted = true;
     setLoading(true);
-    setAuthError(null);
 
     const initAuth = async () => {
-      // Create a promise that rejects after 7 seconds to prevent hanging on stuck sessions
+      // Timeout promise to reject if Supabase hangs (e.g., stale local storage token)
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('auth_timeout')), 7000)
       );
 
-      // Wrapper for the actual fetch logic
-      const fetchSessionPromise = async () => {
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionError) {
-              throw sessionError;
-          }
-
-          if (!session?.user) {
-            return null;
-          }
-
-          // User exists, fetch profile
-          return await api.getUserProfile(session.user.id);
-      };
+      // Validating session
+      const sessionPromise = supabase.auth.getSession();
 
       try {
-        // Race the fetch against the timeout
-        const profile = await Promise.race([fetchSessionPromise(), timeoutPromise]) as User | null;
-        
-        if (mounted) {
-            setUser(profile);
+        const result = await Promise.race([
+            sessionPromise,
+            timeoutPromise
+        ]) as { data: { session: any }, error: any };
+
+        if (result.error) throw result.error;
+
+        const session = result.data.session;
+
+        if (session?.user) {
+          const profile = await api.getUserProfile(session.user.id);
+          if (mounted) setUser(profile);
         }
       } catch (error: any) {
-        console.error("Error during session check/profile fetch:", error);
+        console.error("Auth Initialization Error:", error);
         
         if (mounted) {
-             if (error.message === 'auth_timeout') {
-                 console.warn("Auth initialization timed out. Clearing potentially stale session.");
-                 // Force sign out to clear local storage which might be causing the hang
-                 try {
-                    await supabase.auth.signOut();
-                 } catch (e) {
-                    console.error("Sign out error during timeout handling:", e);
-                 }
-                 setUser(null);
+             if (error.message === 'auth_timeout' || error === 'auth_timeout') {
+                 console.warn("Auth timeout detected. Clearing session.");
                  setAuthError('auth_timeout_error');
+                 // Force sign out to clear the stuck session from local storage
+                 await supabase.auth.signOut();
+                 setUser(null);
+             } else if (error.message === 'rls_error') {
+                 setAuthError('rls_error');
+                 setUser(null);
              } else {
-                 const errorMessage = error?.message || String(error);
-                 if (errorMessage === 'rls_error') {
-                    setAuthError('rls_error');
-                    setUser(null);
-                 } else {
-                    // For other errors (network, etc), we clear auth error to avoid stuck error screens,
-                    // but user will be null (logged out state effectively)
-                    setAuthError(null);
-                    setUser(null);
-                 }
+                 // Generic error, assume logged out
+                 setUser(null);
              }
         }
       } finally {
@@ -87,46 +77,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
-      if (session?.user) {
-        try {
-          // We re-fetch profile on auth change to ensure we have fresh role data
-          // or to handle sign-in after initial load
-          const profile = await api.getUserProfile(session.user.id);
-          if (mounted) {
-            setUser(profile);
-            // Only clear auth error if it wasn't a timeout error that just happened
-            setAuthError(prev => prev === 'auth_timeout_error' ? prev : null);
-          }
-        } catch (e: any) {
-          console.error("Error on auth state change:", e);
-          const errorMessage = e?.message || String(e);
-          if (mounted) {
-            if (errorMessage === 'rls_error') {
-                // Prevent overwriting a timeout error with an RLS error to avoid screen flickering/confusion
-                setAuthError(prev => prev === 'auth_timeout_error' ? prev : 'rls_error');
-            } else {
-                setAuthError(prev => prev === 'auth_timeout_error' ? prev : null);
+      // Only react to explicit sign-in/sign-out events to avoid conflict with initAuth
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          try {
+            // Ensure we have the latest profile data
+            const profile = await api.getUserProfile(session.user.id);
+            if (mounted) {
+                setUser(profile);
+                setAuthError(null);
             }
-            setUser(null);
+          } catch (e) {
+            console.error("Error fetching profile on auth change:", e);
           }
         }
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         if (mounted) {
             setUser(null);
-            // Do not clear auth error here, so if we signed out due to timeout, the error screen persists
+            setAuthError(null);
         }
       }
     });
 
     return () => {
       mounted = false;
-      subscription?.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
-
 
   const login = async (username: string, password: string) => {
     setAuthError(null);
@@ -142,7 +122,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error("Error signing out from server:", error);
     }
   };
-
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, authError }}>
