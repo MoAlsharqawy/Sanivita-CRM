@@ -317,6 +317,17 @@ const RepDashboard: React.FC = () => {
     return { freq1, freq2, freq3 };
   }, [recentVisits]);
 
+  const specializationCounts = useMemo(() => {
+      const counts: Record<string, number> = {};
+      doctors.forEach(d => {
+          const spec = d.specialization;
+          if (spec) {
+              counts[spec] = (counts[spec] || 0) + 1;
+          }
+      });
+      return counts;
+  }, [doctors]);
+
   if (loading) {
     return <Spinner />;
   }
@@ -565,11 +576,32 @@ const RepDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Client Lists Toggle Button - NEW LOCATION */}
-      <div className="flex justify-center mb-8">
+      {/* Client Lists Toggle & Summary Section - REPLACED */}
+      <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
+        {/* Doctors Stats Card */}
+        <div className="bg-white/40 backdrop-blur-lg px-5 py-2 rounded-lg shadow-lg border border-white/50 flex items-center gap-6 animate-fade-in-up">
+            <div className="flex items-center gap-3 border-r border-slate-300/50 pr-5 rtl:border-r-0 rtl:border-l rtl:pr-0 rtl:pl-5">
+                <div className="bg-blue-100 p-1.5 rounded-full text-blue-600">
+                    <DoctorIcon className="w-5 h-5" />
+                </div>
+                <div>
+                    <span className="block text-xl font-bold text-blue-800 leading-none">{doctors.length}</span>
+                    <span className="text-[10px] text-slate-600 font-bold uppercase">{t('doctors')}</span>
+                </div>
+            </div>
+            <div className="flex items-center gap-6">
+                {Object.entries(specializationCounts).map(([spec, count]) => (
+                <div key={spec} className="flex flex-col items-center">
+                    <span className="text-lg font-bold text-slate-700 leading-none">{count}</span>
+                    <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">{t(spec)}</span>
+                </div>
+                ))}
+            </div>
+        </div>
+
         <button 
           onClick={() => setShowClientLists(!showClientLists)}
-          className="bg-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-teal-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+          className="bg-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-teal-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2 h-[54px]"
           aria-expanded={showClientLists}
         >
           <UserGroupIcon className="w-5 h-5"/>
