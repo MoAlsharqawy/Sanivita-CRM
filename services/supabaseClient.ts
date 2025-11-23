@@ -39,6 +39,11 @@ const getEnvVar = (key: string): string | undefined => {
         } catch (e) {}
     }
 
+    // Treat empty strings or 'undefined' string as undefined
+    if (value === '' || value === 'undefined' || value === 'null') {
+        return undefined;
+    }
+
     return value;
 }
 
@@ -46,19 +51,22 @@ const getEnvVar = (key: string): string | undefined => {
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
 const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
+// Strict check to ensure we don't try to connect with invalid configs
+export const isSupabaseConfigured = 
+    !!supabaseUrl && 
+    !!supabaseAnonKey && 
+    supabaseUrl.startsWith('http');
 
 // Log warning for debugging if keys are missing
 if (!isSupabaseConfigured) {
-  console.warn('Supabase URL or Anon Key is missing from environment variables. The app will run in placeholder mode and API calls will fail.');
+  console.warn('Supabase URL or Anon Key is missing or invalid. The app will run in offline/demo mode where possible, or show a setup screen.');
 }
 
 // Create a single static client instance
 // Use fallbacks to ensure createClient never throws "supabaseUrl is required" crash
-// This prevents the "White Screen of Death" on startup
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
+  isSupabaseConfigured ? supabaseUrl! : 'https://placeholder.supabase.co',
+  isSupabaseConfigured ? supabaseAnonKey! : 'placeholder-key',
   {
     auth: {
       persistSession: true,

@@ -1,7 +1,8 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, VisitReport, SystemSettings, WeeklyPlan, Region, Doctor } from '../types';
 import { useLanguage } from '../hooks/useLanguage';
-import { ArrowRightIcon, ChevronRightIcon, ChevronLeftIcon, MapPinIcon, DoctorIcon } from './icons';
+import { ArrowRightIcon, ChevronRightIcon, ChevronLeftIcon, MapPinIcon, DoctorIcon, PharmacyIcon, ReplyIcon } from './icons';
 import { api } from '../services/api';
 import Spinner from './Spinner';
 
@@ -63,20 +64,19 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
 
-  const visitsByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    visits.forEach(visit => {
-        const dateStr = toYYYYMMDD(new Date(visit.date));
-        map.set(dateStr, (map.get(dateStr) || 0) + 1);
-    });
-    return map;
-  }, [visits]);
-
   const navigateWeek = (direction: 'prev' | 'next') => {
     setCurrentDate(prev => {
         const newDate = new Date(prev);
         newDate.setDate(prev.getDate() + (direction === 'next' ? 7 : -7));
         return newDate;
+    });
+  };
+
+  const jumpToLastWeek = () => {
+    setCurrentDate(prev => {
+        const d = new Date(); // Start from today
+        d.setDate(d.getDate() - 7); // Go back 7 days
+        return d;
     });
   };
 
@@ -105,14 +105,26 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
       </div>
 
       {/* Week Navigator */}
-      <div className="flex justify-between items-center bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8">
-        <button onClick={() => navigateWeek('prev')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label={t('previous_week')}>
-            <ChevronRightIcon className="w-6 h-6" />
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8 gap-4">
+        <button 
+            onClick={jumpToLastWeek}
+            className="flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+        >
+            <ReplyIcon className="w-4 h-4" />
+            {t('last_week')}
         </button>
-        <h3 className="text-lg md:text-xl font-bold text-slate-700 text-center">{weekRangeString}</h3>
-        <button onClick={() => navigateWeek('next')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label={t('next_week')}>
-            <ChevronLeftIcon className="w-6 h-6" />
-        </button>
+        
+        <div className="flex items-center gap-4">
+            <button onClick={() => navigateWeek('prev')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label={t('previous_week')}>
+                <ChevronRightIcon className="w-6 h-6" />
+            </button>
+            <h3 className="text-lg md:text-xl font-bold text-slate-700 text-center min-w-[200px]">{weekRangeString}</h3>
+            <button onClick={() => navigateWeek('next')} className="p-2 text-slate-600 hover:text-orange-600 rounded-full hover:bg-slate-200/50 transition-colors" aria-label={t('next_week')}>
+                <ChevronLeftIcon className="w-6 h-6" />
+            </button>
+        </div>
+        
+        <div className="w-0 md:w-24"></div> {/* Spacer for center alignment */}
       </div>
 
       {/* Days Grid */}
@@ -123,7 +135,7 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
           const isWeekend = settings?.weekends.includes(dayIndex) ?? false;
           const isHoliday = settings?.holidays.includes(dateStr) ?? false;
           const isOffDay = isWeekend || isHoliday;
-          const visitCount = visitsByDate.get(dateStr) || 0;
+          
           const dayName = WEEK_DAYS[dayIndex];
           const isToday = toYYYYMMDD(new Date()) === dateStr;
           
@@ -132,51 +144,82 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
           const doctorIds = dayPlan?.doctorIds || [];
           const region = regionId ? regions.find(r => r.id === regionId) : null;
 
+          // Get Actual Visits for this day
+          const actualVisits = visits.filter(v => toYYYYMMDD(new Date(v.date)) === dateStr);
+
           const cardClasses = `
-            p-4 rounded-2xl shadow-lg border flex flex-col items-center justify-between min-h-[160px] transition-all duration-300
-            ${isOffDay ? 'bg-slate-800 text-white border-slate-700' : 'bg-white/40 backdrop-blur-lg border-white/50'}
+            p-3 rounded-2xl shadow-lg border flex flex-col justify-between transition-all duration-300
+            ${isOffDay ? 'bg-slate-800 text-white border-slate-700 min-h-[160px]' : 'bg-white/40 backdrop-blur-lg border-white/50 min-h-[280px]'}
             ${isToday && !isOffDay ? 'ring-2 ring-orange-500' : ''}
           `;
 
           return (
             <div key={dateStr} className={cardClasses}>
-              <div className="text-center w-full">
-                <p className={`font-bold text-lg ${isOffDay ? 'text-slate-300' : 'text-slate-800'}`}>{dayName}</p>
-                <p className={`text-sm mb-2 ${isOffDay ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {date.toLocaleDateString(t('locale'), { day: 'numeric', month: 'numeric' })}
-                </p>
-                {region && !isOffDay && (
-                  <div className="flex items-center justify-center text-xs font-semibold text-slate-700 bg-white/60 px-2 py-1 rounded-full">
-                      <MapPinIcon className="w-4 h-4 me-1.5" />
-                      <span>{region.name}</span>
-                  </div>
-                )}
-                {!region && !isOffDay && doctorIds.length === 0 && (
-                     <div className="text-xs text-slate-400 italic py-1">{t('no_plan_for_day')}</div>
-                )}
-                 {doctorIds.length > 0 && !isOffDay && (
-                    <div className="mt-2 flex flex-wrap justify-center gap-1">
-                        {doctorIds.map(docId => (
-                            <span key={docId} className="flex items-center text-xs bg-blue-500/20 text-blue-700 px-2 py-0.5 rounded-full">
-                                <DoctorIcon className="w-3 h-3 me-1" />
-                                {doctorMap.get(docId)?.name || t('unknown_doctor')}
-                            </span>
-                        ))}
+              <div className="w-full">
+                {/* Header Section */}
+                <div className="text-center mb-3">
+                    <p className={`font-bold text-lg ${isOffDay ? 'text-slate-300' : 'text-slate-800'}`}>{dayName}</p>
+                    <p className={`text-sm ${isOffDay ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {date.toLocaleDateString(t('locale'), { day: 'numeric', month: 'numeric' })}
+                    </p>
+                    {region && !isOffDay && (
+                    <div className="flex items-center justify-center text-xs font-semibold text-slate-700 bg-white/60 px-2 py-0.5 rounded-full mt-1">
+                        <MapPinIcon className="w-3 h-3 me-1" />
+                        <span>{region.name}</span>
+                    </div>
+                    )}
+                </div>
+
+                {!isOffDay && (
+                    <div className="space-y-3">
+                        {/* Planned Section */}
+                        <div className="bg-white/30 rounded-lg p-2">
+                             <p className="text-[10px] uppercase font-bold text-slate-500 mb-1 border-b border-slate-200/50 pb-1">{t('planned')}</p>
+                             {doctorIds.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                    {doctorIds.map(docId => (
+                                        <span key={docId} className="flex items-center text-[10px] bg-blue-100/80 text-blue-800 px-1.5 py-0.5 rounded-full">
+                                            <DoctorIcon className="w-3 h-3 me-1" />
+                                            {doctorMap.get(docId)?.name || t('unknown_doctor')}
+                                        </span>
+                                    ))}
+                                </div>
+                             ) : (
+                                <p className="text-[10px] text-slate-400 italic">{t('no_plan_for_day')}</p>
+                             )}
+                        </div>
+
+                        {/* Actual Visits Section */}
+                         <div className="bg-white/30 rounded-lg p-2">
+                             <p className="text-[10px] uppercase font-bold text-slate-500 mb-1 border-b border-slate-200/50 pb-1">{t('actual')}</p>
+                             {actualVisits.length > 0 ? (
+                                <div className="flex flex-col gap-1">
+                                    {actualVisits.map((visit) => (
+                                        <span key={visit.id} className="flex items-center text-[10px] bg-green-100/80 text-green-800 px-1.5 py-0.5 rounded-full truncate">
+                                            {visit.type === 'DOCTOR_VISIT' ? 
+                                                <DoctorIcon className="w-3 h-3 me-1 flex-shrink-0" /> : 
+                                                <PharmacyIcon className="w-3 h-3 me-1 flex-shrink-0" />
+                                            }
+                                            <span className="truncate">{visit.targetName}</span>
+                                        </span>
+                                    ))}
+                                </div>
+                             ) : (
+                                <p className="text-[10px] text-slate-400 italic">{t('no_visits_text')}</p>
+                             )}
+                        </div>
                     </div>
                 )}
               </div>
-              <div className="text-center mt-auto pt-2">
-                {isOffDay ? (
+              
+              {/* Footer Section (Off-day label or summary) */}
+              {isOffDay && (
+                 <div className="text-center mt-auto pt-2">
                     <span className="text-xs font-semibold bg-red-500/80 text-white px-3 py-1 rounded-full">
                         {isHoliday ? t('official_holiday') : t('weekend_holiday')}
                     </span>
-                ) : (
-                  <>
-                    <p className={`text-4xl font-bold ${visitCount > 0 ? 'text-blue-700' : 'text-slate-400'}`}>{visitCount}</p>
-                    <p className="text-xs text-slate-500">{t('visit_count_label')}</p>
-                  </>
-                )}
-              </div>
+                 </div>
+              )}
             </div>
           );
         })}
