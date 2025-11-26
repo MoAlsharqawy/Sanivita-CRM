@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage, TranslationFunction } from '../hooks/useLanguage';
@@ -102,6 +102,8 @@ const ManagerDashboard: React.FC = () => {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [repToReset, setRepToReset] = useState<User | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  // State for the new expandable List card
+  const [isListCardExpanded, setIsListCardExpanded] = useState(false);
 
 
   // Settings tab local state
@@ -367,6 +369,16 @@ const ManagerDashboard: React.FC = () => {
       };
     });
   }, [reps, totalDoctors, totalPharmacies]);
+
+  const totalSpecializationCounts = useMemo(() => {
+      const counts: Record<string, number> = {};
+      totalDoctors.forEach(d => {
+          if (d.specialization) {
+              counts[d.specialization] = (counts[d.specialization] || 0) + 1;
+          }
+      });
+      return counts;
+  }, [totalDoctors]);
 
   const visitFrequency = useMemo(() => {
     const today = new Date();
@@ -903,6 +915,72 @@ const ManagerDashboard: React.FC = () => {
                          <p className="text-sm text-slate-600 font-semibold mt-1">{t('freq_3_mo')}</p>
                     </div>
                 </div>
+            </div>
+
+            {/* List Summary Card (Expandable) - NEW */}
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '700ms' }}>
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center">
+                        <div className="bg-pink-500/20 text-pink-700 p-3 rounded-full me-3">
+                            <ClipboardListIcon className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-semibold text-blue-800">{t('clients_list_summary')}</h3>
+                            <p className="text-sm text-slate-600 mt-1">{t('total_doctors')}: <span className="font-bold text-slate-800">{totalDoctors.length}</span></p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setIsListCardExpanded(!isListCardExpanded)}
+                        className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors border border-slate-300 px-3 py-1.5 rounded-lg bg-white/50 hover:bg-white"
+                    >
+                        {isListCardExpanded ? (
+                            <>
+                                {t('less_details')}
+                                <ChevronUpIcon className="w-4 h-4" />
+                            </>
+                        ) : (
+                            <>
+                                {t('more_details')}
+                                <ChevronDownIcon className="w-4 h-4" />
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {/* Summary Chips */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                     {Object.entries(totalSpecializationCounts).map(([spec, count]) => (
+                        <span key={spec} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/60 text-slate-700 border border-white/60 shadow-sm">
+                            <span className="opacity-70 me-1">{t(spec)}:</span>
+                            <span className="font-bold">{count}</span>
+                        </span>
+                    ))}
+                </div>
+
+                {/* Expanded Content */}
+                {isListCardExpanded && (
+                    <div className="mt-6 border-t border-slate-300/50 pt-4 animate-fade-in">
+                        <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                             {clientStatsByRep.map(stat => (
+                                <div key={stat.rep.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/30 p-3 rounded-lg border border-white/40 hover:bg-white/50 transition-colors">
+                                    <div className="font-bold text-slate-800 mb-2 sm:mb-0 sm:w-1/4 truncate" title={stat.rep.name}>
+                                        {stat.rep.name}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 flex-grow sm:justify-end">
+                                        <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold border border-blue-200">
+                                            {t('total')}: {stat.doctorCount}
+                                        </span>
+                                        {Object.entries(stat.specializationCounts).map(([spec, count]) => (
+                                            <span key={spec} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full border border-slate-200">
+                                                {t(spec)}: <span className="font-bold text-slate-800">{count}</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
           {/* Analytics Charts */}
