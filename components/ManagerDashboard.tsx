@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
@@ -386,38 +382,48 @@ const ManagerDashboard: React.FC = () => {
       return counts;
   }, [totalDoctors]);
 
-  const visitFrequency = useMemo(() => {
+  const repFrequencyStats = useMemo(() => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    const visitCounts: Record<string, number> = {};
-    
-    // Filter based on selected Rep for consistent stats
-    const relevantReports = selectedRep === 'all'
-        ? allReports
-        : allReports.filter(r => r.repName === selectedRep);
+    // 1. Initialize stats for all reps to ensure everyone appears in the list even with 0 visits
+    const statsMap: Record<string, { f1: number, f2: number, f3: number }> = {};
+    reps.forEach(r => {
+        statsMap[r.name] = { f1: 0, f2: 0, f3: 0 };
+    });
 
-    relevantReports.forEach(visit => {
+    // 2. Count visits per Doctor per Rep for the current month
+    // Key format: "RepName_DoctorName" -> Value: Count
+    const visitCounts = new Map<string, number>();
+
+    allReports.forEach(visit => {
         const visitDate = new Date(visit.date);
-        // Filter for current month and Doctor visits only
+        // Filter: Current Month AND Doctor Visits Only
         if (visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT') {
-            const key = visit.targetName;
-            visitCounts[key] = (visitCounts[key] || 0) + 1;
+            const key = `${visit.repName}_${visit.targetName}`;
+            visitCounts.set(key, (visitCounts.get(key) || 0) + 1);
         }
     });
 
-    let freq1 = 0;
-    let freq2 = 0;
-    let freq3 = 0;
-
-    Object.values(visitCounts).forEach(count => {
-        if (count === 1) freq1++;
-        else if (count === 2) freq2++;
-        else if (count >= 3) freq3++;
+    // 3. Distribute counts into buckets (Freq 1, 2, 3+) per Rep
+    visitCounts.forEach((count, key) => {
+        const repName = key.split('_')[0];
+        if (statsMap[repName]) {
+            if (count === 1) statsMap[repName].f1++;
+            else if (count === 2) statsMap[repName].f2++;
+            else if (count >= 3) statsMap[repName].f3++;
+        }
     });
 
-    return { freq1, freq2, freq3 };
-  }, [allReports, selectedRep]);
+    // 4. Convert to array for rendering
+    let result = Object.entries(statsMap).map(([name, counts]) => ({ name, ...counts }));
+    
+    if (selectedRep !== 'all') {
+        result = result.filter(r => r.name === selectedRep);
+    }
+
+    return result;
+  }, [allReports, reps, selectedRep]);
 
   const handleReviewPlan = async (repId: string, status: 'approved' | 'rejected') => {
       try {
@@ -918,27 +924,41 @@ const ManagerDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Visits Frequency Card - NEW */}
+          {/* Visits Frequency Card - NEW / UPDATED to List View */}
           <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '650ms' }}>
                 <div className="flex items-center mb-4">
                     <div className="bg-indigo-500/20 text-indigo-700 p-3 rounded-full me-3">
                         <GraphIcon className="w-6 h-6" />
                     </div>
-                    <p className="text-slate-600 text-md font-medium">{t('visit_frequency_monthly')} {selectedRep !== 'all' ? `(${selectedRep})` : ''}</p>
+                    <p className="text-slate-600 text-md font-medium">{t('visit_frequency_monthly')}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="flex flex-col items-center">
-                         <p className="text-3xl font-bold text-slate-800">{visitFrequency.freq1}</p>
-                         <p className="text-sm text-slate-600 font-semibold mt-1">{t('freq_1_mo')}</p>
-                    </div>
-                    <div className="flex flex-col items-center border-x border-slate-300/50">
-                         <p className="text-3xl font-bold text-blue-800">{visitFrequency.freq2}</p>
-                         <p className="text-sm text-slate-600 font-semibold mt-1">{t('freq_2_mo')}</p>
-                    </div>
-                    <div className="flex flex-col items-center">
-                         <p className="text-3xl font-bold text-green-800">{visitFrequency.freq3}</p>
-                         <p className="text-sm text-slate-600 font-semibold mt-1">{t('freq_3_mo')}</p>
-                    </div>
+                
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-center">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-100/50">
+                            <tr>
+                                <th scope="col" className="px-4 py-3 text-start">{t('rep_name')}</th>
+                                <th scope="col" className="px-4 py-3 text-slate-800">{t('freq_1_mo')}</th>
+                                <th scope="col" className="px-4 py-3 text-blue-800">{t('freq_2_mo')}</th>
+                                <th scope="col" className="px-4 py-3 text-green-800">{t('freq_3_mo')}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/50">
+                            {repFrequencyStats.map((stat, idx) => (
+                                <tr key={idx} className="hover:bg-white/40 transition-colors">
+                                    <td className="px-4 py-3 font-medium text-slate-900 text-start">{stat.name}</td>
+                                    <td className="px-4 py-3 font-bold text-slate-600">{stat.f1}</td>
+                                    <td className="px-4 py-3 font-bold text-blue-700">{stat.f2}</td>
+                                    <td className="px-4 py-3 font-bold text-green-700">{stat.f3}</td>
+                                </tr>
+                            ))}
+                            {repFrequencyStats.length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="px-4 py-4 text-center text-slate-500 italic">{t('no_data')}</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
