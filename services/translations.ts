@@ -1,4 +1,5 @@
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -63,6 +64,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'more_details': 'تفاصيل أكثر',
     'less_details': 'تفاصيل أقل',
     'total': 'الإجمالي',
+    'show_more_options': 'المزيد / بحث متقدم',
+    'show_less_options': 'عرض زيارات اليوم فقط',
     // Plan related
     'weekly_plan': 'الخطة الأسبوعية',
     'create_next_week_plan': 'إنشاء خطة الأسبوع القادم',
@@ -82,6 +85,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'from_date': 'من تاريخ',
     'to_date': 'إلى تاريخ',
     'export': 'تصدير',
+    'export_reports': 'تصدير التقارير ({0})',
     // DB Error Screen
     'db_error_title': 'خطأ في الاتصال بقاعدة البيانات',
     'db_error_rls_explanation_1': 'تعذر الوصول إلى ملف تعريف المستخدم الخاص بك.',
@@ -205,6 +209,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'more_details': 'More Details',
     'less_details': 'Less Details',
     'total': 'Total',
+    'show_more_options': 'More / Advanced Search',
+    'show_less_options': 'Show Today Only',
     'weekly_plan': 'Weekly Plan',
     'create_next_week_plan': 'Create Next Week Plan',
     'planning_time_message': 'It\'s Thursday! Please hurry to prepare and submit the work plan for next week.',
@@ -222,6 +228,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'from_date': 'From Date',
     'to_date': 'To Date',
     'export': 'Export',
+    'export_reports': 'Export Reports ({0})',
     // DB Error Screen
     'db_error_title': 'Database Connection Error',
     'db_error_rls_explanation_1': 'Unable to access your user profile.',

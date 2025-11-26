@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
@@ -118,7 +120,11 @@ const ManagerDashboard: React.FC = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const [selectedQuickFilter, setSelectedQuickFilter] = useState<'none' | 'today' | 'currentWeek' | 'currentMonth'>('none');
+  // Changed default to 'today'
+  const [selectedQuickFilter, setSelectedQuickFilter] = useState<'none' | 'today' | 'currentWeek' | 'currentMonth'>('today');
+  
+  // New state to control expanded view of reports
+  const [isReportExpanded, setIsReportExpanded] = useState(false);
 
 
   const fetchInitialData = useCallback(async () => {
@@ -501,7 +507,10 @@ const ManagerDashboard: React.FC = () => {
     setSelectedRegion('all');
     setStartDate('');
     setEndDate('');
-    setSelectedQuickFilter('none');
+    // If resetting in expanded mode, we might want to stay expanded or reset to today.
+    // Let's reset to Today default.
+    setSelectedQuickFilter('today');
+    setIsReportExpanded(false);
   }
 
   const handleQuickFilterClick = (filter: 'today' | 'currentWeek' | 'currentMonth') => {
@@ -519,6 +528,22 @@ const ManagerDashboard: React.FC = () => {
       setEndDate(end);
     }
     setSelectedQuickFilter(filter);
+  };
+  
+  const handleToggleReportExpand = () => {
+      const newExpandedState = !isReportExpanded;
+      setIsReportExpanded(newExpandedState);
+      
+      if (newExpandedState) {
+          // Expanding: Switch to Current Week for better context
+          handleQuickFilterClick('currentWeek');
+      } else {
+          // Collapsing: Switch back to Today Only
+          handleQuickFilterClick('today');
+          // Reset other filters to avoid hidden state affecting the view
+          setSelectedRep('all');
+          setSelectedRegion('all');
+      }
   };
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -986,45 +1011,76 @@ const ManagerDashboard: React.FC = () => {
           {/* Analytics Charts */}
           <AnalyticsCharts reports={filteredReports} />
 
-          {/* Filters Section */}
-          <div className="bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8">
-            <h3 className="text-lg font-semibold mb-4 flex items-center text-blue-700"><FilterIcon className="w-5 h-5 me-2"/>{t('filter_options')}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <select value={selectedRep} onChange={e => setSelectedRep(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500">
-                <option value="all">{t('all_reps')}</option>
-                {reps.map(rep => <option key={rep.id} value={rep.name}>{rep.name}</option>)}
-              </select>
-              <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500">
-                <option value="all">{t('all_regions')}</option>
-                {regions.map(region => <option key={region.id} value={region.name}>{region.name}</option>)}
-              </select>
-              <input type="date" value={startDate} onChange={handleStartDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('from_date')} />
-              <input type="date" value={endDate} onChange={handleEndDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('to_date')} />
-              <button onClick={handleResetFilters} className="w-full bg-slate-500 text-white p-2 rounded-md hover:bg-slate-600 transition-colors">{t('reset')}</button>
+          {/* Filters Section - Collapsible */}
+          <div className="bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8 transition-all duration-300 ease-in-out">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold flex items-center text-blue-700"><FilterIcon className="w-5 h-5 me-2"/>{t('filter_options')}</h3>
+                <button 
+                    onClick={handleToggleReportExpand}
+                    className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-orange-600 transition-colors bg-white/50 px-3 py-1.5 rounded-lg border border-blue-200 hover:border-orange-200"
+                >
+                    {isReportExpanded ? (
+                        <>
+                            {t('show_less_options')}
+                            <ChevronUpIcon className="w-4 h-4" />
+                        </>
+                    ) : (
+                        <>
+                            {t('show_more_options')}
+                            <ChevronDownIcon className="w-4 h-4" />
+                        </>
+                    )}
+                </button>
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-300/50">
-                <h4 className="text-md font-semibold mb-2 text-slate-700">{t('quick_filters')}</h4>
-                <div className="flex flex-wrap gap-2">
-                    <button 
-                        onClick={() => handleQuickFilterClick('today')} 
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                    >
-                        {t('today')}
-                    </button>
-                    <button 
-                        onClick={() => handleQuickFilterClick('currentWeek')} 
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentWeek' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                    >
-                        {t('current_week')}
-                    </button>
-                    <button 
-                        onClick={() => handleQuickFilterClick('currentMonth')} 
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentMonth' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                    >
-                        {t('current_month')}
-                    </button>
+            
+            {/* Extended Filters - Visible only when expanded */}
+            {isReportExpanded && (
+                <div className="animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                        <select value={selectedRep} onChange={e => setSelectedRep(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500">
+                            <option value="all">{t('all_reps')}</option>
+                            {reps.map(rep => <option key={rep.id} value={rep.name}>{rep.name}</option>)}
+                        </select>
+                        <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500">
+                            <option value="all">{t('all_regions')}</option>
+                            {regions.map(region => <option key={region.id} value={region.name}>{region.name}</option>)}
+                        </select>
+                        <input type="date" value={startDate} onChange={handleStartDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('from_date')} />
+                        <input type="date" value={endDate} onChange={handleEndDateChange} className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" placeholder={t('to_date')} />
+                        <button onClick={handleResetFilters} className="w-full bg-slate-500 text-white p-2 rounded-md hover:bg-slate-600 transition-colors">{t('reset')}</button>
+                    </div>
+                    <div className="pt-4 border-t border-slate-300/50">
+                        <h4 className="text-md font-semibold mb-2 text-slate-700">{t('quick_filters')}</h4>
+                        <div className="flex flex-wrap gap-2">
+                            <button 
+                                onClick={() => handleQuickFilterClick('today')} 
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                            >
+                                {t('today')}
+                            </button>
+                            <button 
+                                onClick={() => handleQuickFilterClick('currentWeek')} 
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentWeek' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                            >
+                                {t('current_week')}
+                            </button>
+                            <button 
+                                onClick={() => handleQuickFilterClick('currentMonth')} 
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentMonth' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                            >
+                                {t('current_month')}
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
+            
+            {!isReportExpanded && (
+                <div className="flex items-center gap-2 text-sm text-slate-600 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                    <CheckIcon className="w-4 h-4 text-green-600" />
+                    <span>{t('showing_today_reports_only')}</span>
+                </div>
+            )}
           </div>
 
           {/* Alerts Table - Modified to show only title and button */}
