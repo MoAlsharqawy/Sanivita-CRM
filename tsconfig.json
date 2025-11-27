@@ -18,7 +18,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    
+    /* Environment Types */
+    "types": ["vite/client", "node"]
   },
   "include": ["**/*.ts", "**/*.tsx", "vite.config.ts"],
   "exclude": ["node_modules"]
