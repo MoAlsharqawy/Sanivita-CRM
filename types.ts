@@ -1,3 +1,4 @@
+
 export enum UserRole {
   Manager = 'MANAGER',
   Supervisor = 'SUPERVISOR',
@@ -105,4 +106,15 @@ export interface WeeklyPlan {
     [dayIndex: number]: DayPlanDetails | null;
   };
   status: 'draft' | 'pending' | 'approved' | 'rejected';
+}
+
+export interface RepTask {
+  id: string;
+  repId: string;
+  repName?: string; // Populated on fetch for manager view
+  createdBy: string;
+  description: string;
+  isCompleted: boolean;
+  createdAt: string;
+  completedAt?: string;
 }

@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
-import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization } from '../types';
+import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon, ClipboardCheckIcon, CheckCircleIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage, TranslationFunction } from '../hooks/useLanguage';
@@ -68,6 +69,13 @@ const ManagerDashboard: React.FC = () => {
   const [reviewMessage, setReviewMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [allDoctorsMap, setAllDoctorsMap] = useState<Map<number, Doctor>>(new Map());
 
+  // Task Management State
+  const [allTasks, setAllTasks] = useState<RepTask[]>([]);
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [selectedRepForTask, setSelectedRepForTask] = useState<string>('');
+  const [taskCreationMessage, setTaskCreationMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+
 
   const WEEK_DAYS = useMemo(() => [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')], [t]);
   const WEEK_DAYS_ORDERED = useMemo(() => [
@@ -81,7 +89,7 @@ const ManagerDashboard: React.FC = () => {
   ], [t]);
 
 
-  type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport';
+  type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport' | 'tasks';
 
 
   // Tab and Modal states
@@ -126,7 +134,7 @@ const ManagerDashboard: React.FC = () => {
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     try {
-      const [reportsData, usersData, regionsData, doctorsData, pharmaciesData, alertsData, settingsData, plansData] = await Promise.all([
+      const [reportsData, usersData, regionsData, doctorsData, pharmaciesData, alertsData, settingsData, plansData, tasksData] = await Promise.all([
         api.getAllVisitReports(),
         api.getUsers(),
         api.getRegions(),
@@ -135,6 +143,7 @@ const ManagerDashboard: React.FC = () => {
         api.getOverdueVisits(),
         api.getSystemSettings(),
         api.getAllPlans(),
+        api.getAllTasks()
       ]);
       setAllReports(reportsData);
       setFilteredReports(reportsData);
@@ -151,6 +160,7 @@ const ManagerDashboard: React.FC = () => {
       }
       setAllPlans(plansData);
       setAllDoctorsMap(new Map(doctorsData.map(doc => [doc.id, doc]))); // Create doctor map
+      setAllTasks(tasksData);
     } catch (error) {
       console.error("Failed to fetch initial data", error);
     } finally {
@@ -424,6 +434,36 @@ const ManagerDashboard: React.FC = () => {
 
     return result;
   }, [allReports, reps, selectedRep]);
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newTaskDescription || !selectedRepForTask) return;
+
+      setIsCreatingTask(true);
+      setTaskCreationMessage(null);
+      try {
+          const newTask = await api.createTask(selectedRepForTask, newTaskDescription);
+          setAllTasks(prev => [newTask, ...prev]);
+          setTaskCreationMessage({ text: t('task_created_success'), type: 'success' });
+          setNewTaskDescription('');
+      } catch (error) {
+          console.error("Failed to create task", error);
+          setTaskCreationMessage({ text: t('error_unexpected'), type: 'error' });
+      } finally {
+          setIsCreatingTask(false);
+          setTimeout(() => setTaskCreationMessage(null), 3000);
+      }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+      try {
+          await api.deleteTask(taskId);
+          setAllTasks(prev => prev.filter(t => t.id !== taskId));
+      } catch (error) {
+          console.error("Failed to delete task", error);
+      }
+  };
+
 
   const handleReviewPlan = async (repId: string, status: 'approved' | 'rejected') => {
       try {
@@ -737,6 +777,15 @@ const ManagerDashboard: React.FC = () => {
                         >
                             <UserGroupIcon className="w-5 h-5 me-2" />
                             {t('client_management')}
+                        </button>
+                    </li>
+                    <li className="me-2">
+                        <button 
+                            onClick={() => setActiveTab('tasks')}
+                            className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'tasks' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                        >
+                            <ClipboardListIcon className="w-5 h-5 me-2" />
+                            {t('tasks_tab')}
                         </button>
                     </li>
                   <li className="me-2">
@@ -1324,6 +1373,117 @@ const ManagerDashboard: React.FC = () => {
                 {reps.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_data')}</p>}
             </div>
         </div>
+      )}
+
+      {activeTab === 'tasks' && (
+          <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
+              <h3 className="text-xl font-semibold mb-6 text-blue-800 flex items-center gap-2">
+                  <ClipboardListIcon className="w-6 h-6" />
+                  {t('tasks_list')}
+              </h3>
+
+              {/* Create Task Form */}
+              <div className="bg-white/30 p-4 rounded-xl mb-8 border border-white/40">
+                  <h4 className="font-semibold text-lg mb-4 text-slate-700">{t('assign_new_task')}</h4>
+                  <form onSubmit={handleCreateTask} className="flex flex-col md:flex-row gap-4 items-end">
+                      <div className="w-full md:w-1/3">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">{t('select_rep')}</label>
+                          <select 
+                              value={selectedRepForTask} 
+                              onChange={e => setSelectedRepForTask(e.target.value)}
+                              className="w-full p-2.5 rounded-lg border-slate-300 bg-white/50 focus:ring-blue-500"
+                              required
+                          >
+                              <option value="" disabled>{t('select_rep')}</option>
+                              {reps.map(rep => (
+                                  <option key={rep.id} value={rep.id}>{rep.name}</option>
+                              ))}
+                          </select>
+                      </div>
+                      <div className="w-full md:w-1/2">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">{t('task_description')}</label>
+                          <input 
+                              type="text" 
+                              value={newTaskDescription}
+                              onChange={e => setNewTaskDescription(e.target.value)}
+                              className="w-full p-2.5 rounded-lg border-slate-300 bg-white/50 focus:ring-blue-500"
+                              required
+                              placeholder={t('task_description')}
+                          />
+                      </div>
+                      <button 
+                          type="submit" 
+                          disabled={isCreatingTask}
+                          className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300"
+                      >
+                          {isCreatingTask ? t('creating') : t('create_task')}
+                      </button>
+                  </form>
+                  {taskCreationMessage && (
+                      <p className={`mt-3 text-sm font-medium ${taskCreationMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                          {taskCreationMessage.text}
+                      </p>
+                  )}
+              </div>
+
+              {/* Tasks List */}
+              <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-start">
+                      <thead className="text-xs text-blue-800 uppercase bg-white/50">
+                          <tr>
+                              <th className="px-6 py-3">{t('task_description')}</th>
+                              <th className="px-6 py-3">{t('rep_name')}</th>
+                              <th className="px-6 py-3">{t('status')}</th>
+                              <th className="px-6 py-3">{t('date')}</th>
+                              <th className="px-6 py-3">{t('actions')}</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/50">
+                          {allTasks.map(task => (
+                              <tr key={task.id} className="bg-white/20 hover:bg-white/40">
+                                  <td className="px-6 py-4 font-medium text-slate-800">{task.description}</td>
+                                  <td className="px-6 py-4">{task.repName}</td>
+                                  <td className="px-6 py-4">
+                                      {task.isCompleted ? (
+                                          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold flex items-center w-fit gap-1">
+                                              <CheckCircleIcon className="w-3 h-3" /> {t('completed')}
+                                          </span>
+                                      ) : (
+                                          <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold w-fit">
+                                              {t('pending')}
+                                          </span>
+                                      )}
+                                  </td>
+                                  <td className="px-6 py-4 text-slate-600">
+                                      {new Date(task.createdAt).toLocaleDateString()}
+                                      {task.completedAt && (
+                                          <div className="text-xs text-green-700 mt-1">
+                                              {t('task_completed_at', new Date(task.completedAt).toLocaleDateString())}
+                                          </div>
+                                      )}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      <button 
+                                          onClick={() => handleDeleteTask(task.id)}
+                                          className="text-red-600 hover:text-red-800"
+                                          title={t('delete_task')}
+                                      >
+                                          <TrashIcon className="w-5 h-5" />
+                                      </button>
+                                  </td>
+                              </tr>
+                          ))}
+                          {allTasks.length === 0 && (
+                              <tr>
+                                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                      {t('no_tasks')}
+                                  </td>
+                              </tr>
+                          )}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
       )}
 
       {activeTab === 'dataImport' && (

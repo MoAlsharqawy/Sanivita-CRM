@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole } from '../types';
+import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask } from '../types';
 
 // Helper to handle Supabase errors
 const handleSupabaseError = (error: any, context: string) => {
@@ -444,6 +444,102 @@ export const api = {
       };
     });
     return plansObject;
+  },
+
+  // --- TASK MANAGEMENT (NEW) ---
+
+  // Get pending tasks for a specific rep (Rep View)
+  getPendingTasksForRep: async (repId: string): Promise<RepTask[]> => {
+    const { data, error } = await supabase
+      .from('rep_tasks')
+      .select('*')
+      .eq('rep_id', repId)
+      .eq('is_completed', false)
+      .order('created_at', { ascending: false });
+
+    if (error) handleSupabaseError(error, 'getPendingTasksForRep');
+    return (data || []).map(task => ({
+        id: task.id,
+        repId: task.rep_id,
+        createdBy: task.created_by,
+        description: task.description,
+        isCompleted: task.is_completed,
+        createdAt: task.created_at,
+        completedAt: task.completed_at
+    }));
+  },
+
+  // Get all tasks (Manager View) - fetches pending and completed tasks
+  getAllTasks: async (): Promise<RepTask[]> => {
+    const { data, error } = await supabase
+      .from('rep_tasks')
+      .select('*, profiles!rep_id(name)');
+      
+    if (error) handleSupabaseError(error, 'getAllTasks');
+    
+    return (data || []).map((task: any) => ({
+        id: task.id,
+        repId: task.rep_id,
+        repName: task.profiles?.name || 'Unknown',
+        createdBy: task.created_by,
+        description: task.description,
+        isCompleted: task.is_completed,
+        createdAt: task.created_at,
+        completedAt: task.completed_at
+    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  createTask: async (repId: string, description: string): Promise<RepTask> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('rep_tasks')
+      .insert({
+        rep_id: repId,
+        created_by: user.id,
+        description: description,
+        is_completed: false
+      })
+      .select('*, profiles!rep_id(name)')
+      .single();
+
+    if (error) handleSupabaseError(error, 'createTask');
+    
+    // Explicitly cast to any to handle the joined profile data
+    const taskData = data as any;
+    
+    return {
+        id: taskData.id,
+        repId: taskData.rep_id,
+        repName: taskData.profiles?.name || 'Unknown',
+        createdBy: taskData.created_by,
+        description: taskData.description,
+        isCompleted: taskData.is_completed,
+        createdAt: taskData.created_at,
+        completedAt: taskData.completed_at
+    };
+  },
+
+  completeTask: async (taskId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('rep_tasks')
+      .update({
+        is_completed: true,
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', taskId);
+
+    if (error) handleSupabaseError(error, 'completeTask');
+  },
+
+  deleteTask: async (taskId: string): Promise<void> => {
+      const { error } = await supabase
+        .from('rep_tasks')
+        .delete()
+        .eq('id', taskId);
+      
+      if (error) handleSupabaseError(error, 'deleteTask');
   },
 
   // --- SYSTEM SETTINGS ---

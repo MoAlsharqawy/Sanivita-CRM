@@ -1,5 +1,6 @@
 
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -127,6 +128,25 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'فشل تحديث كلمة المرور',
     'error_reauthentication_needed': 'يجب تسجيل الدخول مجدداً لتغيير كلمة المرور',
     'error_unexpected': 'حدث خطأ غير متوقع',
+    // Tasks
+    'tasks_tab': 'المهام',
+    'assign_new_task': 'إسناد مهمة جديدة',
+    'task_description': 'وصف المهمة',
+    'select_rep': 'اختر المندوب',
+    'create_task': 'إنشاء المهمة',
+    'creating': 'جاري الإنشاء...',
+    'task_created_success': 'تم إنشاء المهمة بنجاح',
+    'tasks_list': 'قائمة المهام',
+    'status': 'الحالة',
+    'pending': 'قيد الانتظار',
+    'completed': 'مكتملة',
+    'pending_tasks_alert': 'لديك مهام معلقة! يرجى إنجازها.',
+    'mark_done': 'تم الإنجاز',
+    'you_have_pending_tasks': 'لديك مهام مطلوبة من الإدارة',
+    'task_completed_at': 'تم الإنجاز في: {0}',
+    'no_tasks': 'لا توجد مهام حالياً.',
+    'delete_task': 'حذف المهمة',
+    'task_deleted_success': 'تم حذف المهمة.',
     // Data Import
     'data_import': 'استيراد البيانات',
     'step_1_prepare_file': 'خطوة 1: تحضير الملف',
@@ -270,6 +290,25 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'Failed to update password',
     'error_reauthentication_needed': 'You must log in again to change password',
     'error_unexpected': 'An unexpected error occurred',
+    // Tasks
+    'tasks_tab': 'Tasks',
+    'assign_new_task': 'Assign New Task',
+    'task_description': 'Task Description',
+    'select_rep': 'Select Representative',
+    'create_task': 'Create Task',
+    'creating': 'Creating...',
+    'task_created_success': 'Task created successfully',
+    'tasks_list': 'Tasks List',
+    'status': 'Status',
+    'pending': 'Pending',
+    'completed': 'Completed',
+    'pending_tasks_alert': 'You have pending tasks!',
+    'mark_done': 'Mark as Done',
+    'you_have_pending_tasks': 'You have tasks assigned by management',
+    'task_completed_at': 'Completed at: {0}',
+    'no_tasks': 'No tasks currently.',
+    'delete_task': 'Delete Task',
+    'task_deleted_success': 'Task deleted.',
     // Data Import
     'data_import': 'Data Import',
     'step_1_prepare_file': 'Step 1: Prepare File',

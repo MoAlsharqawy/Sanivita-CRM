@@ -1,12 +1,14 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
-import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon } from './icons';
+import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan, RepTask } from '../types';
+import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -26,6 +28,7 @@ const RepDashboard: React.FC = () => {
   const [alerts, setAlerts] = useState<ClientAlert[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
+  const [pendingTasks, setPendingTasks] = useState<RepTask[]>([]); // New state for tasks
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [view, setView] = useState<'dashboard' | 'search' | 'weekly' | 'plan'>('dashboard');
@@ -73,7 +76,7 @@ const RepDashboard: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [doctorsData, pharmaciesData, productsData, visitsData, regionsData, overdueData, settingsData, planData] = await Promise.all([
+      const [doctorsData, pharmaciesData, productsData, visitsData, regionsData, overdueData, settingsData, planData, tasksData] = await Promise.all([
         api.getDoctorsForRep(user.id),
         api.getPharmaciesForRep(user.id),
         api.getProducts(),
@@ -81,7 +84,8 @@ const RepDashboard: React.FC = () => {
         api.getRegions(),
         api.getOverdueVisits(),
         api.getSystemSettings(),
-        api.getRepPlan(user.id)
+        api.getRepPlan(user.id),
+        api.getPendingTasksForRep(user.id)
       ]);
       setDoctors(doctorsData);
       setPharmacies(pharmaciesData);
@@ -91,6 +95,7 @@ const RepDashboard: React.FC = () => {
       setAlerts(overdueData.filter(a => a.repId === user.id));
       setSystemSettings(settingsData);
       setPlan(planData);
+      setPendingTasks(tasksData);
     } catch (error) {
       console.error("Failed to fetch data", error); // Keep general error logging
     } finally {
@@ -155,6 +160,16 @@ const RepDashboard: React.FC = () => {
 
       exportToExcel(filteredVisits, `visits_${user.username}_${exportStartDate}_to_${exportEndDate}`, t);
       setIsExportModalOpen(false);
+  };
+
+  const handleTaskComplete = async (taskId: string) => {
+      try {
+          await api.completeTask(taskId);
+          // Remove from local state immediately for responsiveness
+          setPendingTasks(prev => prev.filter(t => t.id !== taskId));
+      } catch (error) {
+          console.error("Failed to complete task", error);
+      }
   };
 
 
@@ -371,6 +386,35 @@ const RepDashboard: React.FC = () => {
 
   return (
     <div className="container mx-auto">
+       {/* Tasks Alert Section */}
+       {pendingTasks.length > 0 && (
+           <div className="mb-6 animate-fade-in bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl p-6 shadow-xl text-white border border-white/20">
+               <div className="flex items-start gap-3 mb-4">
+                   <div className="bg-white/20 p-2 rounded-full">
+                        <ClipboardCheckIcon className="w-8 h-8 text-white" />
+                   </div>
+                   <div>
+                       <h3 className="font-bold text-xl">{t('you_have_pending_tasks')}</h3>
+                       <p className="text-sm opacity-90">{t('pending_tasks_alert')}</p>
+                   </div>
+               </div>
+               <div className="space-y-3">
+                   {pendingTasks.map(task => (
+                       <div key={task.id} className="bg-white/10 rounded-lg p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                           <p className="font-medium text-lg">{task.description}</p>
+                           <button 
+                               onClick={() => handleTaskComplete(task.id)}
+                               className="bg-white text-rose-600 hover:bg-rose-50 font-bold py-1.5 px-4 rounded-full text-sm transition-colors flex items-center gap-2 shadow-sm"
+                           >
+                               <CheckCircleIcon className="w-5 h-5" />
+                               {t('mark_done')}
+                           </button>
+                       </div>
+                   ))}
+               </div>
+           </div>
+       )}
+
        {/* Planning Motivation Banner */}
       {isPlanningTime && (
         <div className="mb-6 animate-fade-in bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-4 shadow-xl text-white flex items-center justify-between border border-white/20">
