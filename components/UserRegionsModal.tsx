@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, Region } from '../types';
 import { api } from '../services/api';
@@ -23,7 +24,8 @@ const UserRegionsModal: React.FC<UserRegionsModalProps> = ({ isOpen, onClose, us
     if (isOpen) {
       setLoading(true);
       setMessage(null);
-      api.getRegionsForRep(user.id)
+      // Fetch only explicitly assigned regions (fallbackToAll = false)
+      api.getRegionsForRep(user.id, false)
         .then(regions => {
           setSelectedRegionIds(regions.map(r => r.id));
         })

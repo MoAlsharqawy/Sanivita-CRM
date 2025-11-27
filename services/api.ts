@@ -269,8 +269,10 @@ export const api = {
     return data || [];
   },
 
-  // Fetch assigned regions for a specific rep, with Fallback to ALL regions
-  getRegionsForRep: async (repId: string): Promise<Region[]> => {
+  // Fetch assigned regions for a specific rep
+  // fallbackToAll: If true, returns ALL regions if no specific regions are assigned (default behavior for Rep View)
+  //                If false, returns empty array if no regions assigned (behavior for Manager Edit View)
+  getRegionsForRep: async (repId: string, fallbackToAll: boolean = true): Promise<Region[]> => {
     // 1. Try to fetch specifically assigned regions
     const { data, error } = await supabase
       .from('user_regions')
@@ -285,9 +287,8 @@ export const api = {
     const assignedRegions = (data || []).map((item: any) => item.regions).filter((r: any) => r) as Region[];
 
     // 2. Fallback: If the user has NO specific regions assigned (empty list), 
-    // allow them to see ALL regions by default.
-    // This prevents the "empty dropdown" issue for new/unconfigured reps.
-    if (assignedRegions.length === 0) {
+    // allow them to see ALL regions by default IF fallbackToAll is true.
+    if (assignedRegions.length === 0 && fallbackToAll) {
         return await api.getRegions();
     }
 

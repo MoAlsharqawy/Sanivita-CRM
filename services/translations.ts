@@ -172,7 +172,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'saving_regions': 'جاري حفظ المناطق...',
     'manage_regions_for': 'إدارة المناطق لـ {0}',
     'select_regions_instruction': 'اختر المناطق التي يغطيها هذا المندوب:',
-    'no_regions_selected': 'لم يتم اختيار أي منطقة. لن يرى المندوب أي عملاء.',
+    'no_regions_selected': 'لم يتم اختيار أي منطقة. سيتمكن المندوب من رؤية جميع المناطق تلقائياً.',
   },
   en: {
     'hello': 'Hello, {0}',
@@ -343,6 +343,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'saving_regions': 'Saving regions...',
     'manage_regions_for': 'Manage Regions for {0}',
     'select_regions_instruction': 'Select regions covered by this representative:',
-    'no_regions_selected': 'No regions selected. The rep will not see any clients.',
+    'no_regions_selected': 'No regions selected. The rep will see ALL regions by default.',
   }
 };
