@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask } from '../types';
@@ -72,7 +71,8 @@ const ManagerDashboard: React.FC = () => {
   // Task Management State
   const [allTasks, setAllTasks] = useState<RepTask[]>([]);
   const [newTaskDescription, setNewTaskDescription] = useState('');
-  const [selectedRepForTask, setSelectedRepForTask] = useState<string>('');
+  const [selectedRepsForTask, setSelectedRepsForTask] = useState<string[]>([]);
+  const [isTaskRepDropdownOpen, setIsTaskRepDropdownOpen] = useState(false);
   const [taskCreationMessage, setTaskCreationMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
 
@@ -437,21 +437,41 @@ const ManagerDashboard: React.FC = () => {
 
   const handleCreateTask = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!newTaskDescription || !selectedRepForTask) return;
+      if (!newTaskDescription || selectedRepsForTask.length === 0) return;
 
       setIsCreatingTask(true);
       setTaskCreationMessage(null);
       try {
-          const newTask = await api.createTask(selectedRepForTask, newTaskDescription);
-          setAllTasks(prev => [newTask, ...prev]);
+          // Create task for EACH selected rep
+          const promises = selectedRepsForTask.map(repId => api.createTask(repId, newTaskDescription));
+          const newTasks = await Promise.all(promises);
+          
+          setAllTasks(prev => [...newTasks, ...prev]);
           setTaskCreationMessage({ text: t('task_created_success'), type: 'success' });
           setNewTaskDescription('');
+          setSelectedRepsForTask([]); // Reset selection
       } catch (error) {
           console.error("Failed to create task", error);
           setTaskCreationMessage({ text: t('error_unexpected'), type: 'error' });
       } finally {
           setIsCreatingTask(false);
           setTimeout(() => setTaskCreationMessage(null), 3000);
+      }
+  };
+
+  const toggleRepSelection = (repId: string) => {
+      setSelectedRepsForTask(prev => 
+          prev.includes(repId) 
+              ? prev.filter(id => id !== repId) 
+              : [...prev, repId]
+      );
+  };
+
+  const toggleSelectAll = () => {
+      if (selectedRepsForTask.length === reps.length) {
+          setSelectedRepsForTask([]); // Deselect all
+      } else {
+          setSelectedRepsForTask(reps.map(r => r.id)); // Select all
       }
   };
 
@@ -1386,19 +1406,50 @@ const ManagerDashboard: React.FC = () => {
               <div className="bg-white/30 p-4 rounded-xl mb-8 border border-white/40">
                   <h4 className="font-semibold text-lg mb-4 text-slate-700">{t('assign_new_task')}</h4>
                   <form onSubmit={handleCreateTask} className="flex flex-col md:flex-row gap-4 items-end">
-                      <div className="w-full md:w-1/3">
+                      <div className="w-full md:w-1/3 relative">
                           <label className="block text-sm font-medium text-slate-700 mb-1">{t('select_rep')}</label>
-                          <select 
-                              value={selectedRepForTask} 
-                              onChange={e => setSelectedRepForTask(e.target.value)}
-                              className="w-full p-2.5 rounded-lg border-slate-300 bg-white/50 focus:ring-blue-500"
-                              required
-                          >
-                              <option value="" disabled>{t('select_rep')}</option>
-                              {reps.map(rep => (
-                                  <option key={rep.id} value={rep.id}>{rep.name}</option>
-                              ))}
-                          </select>
+                          <div className="relative">
+                            <button 
+                                type="button"
+                                onClick={() => setIsTaskRepDropdownOpen(!isTaskRepDropdownOpen)}
+                                className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 text-start flex justify-between items-center focus:ring-blue-500"
+                            >
+                                <span className={selectedRepsForTask.length === 0 ? "text-slate-500" : "text-slate-800"}>
+                                    {selectedRepsForTask.length === 0 
+                                        ? t('select_reps_placeholder') 
+                                        : t('reps_selected', selectedRepsForTask.length)}
+                                </span>
+                                <ChevronDownIcon className="w-4 h-4 text-slate-500"/>
+                            </button>
+                            {isTaskRepDropdownOpen && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    <div className="p-2 border-b border-slate-100">
+                                        <label className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedRepsForTask.length === reps.length && reps.length > 0}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                            />
+                                            <span className="ms-2 font-semibold text-sm text-slate-800">{t('select_all')}</span>
+                                        </label>
+                                    </div>
+                                    <div className="p-2 space-y-1">
+                                        {reps.map(rep => (
+                                            <label key={rep.id} className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedRepsForTask.includes(rep.id)}
+                                                    onChange={() => toggleRepSelection(rep.id)}
+                                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                />
+                                                <span className="ms-2 text-sm text-slate-700">{rep.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                          </div>
                       </div>
                       <div className="w-full md:w-1/2">
                           <label className="block text-sm font-medium text-slate-700 mb-1">{t('task_description')}</label>
@@ -1406,7 +1457,7 @@ const ManagerDashboard: React.FC = () => {
                               type="text" 
                               value={newTaskDescription}
                               onChange={e => setNewTaskDescription(e.target.value)}
-                              className="w-full p-2.5 rounded-lg border-slate-300 bg-white/50 focus:ring-blue-500"
+                              className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 focus:ring-blue-500 focus:outline-none"
                               required
                               placeholder={t('task_description')}
                           />

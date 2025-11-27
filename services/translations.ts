@@ -1,6 +1,3 @@
-
-
-
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -135,7 +132,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'select_rep': 'اختر المندوب',
     'create_task': 'إنشاء المهمة',
     'creating': 'جاري الإنشاء...',
-    'task_created_success': 'تم إنشاء المهمة بنجاح',
+    'task_created_success': 'تم إنشاء المهام بنجاح',
     'tasks_list': 'قائمة المهام',
     'status': 'الحالة',
     'pending': 'قيد الانتظار',
@@ -147,6 +144,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'no_tasks': 'لا توجد مهام حالياً.',
     'delete_task': 'حذف المهمة',
     'task_deleted_success': 'تم حذف المهمة.',
+    'select_all': 'تحديد الكل',
+    'reps_selected': 'تم تحديد {0}',
+    'select_reps_placeholder': 'اختر المندوبين',
     // Data Import
     'data_import': 'استيراد البيانات',
     'step_1_prepare_file': 'خطوة 1: تحضير الملف',
@@ -297,7 +297,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'select_rep': 'Select Representative',
     'create_task': 'Create Task',
     'creating': 'Creating...',
-    'task_created_success': 'Task created successfully',
+    'task_created_success': 'Tasks created successfully',
     'tasks_list': 'Tasks List',
     'status': 'Status',
     'pending': 'Pending',
@@ -309,6 +309,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'no_tasks': 'No tasks currently.',
     'delete_task': 'Delete Task',
     'task_deleted_success': 'Task deleted.',
+    'select_all': 'Select All',
+    'reps_selected': '{0} Selected',
+    'select_reps_placeholder': 'Select Representatives',
     // Data Import
     'data_import': 'Data Import',
     'step_1_prepare_file': 'Step 1: Prepare File',
