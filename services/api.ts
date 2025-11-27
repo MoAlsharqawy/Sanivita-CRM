@@ -269,21 +269,29 @@ export const api = {
     return data || [];
   },
 
-  // Fetch only assigned regions for a specific rep
+  // Fetch assigned regions for a specific rep, with Fallback to ALL regions
   getRegionsForRep: async (repId: string): Promise<Region[]> => {
+    // 1. Try to fetch specifically assigned regions
     const { data, error } = await supabase
       .from('user_regions')
       .select('regions (id, name)')
       .eq('user_id', repId);
 
     if (error) {
-        // Fallback or error handling. If table doesn't exist, this will throw.
-        handleSupabaseError(error, 'getRegionsForRep');
+        // Log error but continue to fallback. 
+        console.warn('Error fetching user_regions, falling back to all regions:', error.message);
     }
     
-    // Supabase returns an array of objects like: [{ regions: { id: 1, name: 'North' } }, ...]
-    // We map this to a simple Region[] array
-    return (data || []).map((item: any) => item.regions).filter((r: any) => r) as Region[];
+    const assignedRegions = (data || []).map((item: any) => item.regions).filter((r: any) => r) as Region[];
+
+    // 2. Fallback: If the user has NO specific regions assigned (empty list), 
+    // allow them to see ALL regions by default.
+    // This prevents the "empty dropdown" issue for new/unconfigured reps.
+    if (assignedRegions.length === 0) {
+        return await api.getRegions();
+    }
+
+    return assignedRegions;
   },
 
   updateUserRegions: async (userId: string, regionIds: number[]): Promise<void> => {
@@ -347,10 +355,8 @@ export const api = {
   },
 
   getDoctorsForRep: async (repId: string): Promise<Doctor[]> => {
-    console.log(`API: Fetching doctors for repId: ${repId}`);
     const { data, error } = await supabase.from('doctors').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getDoctorsForRep');
-    console.log(`API: Raw doctors data from Supabase for repId ${repId}:`, data);
     return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
   },
 
@@ -361,11 +367,8 @@ export const api = {
   },
 
   getPharmaciesForRep: async (repId: string): Promise<Pharmacy[]> => {
-    console.log(`API: Fetching pharmacies for repId: ${repId}`);
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
-    console.log(`API: Raw pharmacies data from Supabase for repId ${repId}:`, data);
-    // Corrected type in map function (p.rep_id instead of d.rep_id)
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
   },
 
@@ -404,11 +407,8 @@ export const api = {
   getVisitReportsForRep: async (repId: string): Promise<VisitReport[]> => {
     const { data, error } = await supabase.rpc('get_visit_reports', { p_rep_id: repId });
     if (error) {
-      // Specific error handling for the 'UNION types' issue
       if (error.code === '42804' && error.message.includes('UNION types text and specialization cannot be matched')) {
         console.error("Critical SQL Function Error: 'get_visit_reports' RPC failed due to UNION type mismatch.");
-        console.error("This usually means the 'specialization' column in your 'doctors' table is an ENUM type in the database, and the 'get_visit_reports' function is trying to UNION it with a TEXT or NULL type for pharmacy visits without explicit casting.");
-        console.error("Solution: Edit your 'get_visit_reports' SQL function in Supabase. Ensure that the 'target_specialization' column for BOTH doctor and pharmacy visits is explicitly cast to 'TEXT' (e.g., `d.specialization::text` and `NULL::text`).");
         throw new Error("error_get_visit_reports_sql_config");
       }
       handleSupabaseError(error, 'getVisitReportsForRep');
@@ -419,11 +419,8 @@ export const api = {
   getAllVisitReports: async (): Promise<VisitReport[]> => {
     const { data, error } = await supabase.rpc('get_visit_reports');
     if (error) {
-      // Apply the same specific error handling for all reports as well.
       if (error.code === '42804' && error.message.includes('UNION types text and specialization cannot be matched')) {
         console.error("Critical SQL Function Error: 'get_visit_reports' RPC failed due to UNION type mismatch.");
-        console.error("This usually means the 'specialization' column in your 'doctors' table is an ENUM type in the database, and the 'get_visit_reports' function is trying to UNION it with a TEXT or NULL type for pharmacy visits without explicit casting.");
-        console.error("Solution: Edit your 'get_visit_reports' SQL function in Supabase. Ensure that the 'target_specialization' column for BOTH doctor and pharmacy visits is explicitly cast to 'TEXT' (e.g., `d.specialization::text` and `NULL::text`).");
         throw new Error("error_get_visit_reports_sql_config");
       }
       handleSupabaseError(error, 'getAllVisitReports');
@@ -462,7 +459,6 @@ export const api = {
   },
 
   revokePlanApproval: async (repId: string): Promise<WeeklyPlan> => {
-    // Setting status back to 'draft' allows the rep to edit and resubmit
     const { data, error } = await supabase.from('weekly_plans').update({ status: 'draft' }).eq('rep_id', repId).select('plan, status').single();
     if (error) handleSupabaseError(error, 'revokePlanApproval');
     return data as WeeklyPlan;
@@ -482,9 +478,8 @@ export const api = {
     return plansObject;
   },
 
-  // --- TASK MANAGEMENT (NEW) ---
+  // --- TASK MANAGEMENT ---
 
-  // Get pending tasks for a specific rep (Rep View)
   getPendingTasksForRep: async (repId: string): Promise<RepTask[]> => {
     const { data, error } = await supabase
       .from('rep_tasks')
@@ -505,7 +500,6 @@ export const api = {
     }));
   },
 
-  // Get all tasks (Manager View) - fetches pending and completed tasks
   getAllTasks: async (): Promise<RepTask[]> => {
     const { data, error } = await supabase
       .from('rep_tasks')
@@ -542,7 +536,6 @@ export const api = {
 
     if (error) handleSupabaseError(error, 'createTask');
     
-    // Explicitly cast to any to handle the joined profile data
     const taskData = data as any;
     
     return {
@@ -600,7 +593,6 @@ export const api = {
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
-    // NOTE: userMap now uses the 'username' field (which holds the email) for mapping.
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
     const doctorsToInsert: { name: string; region_id: number; rep_id: string; specialization: string }[] = [];
@@ -610,8 +602,8 @@ export const api = {
 
       const Name = row[0];
       const RegionName = row[1];
-      const Spec = row[2]; // Specialization from Excel
-      const repEmail = row[3]; // Expecting a full email address now
+      const Spec = row[2];
+      const repEmail = row[3];
       const rowIndex = index + 2;
 
       if (!Name || !RegionName || !Spec || !repEmail) {
@@ -634,13 +626,10 @@ export const api = {
         }
       }
 
-      // NOTE: repId is found using the provided repEmail (username) from the import file.
       const repId = userMap.get(String(repEmail).trim().toLowerCase());
 
       if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found. Ensure this email exists in the system.`); continue; }
 
-      // Specialization: Directly use the provided string from the Excel file
-      // Assuming the database column 'specialization' is of type 'text' or 'varchar'
       doctorsToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: String(Spec).trim() });
     }
 
@@ -672,7 +661,6 @@ export const api = {
     const result = { success: 0, failed: 0, errors: [] as string[] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
     const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
-    // NOTE: userMap now uses the 'username' field (which holds the the email) for mapping.
     const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
 
     const pharmaciesToInsert: { name: string; region_id: number; rep_id: string; specialization: Specialization.Pharmacy }[] = [];
@@ -682,7 +670,7 @@ export const api = {
 
       const Name = row[0];
       const RegionName = row[1];
-      const repEmail = row[2]; // Expecting a full email address now
+      const repEmail = row[2];
       const rowIndex = index + 2;
 
       if (!Name || !RegionName || !repEmail) {
@@ -704,7 +692,6 @@ export const api = {
         }
       }
 
-      // NOTE: repId is found using the provided repEmail (username) from the import file.
       const repId = userMap.get(String(repEmail).trim().toLowerCase());
 
       if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep with email "${repEmail}" not found. Ensure this email exists in the system.`); continue; }
