@@ -286,6 +286,25 @@ export const api = {
     return (data || []).map((item: any) => item.regions).filter((r: any) => r) as Region[];
   },
 
+  updateUserRegions: async (userId: string, regionIds: number[]): Promise<void> => {
+    // 1. Delete all existing regions for this user
+    const { error: deleteError } = await supabase
+      .from('user_regions')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (deleteError) handleSupabaseError(deleteError, 'updateUserRegions:delete');
+
+    // 2. Insert new selections
+    if (regionIds.length > 0) {
+      const { error: insertError } = await supabase
+        .from('user_regions')
+        .insert(regionIds.map(rId => ({ user_id: userId, region_id: rId })));
+
+      if (insertError) handleSupabaseError(insertError, 'updateUserRegions:insert');
+    }
+  },
+
   addRegion: async (regionName: string): Promise<Region> => {
     if (!regionName) {
       throw new Error("Region name cannot be empty.");

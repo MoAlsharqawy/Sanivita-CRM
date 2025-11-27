@@ -1,3 +1,4 @@
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -166,6 +167,12 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_details': 'تفاصيل الأخطاء',
     'file_processing_error': 'حدث خطأ أثناء معالجة الملف',
     'file_reading_error': 'حدث خطأ أثناء قراءة الملف',
+    // User Regions
+    'regions_updated_success': 'تم تحديث المناطق بنجاح',
+    'saving_regions': 'جاري حفظ المناطق...',
+    'manage_regions_for': 'إدارة المناطق لـ {0}',
+    'select_regions_instruction': 'اختر المناطق التي يغطيها هذا المندوب:',
+    'no_regions_selected': 'لم يتم اختيار أي منطقة. لن يرى المندوب أي عملاء.',
   },
   en: {
     'hello': 'Hello, {0}',
@@ -331,5 +338,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_details': 'Error Details',
     'file_processing_error': 'Error processing file',
     'file_reading_error': 'Error reading file',
+    // User Regions
+    'regions_updated_success': 'Regions updated successfully',
+    'saving_regions': 'Saving regions...',
+    'manage_regions_for': 'Manage Regions for {0}',
+    'select_regions_instruction': 'Select regions covered by this representative:',
+    'no_regions_selected': 'No regions selected. The rep will not see any clients.',
   }
 };
