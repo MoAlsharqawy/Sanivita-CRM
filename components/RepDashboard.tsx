@@ -3,6 +3,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -81,7 +82,7 @@ const RepDashboard: React.FC = () => {
         api.getPharmaciesForRep(user.id),
         api.getProducts(),
         api.getVisitReportsForRep(user.id),
-        api.getRegions(),
+        api.getRegionsForRep(user.id), // Changed to fetch only assigned regions
         api.getOverdueVisits(),
         api.getSystemSettings(),
         api.getRepPlan(user.id),

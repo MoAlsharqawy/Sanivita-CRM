@@ -269,6 +269,23 @@ export const api = {
     return data || [];
   },
 
+  // Fetch only assigned regions for a specific rep
+  getRegionsForRep: async (repId: string): Promise<Region[]> => {
+    const { data, error } = await supabase
+      .from('user_regions')
+      .select('regions (id, name)')
+      .eq('user_id', repId);
+
+    if (error) {
+        // Fallback or error handling. If table doesn't exist, this will throw.
+        handleSupabaseError(error, 'getRegionsForRep');
+    }
+    
+    // Supabase returns an array of objects like: [{ regions: { id: 1, name: 'North' } }, ...]
+    // We map this to a simple Region[] array
+    return (data || []).map((item: any) => item.regions).filter((r: any) => r) as Region[];
+  },
+
   addRegion: async (regionName: string): Promise<Region> => {
     if (!regionName) {
       throw new Error("Region name cannot be empty.");
