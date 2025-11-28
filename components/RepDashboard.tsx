@@ -752,7 +752,7 @@ const RepDashboard: React.FC = () => {
         <Modal 
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)}
-          title={t('new_visit_registration')}
+          title={t('New_visit_registration')}
         >
           <VisitForm 
               user={user} 
