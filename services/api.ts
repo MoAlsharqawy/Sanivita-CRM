@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask } from '../types';
 

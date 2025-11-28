@@ -11,7 +11,8 @@ import Spinner from './Spinner';
 import UserEditModal from './UserEditModal';
 import AnalyticsCharts from './AnalyticsCharts';
 import DailyVisitsDetailModal from './DailyVisitsDetailModal';
-import OverdueClientsDetailModal from './OverdueClientsDetailModal'; // New import
+import OverdueClientsDetailModal from './OverdueClientsDetailModal';
+import UserRegionsModal from './UserRegionsModal';
 
 // Helper functions for dates (YYYY-MM-DD format)
 const toYYYYMMDD = (date: Date): string => {
@@ -98,18 +99,24 @@ const ManagerDashboard: React.FC = () => {
   const [selectedRepsForExport, setSelectedRepsForExport] = useState<string[]>([]);
   const [selectedRepForDailyVisits, setSelectedRepForDailyVisits] = useState<string | 'all'>('all');
   const [isDailyVisitsDetailModalOpen, setIsDailyVisitsDetailModalOpen] = useState(false);
-  const [isOverdueClientsDetailModalOpen, setIsOverdueClientsDetailModalOpen] = useState(false); // New state for overdue clients detail modal
+  const [isOverdueClientsDetailModalOpen, setIsOverdueClientsDetailModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewingRepClients, setViewingRepClients] = useState<User | null>(null);
-  // New state for reset visits functionality
+  
+  // Reset visits functionality
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [repToReset, setRepToReset] = useState<User | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  
   // State for the new expandable List card
   const [isListCardExpanded, setIsListCardExpanded] = useState(false);
+
+  // New state for User Regions Modal
+  const [isUserRegionsModalOpen, setIsUserRegionsModalOpen] = useState(false);
+  const [userForRegions, setUserForRegions] = useState<User | null>(null);
 
 
   // Settings tab local state
@@ -117,17 +124,14 @@ const ManagerDashboard: React.FC = () => {
   const [localHolidays, setLocalHolidays] = useState<string[]>([]);
   const [newHoliday, setNewHoliday] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
-  const [isSavingSettings, setIsSavingSettings] = useState(false); // New state for settings button
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Filter states
   const [selectedRep, setSelectedRep] = useState<string>('all');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  // Changed default to 'today'
   const [selectedQuickFilter, setSelectedQuickFilter] = useState<'none' | 'today' | 'currentWeek' | 'currentMonth'>('today');
-  
-  // New state to control expanded view of reports
   const [isReportExpanded, setIsReportExpanded] = useState(false);
 
 
@@ -138,7 +142,7 @@ const ManagerDashboard: React.FC = () => {
         api.getAllVisitReports(),
         api.getUsers(),
         api.getRegions(),
-        api.getAllDoctors(), // Fetch all doctors
+        api.getAllDoctors(),
         api.getAllPharmacies(),
         api.getOverdueVisits(),
         api.getSystemSettings(),
@@ -159,7 +163,7 @@ const ManagerDashboard: React.FC = () => {
         setLocalHolidays(settingsData.holidays.sort((a,b) => new Date(a).getTime() - new Date(b).getTime()));
       }
       setAllPlans(plansData);
-      setAllDoctorsMap(new Map(doctorsData.map(doc => [doc.id, doc]))); // Create doctor map
+      setAllDoctorsMap(new Map(doctorsData.map(doc => [doc.id, doc])));
       setAllTasks(tasksData);
     } catch (error) {
       console.error("Failed to fetch initial data", error);
@@ -169,23 +173,18 @@ const ManagerDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Fetch data on initial component mount
     fetchInitialData();
   }, [fetchInitialData]);
 
   useEffect(() => {
-    // Refetch data whenever the active tab changes to ensure fresh data
-    // This is especially important for tabs where data might have been modified
-    // in another tab (e.g., users after data import).
     fetchInitialData();
-  }, [activeTab, fetchInitialData]); // Add activeTab as a dependency
+  }, [activeTab, fetchInitialData]);
 
   useMemo(() => {
     let reports = allReports;
     let currentStartDate = startDate;
     let currentEndDate = endDate;
 
-    // Apply quick filters if selected, overriding manual inputs
     if (selectedQuickFilter === 'today') {
       const today = getTodayDateString();
       currentStartDate = today;
@@ -210,14 +209,12 @@ const ManagerDashboard: React.FC = () => {
       reports = reports.filter(r => new Date(r.date) >= new Date(currentStartDate));
     }
     if (currentEndDate) {
-      // Add one day to endDate to include visits on the selected end date
       const endOfDay = new Date(currentEndDate);
       endOfDay.setDate(endOfDay.getDate() + 1);
       reports = reports.filter(r => new Date(r.date) < endOfDay);
     }
     setFilteredReports(reports);
     
-    // Filter alerts
     let alerts = overdueAlerts;
     if (selectedRep !== 'all') {
       alerts = alerts.filter(a => a.repName === selectedRep);
@@ -1321,16 +1318,26 @@ const ManagerDashboard: React.FC = () => {
                                   <td className="px-6 py-4">{t(rep.role)}</td>
                                   <td className="px-6 py-4">
                                       <div className="flex items-center gap-4">
+                                          {/* Manage Regions Button */}
+                                          <button 
+                                            onClick={() => { setUserForRegions(rep); setIsUserRegionsModalOpen(true); }}
+                                            className="text-purple-600 hover:text-purple-800" 
+                                            aria-label={t('manage_regions')}
+                                            title={t('manage_regions')}
+                                          >
+                                              <MapPinIcon className="w-5 h-5"/>
+                                          </button>
+
                                           <button onClick={() => handleEditUserClick(rep)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}>
                                               <EditIcon className="w-5 h-5"/>
                                           </button>
-                                          {user?.role === UserRole.Manager && ( // Only Manager can delete and reset
+                                          {user?.role === UserRole.Manager && ( 
                                             <>
                                               <button onClick={() => setDeletingUser(rep)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}>
                                                   <TrashIcon className="w-5 h-5"/>
                                               </button>
                                               <button onClick={() => handleResetClick(rep)} className="text-orange-600 hover:text-orange-800" aria-label={t('reset_rep_visits')}>
-                                                  <ReplyIcon className="w-5 h-5"/> {/* Using ReplyIcon for reset, as it indicates a fresh start */}
+                                                  <ReplyIcon className="w-5 h-5"/> 
                                               </button>
                                             </>
                                           )}
@@ -1881,6 +1888,16 @@ const ManagerDashboard: React.FC = () => {
                     </div>
                 </div>
             </Modal>
+        )}
+
+        {/* NEW: User Regions Management Modal */}
+        {userForRegions && (
+            <UserRegionsModal
+                isOpen={isUserRegionsModalOpen}
+                onClose={() => setIsUserRegionsModalOpen(false)}
+                user={userForRegions}
+                allRegions={regions}
+            />
         )}
     </div>
   );
