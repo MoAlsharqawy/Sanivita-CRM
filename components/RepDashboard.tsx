@@ -23,7 +23,7 @@ const RepDashboard: React.FC = () => {
   const [alerts, setAlerts] = useState<ClientAlert[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
-  const [pendingTasks, setPendingTasks] = useState<RepTask[]>([]); // New state for tasks
+  const [pendingTasks, setPendingTasks] = useState<RepTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [view, setView] = useState<'dashboard' | 'search' | 'weekly' | 'plan'>('dashboard');
@@ -38,31 +38,19 @@ const RepDashboard: React.FC = () => {
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
 
-  // State for drag and drop visual feedback
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const draggedItemIndex = useRef<number | null>(null);
-  const dragOverItemIndex = useRef<number | null>(null);
-
   // Calculate Planning Time Logic
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 (Sun) to 6 (Sat)
-  // Planning time is Thursday (4) and Friday (5)
-  const isPlanningTime = dayOfWeek === 4 || dayOfWeek === 5;
+  const isPlanningTime = dayOfWeek === 4 || dayOfWeek === 5; // Thursday (4) or Friday (5)
 
-  // Calculate the start date of the plan week
-  // If it's planning time, we plan for the NEXT week (starting next Saturday).
-  // Otherwise, we are viewing the CURRENT week (started last Saturday).
   const planStartDate = useMemo(() => {
       const d = new Date();
       const currentDay = d.getDay();
       
       if (isPlanningTime) {
-          // If Thu(4), next Sat is +2. If Fri(5), next Sat is +1.
           const daysUntilNextSaturday = (6 - currentDay + 7) % 7;
           d.setDate(d.getDate() + (daysUntilNextSaturday === 0 ? 7 : daysUntilNextSaturday));
       } else {
-          // Current week started on the most recent Saturday (or today if Sat)
-          // Sat(6)->0, Sun(0)->1 ... Wed(3)->4
           const daysSinceSaturday = (currentDay + 1) % 7;
           d.setDate(d.getDate() - daysSinceSaturday);
       }
@@ -79,7 +67,7 @@ const RepDashboard: React.FC = () => {
         api.getPharmaciesForRep(user.id),
         api.getProducts(),
         api.getVisitReportsForRep(user.id),
-        api.getRegionsForRep(user.id), // Changed to fetch only assigned regions
+        api.getRegionsForRep(user.id),
         api.getOverdueVisits(),
         api.getSystemSettings(),
         api.getRepPlan(user.id),
@@ -90,12 +78,13 @@ const RepDashboard: React.FC = () => {
       setProducts(productsData);
       setRecentVisits(visitsData);
       setRegions(regionsData);
+      // Filter overdue alerts for this specific rep
       setAlerts(overdueData.filter(a => a.repId === user.id));
       setSystemSettings(settingsData);
       setPlan(planData);
       setPendingTasks(tasksData);
     } catch (error) {
-      console.error("Failed to fetch data", error); // Keep general error logging
+      console.error("Failed to fetch data", error);
     } finally {
       setLoading(false);
     }
@@ -115,7 +104,7 @@ const RepDashboard: React.FC = () => {
   
   const handleFormSuccess = () => {
     setIsModalOpen(false);
-    fetchData(); // Refresh all data to show the new visit in history
+    fetchData(); 
   }
 
   const handleExportClients = () => {
@@ -135,7 +124,6 @@ const RepDashboard: React.FC = () => {
   };
 
   const handleExportVisitsClick = () => {
-      // Set default dates (e.g., current month)
       const today = new Date();
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
       setExportStartDate(firstDay.toISOString().split('T')[0]);
@@ -148,7 +136,6 @@ const RepDashboard: React.FC = () => {
       
       const start = new Date(exportStartDate);
       const end = new Date(exportEndDate);
-      // Add one day to end date to include the selected day (since time is 00:00:00)
       end.setDate(end.getDate() + 1);
 
       const filteredVisits = recentVisits.filter(v => {
@@ -163,44 +150,12 @@ const RepDashboard: React.FC = () => {
   const handleTaskComplete = async (taskId: string) => {
       try {
           await api.completeTask(taskId);
-          // Remove from local state immediately for responsiveness
           setPendingTasks(prev => prev.filter(t => t.id !== taskId));
       } catch (error) {
           console.error("Failed to complete task", error);
       }
   };
-
-
-  // Drag and Drop Handlers
-  const handleDragStart = (index: number) => {
-    draggedItemIndex.current = index;
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnter = (index: number) => {
-    if (draggedItemIndex.current !== null && draggedItemIndex.current !== index) {
-      dragOverItemIndex.current = index;
-    }
-  };
-
-  const handleDrop = () => {
-    // Re-ordering logic is purely visual here since we are filtering the view.
-    // If re-ordering is required for "Today/Yesterday" view, we need a separate state for it.
-    // For now, disabling reorder on the filtered list to avoid confusion or complex state sync.
-    return; 
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    draggedItemIndex.current = null;
-    dragOverItemIndex.current = null;
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
   
-  // Filtered list for display (Today and Yesterday only)
   const displayVisits = useMemo(() => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -222,13 +177,13 @@ const RepDashboard: React.FC = () => {
     
     let doctorVisits = 0;
     let pharmacyVisits = 0;
-    const workingDays = new Set<string>(); // Stores 'YYYY-MM-DD' for days with visits
+    const workingDays = new Set<string>();
 
     recentVisits.forEach(visit => {
         const visitDate = new Date(visit.date);
         if (visitDate >= startOfMonth && visitDate <= today) {
             const dateStr = visitDate.toISOString().split('T')[0];
-            workingDays.add(dateStr); // Add day to working days set
+            workingDays.add(dateStr);
             if (visit.type === 'DOCTOR_VISIT') {
                 doctorVisits++;
             } else if (visit.type === 'PHARMACY_VISIT') {
@@ -310,7 +265,6 @@ const RepDashboard: React.FC = () => {
     
     recentVisits.forEach(visit => {
         const visitDate = new Date(visit.date);
-        // Filter for current month and Doctor visits only
         if (visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT') {
             const key = visit.targetName;
             visitCounts[key] = (visitCounts[key] || 0) + 1;
@@ -381,7 +335,7 @@ const RepDashboard: React.FC = () => {
   }
   
   const totalDailyCount = dailyCounts.doctorVisits + dailyCounts.pharmacyVisits;
-  const dailyTarget = 12; // An arbitrary target for visual effect
+  const dailyTarget = 12;
   const dailyProgress = Math.min((totalDailyCount / dailyTarget) * 100, 100);
 
   return (
@@ -414,6 +368,68 @@ const RepDashboard: React.FC = () => {
                </div>
            </div>
        )}
+
+       {/* Overdue Alerts Section - Prominently Displayed */}
+       {alerts.length > 0 && (
+        <div className="mb-8 animate-fade-in-up">
+          <div className="bg-red-100/80 border-t-4 border-red-600 rounded-lg text-red-900 shadow-md backdrop-blur-lg overflow-hidden">
+            <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-start">
+                <div className="py-1 bg-white/50 p-2 rounded-full me-4">
+                    <WarningIcon className="h-6 w-6 text-red-600 flex-shrink-0"/>
+                </div>
+                <div>
+                  <p className="font-bold text-lg">{t('overdue_visits_alert', alerts.length)}</p>
+                  <p className="text-sm text-red-800 opacity-90">{t('overdue_visits_description')}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsAlertsExpanded(!isAlertsExpanded)}
+                className="flex items-center gap-1 text-sm font-bold text-red-700 hover:text-red-900 bg-white/70 px-4 py-2 rounded-lg border border-red-200 hover:bg-white transition-all whitespace-nowrap self-end sm:self-auto shadow-sm"
+              >
+                {isAlertsExpanded ? (
+                    <>
+                        {t('less_details')}
+                        <ChevronUpIcon className="w-4 h-4" />
+                    </>
+                ) : (
+                    <>
+                        {t('view_details')}
+                        <ChevronDownIcon className="w-4 h-4" />
+                    </>
+                )}
+              </button>
+            </div>
+            
+            {/* Expandable Content */}
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isAlertsExpanded ? 'max-h-[500px] opacity-100 border-t border-red-200' : 'max-h-0 opacity-0'}`}>
+                <div className="p-4 bg-white/40">
+                    <ul className="space-y-2 max-h-60 overflow-y-auto pe-2">
+                        {alerts.map(alert => (
+                            <li key={alert.id} className="flex justify-between items-center p-3 bg-white/80 rounded-lg shadow-sm hover:bg-white transition-colors">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        {alert.type === 'doctor' ? <DoctorIcon className="w-4 h-4 text-blue-600"/> : <PharmacyIcon className="w-4 h-4 text-orange-600"/>}
+                                        <span className="font-semibold text-slate-800">{alert.name}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 mt-0.5 ms-6">
+                                        {regionMap.get(parseInt(alert.regionName, 10)) || alert.regionName}
+                                    </p>
+                                </div>
+                                <span className="text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full border border-red-200">
+                                    {alert.daysSinceLastVisit === null 
+                                        ? t('never_visited')
+                                        : t('days_ago', alert.daysSinceLastVisit)
+                                    }
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
 
        {/* Planning Motivation Banner */}
       {isPlanningTime && (
@@ -595,67 +611,7 @@ const RepDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Alerts Section (Expandable) */}
-      {alerts.length > 0 && (
-        <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-          <div className="bg-red-100/60 border-t-4 border-red-500 rounded-lg text-red-900 shadow-md backdrop-blur-lg overflow-hidden">
-            <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-start">
-                <div className="py-1"><WarningIcon className="h-6 w-6 text-red-500 me-4 flex-shrink-0"/></div>
-                <div>
-                  <p className="font-bold text-lg">{t('overdue_visits_alert', alerts.length)}</p>
-                  <p className="text-sm text-red-800 opacity-80">{t('overdue_visits_description')}</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsAlertsExpanded(!isAlertsExpanded)}
-                className="flex items-center gap-1 text-sm font-bold text-red-700 hover:text-red-900 bg-white/50 px-4 py-2 rounded-lg border border-red-200 hover:bg-white transition-all whitespace-nowrap self-end sm:self-auto"
-              >
-                {isAlertsExpanded ? (
-                    <>
-                        {t('less_details')}
-                        <ChevronUpIcon className="w-4 h-4" />
-                    </>
-                ) : (
-                    <>
-                        {t('view_details')}
-                        <ChevronDownIcon className="w-4 h-4" />
-                    </>
-                )}
-              </button>
-            </div>
-            
-            {/* Expandable Content */}
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isAlertsExpanded ? 'max-h-[500px] opacity-100 border-t border-red-200' : 'max-h-0 opacity-0'}`}>
-                <div className="p-4 bg-white/40">
-                    <ul className="space-y-2 max-h-60 overflow-y-auto pe-2">
-                        {alerts.map(alert => (
-                            <li key={alert.id} className="flex justify-between items-center p-3 bg-white/60 rounded-lg shadow-sm">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        {alert.type === 'doctor' ? <DoctorIcon className="w-4 h-4 text-blue-500"/> : <PharmacyIcon className="w-4 h-4 text-orange-500"/>}
-                                        <span className="font-semibold text-slate-800">{alert.name}</span>
-                                    </div>
-                                    <p className="text-xs text-slate-500 mt-0.5 ms-6">
-                                        {regionMap.get(parseInt(alert.regionName, 10)) || alert.regionName}
-                                    </p>
-                                </div>
-                                <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">
-                                    {alert.daysSinceLastVisit === null 
-                                        ? t('never_visited')
-                                        : t('days_ago', alert.daysSinceLastVisit)
-                                    }
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Client Lists Toggle & Summary Section - REPLACED */}
+      {/* Client Lists Toggle & Summary Section */}
       <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
         {/* Doctors Stats Card */}
         <div className="bg-white/40 backdrop-blur-lg px-5 py-2 rounded-lg shadow-lg border border-white/50 flex items-center gap-6 animate-fade-in-up">

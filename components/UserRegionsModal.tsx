@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, Region } from '../types';
 import { api } from '../services/api';
