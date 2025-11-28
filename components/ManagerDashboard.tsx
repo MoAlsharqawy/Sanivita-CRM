@@ -393,26 +393,21 @@ const ManagerDashboard: React.FC = () => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    // 1. Initialize stats for all reps to ensure everyone appears in the list even with 0 visits
     const statsMap: Record<string, { f1: number, f2: number, f3: number }> = {};
     reps.forEach(r => {
         statsMap[r.name] = { f1: 0, f2: 0, f3: 0 };
     });
 
-    // 2. Count visits per Doctor per Rep for the current month
-    // Key format: "RepName_DoctorName" -> Value: Count
     const visitCounts = new Map<string, number>();
 
     allReports.forEach(visit => {
         const visitDate = new Date(visit.date);
-        // Filter: Current Month AND Doctor Visits Only
         if (visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT') {
             const key = `${visit.repName}_${visit.targetName}`;
             visitCounts.set(key, (visitCounts.get(key) || 0) + 1);
         }
     });
 
-    // 3. Distribute counts into buckets (Freq 1, 2, 3+) per Rep
     visitCounts.forEach((count, key) => {
         const repName = key.split('_')[0];
         if (statsMap[repName]) {
@@ -422,7 +417,6 @@ const ManagerDashboard: React.FC = () => {
         }
     });
 
-    // 4. Convert to array for rendering
     let result = Object.entries(statsMap).map(([name, counts]) => ({ name, ...counts }));
     
     if (selectedRep !== 'all') {
@@ -439,14 +433,13 @@ const ManagerDashboard: React.FC = () => {
       setIsCreatingTask(true);
       setTaskCreationMessage(null);
       try {
-          // Create task for EACH selected rep
           const promises = selectedRepsForTask.map(repId => api.createTask(repId, newTaskDescription));
           const newTasks = await Promise.all(promises);
           
           setAllTasks(prev => [...newTasks, ...prev]);
           setTaskCreationMessage({ text: t('task_created_success'), type: 'success' });
           setNewTaskDescription('');
-          setSelectedRepsForTask([]); // Reset selection
+          setSelectedRepsForTask([]);
       } catch (error) {
           console.error("Failed to create task", error);
           setTaskCreationMessage({ text: t('error_unexpected'), type: 'error' });
@@ -466,9 +459,9 @@ const ManagerDashboard: React.FC = () => {
 
   const toggleSelectAll = () => {
       if (selectedRepsForTask.length === reps.length) {
-          setSelectedRepsForTask([]); // Deselect all
+          setSelectedRepsForTask([]);
       } else {
-          setSelectedRepsForTask(reps.map(r => r.id)); // Select all
+          setSelectedRepsForTask(reps.map(r => r.id));
       }
   };
 
@@ -485,7 +478,6 @@ const ManagerDashboard: React.FC = () => {
   const handleReviewPlan = async (repId: string, status: 'approved' | 'rejected') => {
       try {
           await api.reviewRepPlan(repId, status);
-           // Optimistic update
           setAllPlans(prevPlans => ({
               ...prevPlans,
               [repId]: { ...prevPlans[repId], status: status }
@@ -506,13 +498,12 @@ const ManagerDashboard: React.FC = () => {
   const handleRevokeApproval = async (repId: string) => {
       if (!user || user.role !== UserRole.Manager) {
           console.warn("Only managers can revoke plan approval.");
-          setReviewMessage({ text: t('error_permission_denied'), type: 'error' }); // Reusing permission denied translation
+          setReviewMessage({ text: t('error_permission_denied'), type: 'error' });
           setTimeout(() => setReviewMessage(null), 3000);
           return;
       }
       try {
           await api.revokePlanApproval(repId);
-           // Optimistic update
           setAllPlans(prevPlans => ({
               ...prevPlans,
               [repId]: { ...prevPlans[repId], status: 'draft' }
@@ -529,7 +520,6 @@ const ManagerDashboard: React.FC = () => {
       }
   };
 
-  // NEW: Handle reset visits click
   const handleResetClick = (rep: User) => {
       if (user?.role !== UserRole.Manager) {
           setReviewMessage({ text: t('error_permission_denied'), type: 'error' });
@@ -540,7 +530,6 @@ const ManagerDashboard: React.FC = () => {
       setIsResetModalOpen(true);
   };
 
-  // NEW: Handle confirmation of reset visits
   const handleConfirmReset = async () => {
       if (!repToReset) return;
 
@@ -548,7 +537,6 @@ const ManagerDashboard: React.FC = () => {
       try {
           await api.resetRepData(repToReset.id);
           setReviewMessage({ text: t('reset_success', repToReset.name), type: 'success' });
-          // Re-fetch all data to reflect the changes
           await fetchInitialData();
       } catch (error: any) {
           console.error("Failed to reset rep data:", error);
@@ -570,8 +558,6 @@ const ManagerDashboard: React.FC = () => {
     setSelectedRegion('all');
     setStartDate('');
     setEndDate('');
-    // If resetting in expanded mode, we might want to stay expanded or reset to today.
-    // Let's reset to Today default.
     setSelectedQuickFilter('today');
     setIsReportExpanded(false);
   }
@@ -598,12 +584,9 @@ const ManagerDashboard: React.FC = () => {
       setIsReportExpanded(newExpandedState);
       
       if (newExpandedState) {
-          // Expanding: Switch to Current Week for better context
           handleQuickFilterClick('currentWeek');
       } else {
-          // Collapsing: Switch back to Today Only
           handleQuickFilterClick('today');
-          // Reset other filters to avoid hidden state affecting the view
           setSelectedRep('all');
           setSelectedRegion('all');
       }
@@ -611,12 +594,12 @@ const ManagerDashboard: React.FC = () => {
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setStartDate(e.target.value);
-    setSelectedQuickFilter('none'); // Clear quick filter if manual date is set
+    setSelectedQuickFilter('none');
   };
 
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEndDate(e.target.value);
-    setSelectedQuickFilter('none'); // Clear quick filter if manual date is set
+    setSelectedQuickFilter('none');
   };
 
   const handleExportUsers = () => {
@@ -676,34 +659,26 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const handleSaveSettings = async () => {
-      console.log('handleSaveSettings triggered');
-      setIsSavingSettings(true); // Start saving
-      console.log('isSavingSettings set to true');
-
-      setSettingsMessage(''); // Clear previous messages
+      setIsSavingSettings(true);
+      setSettingsMessage(''); 
 
       if (!systemSettings) {
-          console.error('System settings are null when trying to save.');
-          setSettingsMessage(t('settings_saved_error')); // Provide specific error feedback
-          setIsSavingSettings(false); // Ensure button is re-enabled
+          setSettingsMessage(t('settings_saved_error'));
+          setIsSavingSettings(false);
           return;
       }
       const newSettings = { weekends: localWeekends, holidays: localHolidays };
       try {
-          console.log('Attempting to update system settings with:', newSettings);
           await api.updateSystemSettings(newSettings);
-          setSystemSettings(newSettings); // Update local state with potentially new settings from DB
+          setSystemSettings(newSettings);
           setSettingsMessage(t('settings_saved_success'));
-          console.log('Settings saved successfully.');
           setTimeout(() => setSettingsMessage(''), 3000);
       } catch (error: any) {
           console.error("Failed to save settings:", error);
-          // Ensure the error message from API is displayed if available, otherwise generic.
           setSettingsMessage(error.message ? t(error.message) : t('settings_saved_error'));
-          setTimeout(() => setSettingsMessage(''), 5000); // Give user more time to read error
+          setTimeout(() => setSettingsMessage(''), 5000);
       } finally {
-          setIsSavingSettings(false); // End saving
-          console.log('isSavingSettings set to false (finally block)');
+          setIsSavingSettings(false);
       }
   };
 
@@ -720,7 +695,7 @@ const ManagerDashboard: React.FC = () => {
   const handleUserModalSuccess = () => {
     setIsUserModalOpen(false);
     setEditingUser(null);
-    fetchInitialData(); // Refetch all data including users after successful user add/edit
+    fetchInitialData();
   };
 
   const handleConfirmDelete = async () => {
@@ -729,7 +704,7 @@ const ManagerDashboard: React.FC = () => {
     try {
       await api.deleteUser(deletingUser.id);
       setDeletingUser(null);
-      fetchInitialData(); // Refetch all data including users after successful user deletion
+      fetchInitialData();
     } catch (error) {
       console.error("Failed to delete user", error);
     } finally {
