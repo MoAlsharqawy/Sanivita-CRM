@@ -1,15 +1,9 @@
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
 import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan, RepTask } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon } from './icons';
+import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -35,6 +29,9 @@ const RepDashboard: React.FC = () => {
   const [view, setView] = useState<'dashboard' | 'search' | 'weekly' | 'plan'>('dashboard');
   const [showClientLists, setShowClientLists] = useState(false);
   const [initialRegionForVisit, setInitialRegionForVisit] = useState<number | null>(null);
+
+  // Overdue Alerts View State
+  const [isAlertsExpanded, setIsAlertsExpanded] = useState(false);
 
   // Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -344,6 +341,8 @@ const RepDashboard: React.FC = () => {
       return counts;
   }, [doctors]);
 
+  const regionMap = useMemo(() => new Map(regions.map(r => [r.id, r.name])), [regions]);
+
   if (loading) {
     return <Spinner />;
   }
@@ -596,26 +595,61 @@ const RepDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Alerts Section */}
+      {/* Alerts Section (Expandable) */}
       {alerts.length > 0 && (
         <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-          <div className="bg-red-100/60 border-t-4 border-red-500 rounded-b text-red-900 px-4 py-3 shadow-md backdrop-blur-lg" role="alert">
-            <div className="flex items-start">
-              <div className="py-1"><WarningIcon className="h-6 w-6 text-red-500 me-4 flex-shrink-0"/></div>
-              <div>
-                <p className="font-bold text-lg">{t('overdue_visits_alert', alerts.length)}</p>
-                <ul className="mt-2 list-disc list-inside space-y-1 text-sm">
-                    {alerts.map(alert => (
-                        <li key={alert.id}>
-                            <span className="font-semibold">{alert.name}</span>
-                            {alert.daysSinceLastVisit === null 
-                                ? ` ${t('not_visited_before')}`
-                                : ` ${t('not_visited_since', alert.daysSinceLastVisit)}`
-                            }
-                        </li>
-                    ))}
-                </ul>
+          <div className="bg-red-100/60 border-t-4 border-red-500 rounded-lg text-red-900 shadow-md backdrop-blur-lg overflow-hidden">
+            <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-start">
+                <div className="py-1"><WarningIcon className="h-6 w-6 text-red-500 me-4 flex-shrink-0"/></div>
+                <div>
+                  <p className="font-bold text-lg">{t('overdue_visits_alert', alerts.length)}</p>
+                  <p className="text-sm text-red-800 opacity-80">{t('overdue_visits_description')}</p>
+                </div>
               </div>
+              <button 
+                onClick={() => setIsAlertsExpanded(!isAlertsExpanded)}
+                className="flex items-center gap-1 text-sm font-bold text-red-700 hover:text-red-900 bg-white/50 px-4 py-2 rounded-lg border border-red-200 hover:bg-white transition-all whitespace-nowrap self-end sm:self-auto"
+              >
+                {isAlertsExpanded ? (
+                    <>
+                        {t('less_details')}
+                        <ChevronUpIcon className="w-4 h-4" />
+                    </>
+                ) : (
+                    <>
+                        {t('view_details')}
+                        <ChevronDownIcon className="w-4 h-4" />
+                    </>
+                )}
+              </button>
+            </div>
+            
+            {/* Expandable Content */}
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isAlertsExpanded ? 'max-h-[500px] opacity-100 border-t border-red-200' : 'max-h-0 opacity-0'}`}>
+                <div className="p-4 bg-white/40">
+                    <ul className="space-y-2 max-h-60 overflow-y-auto pe-2">
+                        {alerts.map(alert => (
+                            <li key={alert.id} className="flex justify-between items-center p-3 bg-white/60 rounded-lg shadow-sm">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        {alert.type === 'doctor' ? <DoctorIcon className="w-4 h-4 text-blue-500"/> : <PharmacyIcon className="w-4 h-4 text-orange-500"/>}
+                                        <span className="font-semibold text-slate-800">{alert.name}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-0.5 ms-6">
+                                        {regionMap.get(parseInt(alert.regionName, 10)) || alert.regionName}
+                                    </p>
+                                </div>
+                                <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                                    {alert.daysSinceLastVisit === null 
+                                        ? t('never_visited')
+                                        : t('days_ago', alert.daysSinceLastVisit)
+                                    }
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             </div>
           </div>
         </div>
