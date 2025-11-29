@@ -325,9 +325,9 @@ export const api = {
         id: item.id,
         name: item.name,
         type: item.type,
-        repId: item.rep_id || item.repId,
+        repId: String(item.rep_id || item.repId),
         repName: item.rep_name || item.repName,
-        regionName: item.region_name || item.regionName || String(item.region_id || ''),
+        regionName: String(item.region_name || item.regionName || item.region_id || ''),
         daysSinceLastVisit: item.days_since_last_visit ?? item.daysSinceLastVisit
     }));
   },

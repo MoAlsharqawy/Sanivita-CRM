@@ -3,7 +3,11 @@ import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
 import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan, RepTask } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, MapPinIcon } from './icons';
+import { 
+    DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, 
+    UserGroupIcon, DownloadIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, 
+    ClipboardCheckIcon, CheckCircleIcon, ChevronDownIcon, ChevronUpIcon, MapPinIcon 
+} from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -78,8 +82,11 @@ const RepDashboard: React.FC = () => {
       setProducts(productsData);
       setRecentVisits(visitsData);
       setRegions(regionsData);
-      // Filter overdue alerts for this specific rep
-      setAlerts(overdueData.filter(a => a.repId === user.id));
+      
+      // Filter overdue alerts for this specific rep using robust string comparison
+      const userAlerts = overdueData.filter(a => String(a.repId) === String(user.id));
+      setAlerts(userAlerts);
+
       setSystemSettings(settingsData);
       setPlan(planData);
       setPendingTasks(tasksData);
@@ -416,7 +423,7 @@ const RepDashboard: React.FC = () => {
                                          <MapPinIcon className="w-3 h-3 text-slate-400" />
                                          <span>{t('region')}:</span>
                                          <span className="font-medium">
-                                             {/* Attempt to display region name, handling potential ID to Name mapping or direct string display */}
+                                             {/* Robust region display */}
                                              {(alert.regionName && !isNaN(parseInt(alert.regionName)) 
                                                 ? regionMap.get(parseInt(alert.regionName)) 
                                                 : alert.regionName) || t('unknown')}
@@ -574,7 +581,7 @@ const RepDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Visits Frequency Card - NEW */}
+        {/* Visits Frequency Card */}
         <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: '250ms' }}>
             <div>
                 <div className="flex items-center mb-4">
