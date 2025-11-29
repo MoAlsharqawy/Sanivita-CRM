@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask } from '../types';
@@ -13,6 +14,7 @@ import AnalyticsCharts from './AnalyticsCharts';
 import DailyVisitsDetailModal from './DailyVisitsDetailModal';
 import OverdueClientsDetailModal from './OverdueClientsDetailModal';
 import UserRegionsModal from './UserRegionsModal';
+import FrequencyDetailModal from './FrequencyDetailModal';
 
 // Helper functions for dates (YYYY-MM-DD format)
 const toYYYYMMDD = (date: Date): string => {
@@ -117,6 +119,15 @@ const ManagerDashboard: React.FC = () => {
   // New state for User Regions Modal
   const [isUserRegionsModalOpen, setIsUserRegionsModalOpen] = useState(false);
   const [userForRegions, setUserForRegions] = useState<User | null>(null);
+
+  // NEW: State for Frequency Detail Modal
+  const [isFrequencyDetailModalOpen, setIsFrequencyDetailModalOpen] = useState(false);
+  const [selectedFrequencyDetails, setSelectedFrequencyDetails] = useState<{
+      title: string;
+      doctors: { name: string; region: string; specialization: string; visits: number }[];
+      repName: string;
+      frequencyLabel: string;
+  } | null>(null);
 
 
   // Settings tab local state
@@ -425,6 +436,55 @@ const ManagerDashboard: React.FC = () => {
 
     return result;
   }, [allReports, reps, selectedRep]);
+
+  const handleFrequencyClick = (repName: string, freqType: 'f1' | 'f2' | 'f3') => {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const visitCounts: Record<string, { count: number, region: string, specialization: string }> = {};
+
+      // 1. Filter reports for this month & doctors only & specific rep
+      const reports = allReports.filter(visit => {
+          const visitDate = new Date(visit.date);
+          return visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT' && visit.repName === repName;
+      });
+
+      // 2. Count visits per doctor and store details
+      reports.forEach(visit => {
+          const key = visit.targetName;
+          if (!visitCounts[key]) {
+              visitCounts[key] = { count: 0, region: visit.regionName, specialization: visit.targetSpecialization || '' };
+          }
+          visitCounts[key].count++;
+      });
+
+      // 3. Filter based on frequency type
+      const filteredDoctors = Object.entries(visitCounts)
+          .filter(([_, data]) => {
+              if (freqType === 'f1') return data.count === 1;
+              if (freqType === 'f2') return data.count === 2;
+              if (freqType === 'f3') return data.count >= 3;
+              return false;
+          })
+          .map(([name, data]) => ({
+              name,
+              region: data.region,
+              specialization: data.specialization,
+              visits: data.count
+          }));
+      
+      let freqLabel = '';
+      if (freqType === 'f1') freqLabel = t('freq_1_mo');
+      else if (freqType === 'f2') freqLabel = t('freq_2_mo');
+      else freqLabel = t('freq_3_mo');
+
+      setSelectedFrequencyDetails({
+          title: t('frequency_details_title', repName, freqLabel),
+          doctors: filteredDoctors,
+          repName: repName,
+          frequencyLabel: freqLabel
+      });
+      setIsFrequencyDetailModalOpen(true);
+  };
 
   const handleCreateTask = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -742,6 +802,7 @@ const ManagerDashboard: React.FC = () => {
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200/80">
           <ul className="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
+              {/* ... Tabs Buttons ... */}
               <li className="me-2">
                   <button 
                       onClick={() => setActiveTab('reports')}
@@ -825,7 +886,7 @@ const ManagerDashboard: React.FC = () => {
 
       {activeTab === 'reports' && (
         <>
-          {/* Welcome Widget */}
+          {/* Welcome Widget ... */}
           <div className="animate-fade-in-up bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-6 rounded-2xl shadow-lg border border-white/50 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
               <div>
                   <h3 className="text-2xl font-bold">{t('welcome_manager', user?.name || '')}</h3>
@@ -846,9 +907,10 @@ const ManagerDashboard: React.FC = () => {
               )}
           </div>
 
-          {/* Monthly Summary Stats */}
+          {/* Monthly Summary Stats ... */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
+            {/* ... (Same stats cards) ... */}
+             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center">
               <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4">
                 <ChartBarIcon className="w-8 h-8" />
               </div>
@@ -877,7 +939,7 @@ const ManagerDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Daily Visits Card */}
+          {/* Daily Visits Card ... */}
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
                 <h3 className="text-xl font-semibold mb-4 text-blue-700">{t('daily_visits')}</h3>
                 <div className="flex border-b border-slate-300/50 mb-4 overflow-x-auto pb-1 no-scrollbar">
@@ -925,47 +987,28 @@ const ManagerDashboard: React.FC = () => {
                 </div>
             </div>
 
-          {/* Stats Cards */}
+          {/* Stats Cards ... */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-                <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4">
-                    <CalendarIcon className="w-8 h-8" />
-                </div>
-                <div>
-                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_monthly_visits' : 'monthly_visits_for', selectedRep)}</p>
-                    <p className="text-4xl font-bold text-blue-800">{displayedStats.visitsThisMonth}</p>
-                </div>
-            </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-                <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4">
-                    <DoctorIcon className="w-8 h-8" />
-                </div>
-                <div>
-                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_doctors' : 'doctors_of', selectedRep)}</p>
-                    <p className="text-4xl font-bold text-green-800">{displayedStats.doctorCount}</p>
-                </div>
-            </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '500ms' }}>
-                <div className="bg-orange-500/20 text-orange-700 p-4 rounded-full me-4">
-                    <PharmacyIcon className="w-8 h-8" />
-                </div>
-                <div>
-                    <p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_pharmacies' : 'pharmacies_of', selectedRep)}</p>
-                    <p className="text-4xl font-bold text-orange-800">{displayedStats.pharmacyCount}</p>
-                </div>
-            </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '600ms' }}>
-                <div className="bg-red-500/20 text-red-700 p-4 rounded-full me-4">
-                    <WarningIcon className="w-8 h-8" />
-                </div>
-                <div>
-                    <p className="text-slate-600 text-sm font-medium">{t('overdue_visits')}</p>
-                    <p className="text-4xl font-bold text-red-800">{filteredAlerts.length}</p>
-                </div>
-            </div>
+             {/* ... (Keep existing cards) ... */}
+             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+                <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4"><CalendarIcon className="w-8 h-8" /></div>
+                <div><p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_monthly_visits' : 'monthly_visits_for', selectedRep)}</p><p className="text-4xl font-bold text-blue-800">{displayedStats.visitsThisMonth}</p></div>
+               </div>
+               <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+                <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4"><DoctorIcon className="w-8 h-8" /></div>
+                <div><p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_doctors' : 'doctors_of', selectedRep)}</p><p className="text-4xl font-bold text-green-800">{displayedStats.doctorCount}</p></div>
+               </div>
+               <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '500ms' }}>
+                <div className="bg-orange-500/20 text-orange-700 p-4 rounded-full me-4"><PharmacyIcon className="w-8 h-8" /></div>
+                <div><p className="text-slate-600 text-sm font-medium">{t(selectedRep === 'all' ? 'total_pharmacies' : 'pharmacies_of', selectedRep)}</p><p className="text-4xl font-bold text-orange-800">{displayedStats.pharmacyCount}</p></div>
+               </div>
+               <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '600ms' }}>
+                <div className="bg-red-500/20 text-red-700 p-4 rounded-full me-4"><WarningIcon className="w-8 h-8" /></div>
+                <div><p className="text-slate-600 text-sm font-medium">{t('overdue_visits')}</p><p className="text-4xl font-bold text-red-800">{filteredAlerts.length}</p></div>
+               </div>
           </div>
 
-          {/* Visits Frequency Card - NEW / UPDATED to List View */}
+          {/* Visits Frequency Card - UPDATED INTERACTIVITY */}
           <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '650ms' }}>
                 <div className="flex items-center mb-4">
                     <div className="bg-indigo-500/20 text-indigo-700 p-3 rounded-full me-3">
@@ -988,9 +1031,21 @@ const ManagerDashboard: React.FC = () => {
                             {repFrequencyStats.map((stat, idx) => (
                                 <tr key={idx} className="hover:bg-white/40 transition-colors">
                                     <td className="px-4 py-3 font-medium text-slate-900 text-start">{stat.name}</td>
-                                    <td className="px-4 py-3 font-bold text-slate-600">{stat.f1}</td>
-                                    <td className="px-4 py-3 font-bold text-blue-700">{stat.f2}</td>
-                                    <td className="px-4 py-3 font-bold text-green-700">{stat.f3}</td>
+                                    <td className="px-4 py-3">
+                                        <button onClick={() => handleFrequencyClick(stat.name, 'f1')} className="font-bold text-slate-600 hover:text-blue-600 hover:underline">
+                                            {stat.f1}
+                                        </button>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <button onClick={() => handleFrequencyClick(stat.name, 'f2')} className="font-bold text-blue-700 hover:text-blue-900 hover:underline">
+                                            {stat.f2}
+                                        </button>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <button onClick={() => handleFrequencyClick(stat.name, 'f3')} className="font-bold text-green-700 hover:text-green-900 hover:underline">
+                                            {stat.f3}
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                             {repFrequencyStats.length === 0 && (
@@ -1003,63 +1058,35 @@ const ManagerDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* List Summary Card (Expandable) - NEW */}
+            {/* List Summary Card ... */}
             <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '700ms' }}>
+                {/* ... content from previous update ... */}
                 <div className="flex justify-between items-start">
                     <div className="flex items-center">
-                        <div className="bg-pink-500/20 text-pink-700 p-3 rounded-full me-3">
-                            <ClipboardListIcon className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-semibold text-blue-800">{t('clients_list_summary')}</h3>
-                            <p className="text-sm text-slate-600 mt-1">{t('total_doctors')}: <span className="font-bold text-slate-800">{totalDoctors.length}</span></p>
-                        </div>
+                        <div className="bg-pink-500/20 text-pink-700 p-3 rounded-full me-3"><ClipboardListIcon className="w-6 h-6" /></div>
+                        <div><h3 className="text-xl font-semibold text-blue-800">{t('clients_list_summary')}</h3><p className="text-sm text-slate-600 mt-1">{t('total_doctors')}: <span className="font-bold text-slate-800">{totalDoctors.length}</span></p></div>
                     </div>
-                    <button 
-                        onClick={() => setIsListCardExpanded(!isListCardExpanded)}
-                        className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors border border-slate-300 px-3 py-1.5 rounded-lg bg-white/50 hover:bg-white"
-                    >
-                        {isListCardExpanded ? (
-                            <>
-                                {t('less_details')}
-                                <ChevronUpIcon className="w-4 h-4" />
-                            </>
-                        ) : (
-                            <>
-                                {t('more_details')}
-                                <ChevronDownIcon className="w-4 h-4" />
-                            </>
-                        )}
+                    <button onClick={() => setIsListCardExpanded(!isListCardExpanded)} className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors border border-slate-300 px-3 py-1.5 rounded-lg bg-white/50 hover:bg-white">
+                        {isListCardExpanded ? (<>{t('less_details')}<ChevronUpIcon className="w-4 h-4" /></>) : (<>{t('more_details')}<ChevronDownIcon className="w-4 h-4" /></>)}
                     </button>
                 </div>
-
-                {/* Summary Chips */}
                 <div className="mt-4 flex flex-wrap gap-2">
                      {Object.entries(totalSpecializationCounts).map(([spec, count]) => (
                         <span key={spec} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/60 text-slate-700 border border-white/60 shadow-sm">
-                            <span className="opacity-70 me-1">{t(spec)}:</span>
-                            <span className="font-bold">{count}</span>
+                            <span className="opacity-70 me-1">{t(spec)}:</span><span className="font-bold">{count}</span>
                         </span>
                     ))}
                 </div>
-
-                {/* Expanded Content */}
                 {isListCardExpanded && (
                     <div className="mt-6 border-t border-slate-300/50 pt-4 animate-fade-in">
                         <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                              {clientStatsByRep.map(stat => (
                                 <div key={stat.rep.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/30 p-3 rounded-lg border border-white/40 hover:bg-white/50 transition-colors">
-                                    <div className="font-bold text-slate-800 mb-2 sm:mb-0 sm:w-1/4 truncate" title={stat.rep.name}>
-                                        {stat.rep.name}
-                                    </div>
+                                    <div className="font-bold text-slate-800 mb-2 sm:mb-0 sm:w-1/4 truncate" title={stat.rep.name}>{stat.rep.name}</div>
                                     <div className="flex flex-wrap gap-2 flex-grow sm:justify-end">
-                                        <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold border border-blue-200">
-                                            {t('total')}: {stat.doctorCount}
-                                        </span>
+                                        <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold border border-blue-200">{t('total')}: {stat.doctorCount}</span>
                                         {Object.entries(stat.specializationCounts).map(([spec, count]) => (
-                                            <span key={spec} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full border border-slate-200">
-                                                {t(spec)}: <span className="font-bold text-slate-800">{count}</span>
-                                            </span>
+                                            <span key={spec} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full border border-slate-200">{t(spec)}: <span className="font-bold text-slate-800">{count}</span></span>
                                         ))}
                                     </div>
                                 </div>
@@ -1069,32 +1096,18 @@ const ManagerDashboard: React.FC = () => {
                 )}
             </div>
 
-          {/* Analytics Charts */}
+          {/* Analytics Charts ... */}
           <AnalyticsCharts reports={filteredReports} />
 
-          {/* Filters Section - Collapsible */}
+          {/* Filters Section ... */}
           <div className="bg-white/40 backdrop-blur-lg p-4 rounded-2xl shadow-lg border border-white/50 mb-8 transition-all duration-300 ease-in-out">
-            <div className="flex justify-between items-center mb-4">
+             {/* ... content from previous update ... */}
+             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold flex items-center text-blue-700"><FilterIcon className="w-5 h-5 me-2"/>{t('filter_options')}</h3>
-                <button 
-                    onClick={handleToggleReportExpand}
-                    className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-orange-600 transition-colors bg-white/50 px-3 py-1.5 rounded-lg border border-blue-200 hover:border-orange-200"
-                >
-                    {isReportExpanded ? (
-                        <>
-                            {t('show_less_options')}
-                            <ChevronUpIcon className="w-4 h-4" />
-                        </>
-                    ) : (
-                        <>
-                            {t('show_more_options')}
-                            <ChevronDownIcon className="w-4 h-4" />
-                        </>
-                    )}
+                <button onClick={handleToggleReportExpand} className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-orange-600 transition-colors bg-white/50 px-3 py-1.5 rounded-lg border border-blue-200 hover:border-orange-200">
+                    {isReportExpanded ? (<>{t('show_less_options')}<ChevronUpIcon className="w-4 h-4" /></>) : (<>{t('show_more_options')}<ChevronDownIcon className="w-4 h-4" /></>)}
                 </button>
             </div>
-            
-            {/* Extended Filters - Visible only when expanded */}
             {isReportExpanded && (
                 <div className="animate-fade-in">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
@@ -1113,84 +1126,41 @@ const ManagerDashboard: React.FC = () => {
                     <div className="pt-4 border-t border-slate-300/50">
                         <h4 className="text-md font-semibold mb-2 text-slate-700">{t('quick_filters')}</h4>
                         <div className="flex flex-wrap gap-2">
-                            <button 
-                                onClick={() => handleQuickFilterClick('today')} 
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                            >
-                                {t('today')}
-                            </button>
-                            <button 
-                                onClick={() => handleQuickFilterClick('currentWeek')} 
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentWeek' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                            >
-                                {t('current_week')}
-                            </button>
-                            <button 
-                                onClick={() => handleQuickFilterClick('currentMonth')} 
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentMonth' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                            >
-                                {t('current_month')}
-                            </button>
+                            <button onClick={() => handleQuickFilterClick('today')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'today' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>{t('today')}</button>
+                            <button onClick={() => handleQuickFilterClick('currentWeek')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentWeek' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>{t('current_week')}</button>
+                            <button onClick={() => handleQuickFilterClick('currentMonth')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedQuickFilter === 'currentMonth' ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>{t('current_month')}</button>
                         </div>
                     </div>
                 </div>
             )}
-            
             {!isReportExpanded && (
                 <div className="flex items-center gap-2 text-sm text-slate-600 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                    <CheckIcon className="w-4 h-4 text-green-600" />
-                    <span>{t('showing_today_reports_only')}</span>
+                    <CheckIcon className="w-4 h-4 text-green-600" /><span>{t('showing_today_reports_only')}</span>
                 </div>
             )}
           </div>
 
-          {/* Alerts Table - Modified to show only title and button */}
+          {/* Alerts Table ... */}
           {filteredAlerts.length > 0 && (
             <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden mb-8">
-              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50">
-                <WarningIcon className="w-6 h-6 me-3"/>
-                {t('overdue_visits_alerts_table')} ({filteredAlerts.length})
-              </h3>
-              {/* Removed the table content here. It will now be displayed in the modal. */}
-              <div className="flex justify-center p-4">
-                <button
-                    onClick={() => setIsOverdueClientsDetailModalOpen(true)}
-                    className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-all shadow-lg flex items-center gap-2"
-                >
-                    <EyeIcon className="w-5 h-5" />
-                    {t('view_details')}
-                </button>
-            </div>
+              <h3 className="text-xl font-semibold p-4 flex items-center text-red-700 bg-red-100/50"><WarningIcon className="w-6 h-6 me-3"/>{t('overdue_visits_alerts_table')} ({filteredAlerts.length})</h3>
+              <div className="flex justify-center p-4"><button onClick={() => setIsOverdueClientsDetailModalOpen(true)} className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-all shadow-lg flex items-center gap-2"><EyeIcon className="w-5 h-5" />{t('view_details')}</button></div>
             </div>
           )}
           
-          {/* Export Buttons */}
+          {/* Export Buttons ... */}
           <div className="flex flex-col sm:flex-row justify-end items-center mb-4 gap-3">
                 <span className="text-slate-700 font-medium">{t('export_reports', filteredReports.length)}</span>
-                <button onClick={() => exportToExcel(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
-                    <DownloadIcon className="w-5 h-5 me-2"/> Excel
-                </button>
-                <button onClick={() => exportToPdf(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition-colors">
-                    <DownloadIcon className="w-5 h-5 me-2"/> PDF
-                </button>
+                <button onClick={() => exportToExcel(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"><DownloadIcon className="w-5 h-5 me-2"/> Excel</button>
+                <button onClick={() => exportToPdf(filteredReports, 'reports', t)} className="w-full sm:w-auto flex items-center justify-center bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition-colors"><DownloadIcon className="w-5 h-5 me-2"/> PDF</button>
             </div>
 
-          {/* Reports Table */}
+          {/* Reports Table ... */}
           <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-start text-gray-500">
                 <thead className="text-xs text-blue-800 uppercase bg-white/50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3">{t('date')}</th>
-                    <th scope="col" className="px-6 py-3">{t('visit_type')}</th>
-                    <th scope="col" className="px-6 py-3">{t('rep')}</th>
-                    <th scope="col" className="px-6 py-3">{t('region')}</th>
-                    <th scope="col" className="px-6 py-3">{t('client')}</th>
-                    <th scope="col" className="px-6 py-3">{t('target_specialization')}</th>
-                    <th scope="col" className="px-6 py-3">{t('product')}</th>
-                    <th scope="col" className="px-6 py-3">{t('doctor_visit_type')}</th>
-                    <th scope="col" className="px-6 py-3">{t('notes')}</th>
-                  </tr>
+                  <tr><th className="px-6 py-3">{t('date')}</th><th className="px-6 py-3">{t('visit_type')}</th><th className="px-6 py-3">{t('rep')}</th><th className="px-6 py-3">{t('region')}</th><th className="px-6 py-3">{t('client')}</th><th className="px-6 py-3">{t('target_specialization')}</th><th className="px-6 py-3">{t('product')}</th><th className="px-6 py-3">{t('doctor_visit_type')}</th><th className="px-6 py-3">{t('notes')}</th></tr>
                 </thead>
                 <tbody>
                   {filteredReports.map((report, index) => (
@@ -1214,110 +1184,38 @@ const ManagerDashboard: React.FC = () => {
         </>
       )}
 
-      {activeTab === 'users' && (
+      {/* ... Other Tabs (Users, Clients, Tasks, DataImport, Approvals, WeeklyPlans, Settings) ... */}
+      {/* (Content remains as previously provided, ensuring UserRegionsModal button is present in Users tab) */}
+       {activeTab === 'users' && (
         <>
-          {/* User Management Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up">
-                <div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4">
-                    <CalendarIcon className="w-8 h-8" />
-                </div>
-                <div>
-                    <p className="text-slate-600 text-sm font-medium">{t('total_visits_recorded')}</p>
-                    <p className="text-4xl font-bold text-blue-800">{userManagementStats.totalVisits}</p>
-                </div>
-            </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '150ms' }}>
-                <div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4">
-                    <UsersIcon className="w-8 h-8" />
-                </div>
-                <div>
-                    <p className="text-slate-600 text-sm font-medium">{t('total_unique_clients')}</p>
-                    <p className="text-4xl font-bold text-green-800">{userManagementStats.totalUniqueClients}</p>
-                </div>
-            </div>
-            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-                <div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4">
-                    <ChartBarIcon className="w-8 h-8" />
-                </div>
-                <div>
-                    <p className="text-slate-600 text-sm font-medium">{t('avg_visits_per_month')}</p>
-                    <p className="text-4xl font-bold text-purple-800">{userManagementStats.averageVisitsPerMonth}</p>
-                </div>
-            </div>
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up"><div className="bg-blue-500/20 text-blue-700 p-4 rounded-full me-4"><CalendarIcon className="w-8 h-8" /></div><div><p className="text-slate-600 text-sm font-medium">{t('total_visits_recorded')}</p><p className="text-4xl font-bold text-blue-800">{userManagementStats.totalVisits}</p></div></div>
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '150ms' }}><div className="bg-green-500/20 text-green-700 p-4 rounded-full me-4"><UsersIcon className="w-8 h-8" /></div><div><p className="text-slate-600 text-sm font-medium">{t('total_unique_clients')}</p><p className="text-4xl font-bold text-green-800">{userManagementStats.totalUniqueClients}</p></div></div>
+            <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 flex items-center animate-fade-in-up" style={{ animationDelay: '300ms' }}><div className="bg-purple-500/20 text-purple-700 p-4 rounded-full me-4"><ChartBarIcon className="w-8 h-8" /></div><div><p className="text-slate-600 text-sm font-medium">{t('avg_visits_per_month')}</p><p className="text-4xl font-bold text-purple-800">{userManagementStats.averageVisitsPerMonth}</p></div></div>
           </div>
           <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden">
               <div className="flex flex-wrap justify-between items-center p-4 bg-white/50 border-b border-white/30 gap-4">
-                <h3 className="text-xl font-semibold flex items-center text-blue-800">
-                    <UsersIcon className="w-6 h-6 me-3"/>
-                    {t('reps_list')}
-                </h3>
+                <h3 className="text-xl font-semibold flex items-center text-blue-800"><UsersIcon className="w-6 h-6 me-3"/>{t('reps_list')}</h3>
                 <div className="flex items-center gap-3">
-                  <button onClick={handleAddUserClick} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-all shadow flex items-center gap-2">
-                    <PlusIcon className="w-5 h-5"/>
-                    <span>{t('add_rep')}</span>
-                  </button>
-                  <button
-                      onClick={() => { setSelectedRepsForExport([]); setIsExportModalOpen(true); }}
-                      disabled={reps.length === 0}
-                      className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition-all shadow flex items-center gap-2 disabled:bg-teal-300 disabled:cursor-not-allowed"
-                  >
-                      <DownloadIcon className="w-5 h-5"/>
-                      <span className="hidden sm:inline">{t('download_client_lists')}</span>
-                  </button>
-                  <button
-                      onClick={handleExportUsers}
-                      disabled={reps.length === 0}
-                      className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2 disabled:bg-green-300 disabled:cursor-not-allowed"
-                  >
-                      <DownloadIcon className="w-5 h-5"/>
-                      <span className="hidden sm:inline">{t('download_reps_list')}</span>
-                  </button>
+                  <button onClick={handleAddUserClick} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-all shadow flex items-center gap-2"><PlusIcon className="w-5 h-5"/><span>{t('add_rep')}</span></button>
+                  <button onClick={() => { setSelectedRepsForExport([]); setIsExportModalOpen(true); }} disabled={reps.length === 0} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition-all shadow flex items-center gap-2 disabled:bg-teal-300 disabled:cursor-not-allowed"><DownloadIcon className="w-5 h-5"/><span className="hidden sm:inline">{t('download_client_lists')}</span></button>
+                  <button onClick={handleExportUsers} disabled={reps.length === 0} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2 disabled:bg-green-300 disabled:cursor-not-allowed"><DownloadIcon className="w-5 h-5"/><span className="hidden sm:inline">{t('download_reps_list')}</span></button>
                 </div>
               </div>
               <div className="overflow-x-auto">
                   <table className="w-full text-sm text-start text-gray-500">
                       <thead className="text-xs text-blue-800 uppercase bg-white/50">
-                          <tr>
-                              <th scope="col" className="px-6 py-3">{t('full_name')}</th>
-                              <th scope="col" className="px-6 py-3">{t('username')}</th>
-                              <th scope="col" className="px-6 py-3">{t('role')}</th>
-                              <th scope="col" className="px-6 py-3">{t('actions')}</th>
-                          </tr>
+                          <tr><th className="px-6 py-3">{t('full_name')}</th><th className="px-6 py-3">{t('username')}</th><th className="px-6 py-3">{t('role')}</th><th className="px-6 py-3">{t('actions')}</th></tr>
                       </thead>
                       <tbody>
                           {reps.map(rep => (
                               <tr key={rep.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
-                                  <td className="px-6 py-4 font-medium text-slate-900">{rep.name}</td>
-                                  <td className="px-6 py-4">{rep.username}</td>
-                                  <td className="px-6 py-4">{t(rep.role)}</td>
-                                  <td className="px-6 py-4">
-                                      <div className="flex items-center gap-4">
-                                          {/* Manage Regions Button */}
-                                          <button 
-                                            onClick={() => { setUserForRegions(rep); setIsUserRegionsModalOpen(true); }}
-                                            className="text-purple-600 hover:text-purple-800" 
-                                            aria-label={t('manage_regions')}
-                                            title={t('manage_regions')}
-                                          >
-                                              <MapPinIcon className="w-5 h-5"/>
-                                          </button>
-
-                                          <button onClick={() => handleEditUserClick(rep)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}>
-                                              <EditIcon className="w-5 h-5"/>
-                                          </button>
-                                          {user?.role === UserRole.Manager && ( 
-                                            <>
-                                              <button onClick={() => setDeletingUser(rep)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}>
-                                                  <TrashIcon className="w-5 h-5"/>
-                                              </button>
-                                              <button onClick={() => handleResetClick(rep)} className="text-orange-600 hover:text-orange-800" aria-label={t('reset_rep_visits')}>
-                                                  <ReplyIcon className="w-5 h-5"/> 
-                                              </button>
-                                            </>
-                                          )}
-                                      </div>
-                                  </td>
+                                  <td className="px-6 py-4 font-medium text-slate-900">{rep.name}</td><td className="px-6 py-4">{rep.username}</td><td className="px-6 py-4">{t(rep.role)}</td>
+                                  <td className="px-6 py-4"><div className="flex items-center gap-4">
+                                      <button onClick={() => { setUserForRegions(rep); setIsUserRegionsModalOpen(true); }} className="text-purple-600 hover:text-purple-800" aria-label={t('manage_regions')} title={t('manage_regions')}><MapPinIcon className="w-5 h-5"/></button>
+                                      <button onClick={() => handleEditUserClick(rep)} className="text-blue-600 hover:text-blue-800" aria-label={t('edit')}><EditIcon className="w-5 h-5"/></button>
+                                      {user?.role === UserRole.Manager && (<><button onClick={() => setDeletingUser(rep)} className="text-red-600 hover:text-red-800" aria-label={t('delete')}><TrashIcon className="w-5 h-5"/></button><button onClick={() => handleResetClick(rep)} className="text-orange-600 hover:text-orange-800" aria-label={t('reset_rep_visits')}><ReplyIcon className="w-5 h-5"/></button></>)}
+                                  </div></td>
                               </tr>
                           ))}
                       </tbody>
@@ -1327,539 +1225,74 @@ const ManagerDashboard: React.FC = () => {
           </div>
         </>
       )}
-
-      {activeTab === 'clients' && (
-        <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden">
-            <h3 className="text-xl font-semibold p-4 flex items-center text-blue-800 bg-white/50 border-b border-white/30">
-                <UserGroupIcon className="w-6 h-6 me-3"/>
-                {t('client_management')}
-            </h3>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-start text-gray-500">
-                    <thead className="text-xs text-blue-800 uppercase bg-white/50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3">{t('rep_name')}</th>
-                            <th scope="col" className="px-6 py-3">{t('doctors')}</th>
-                            <th scope="col" className="px-6 py-3">{t('pharmacies')}</th>
-                            <th scope="col" className="px-6 py-3">{t('total_clients')}</th>
-                            <th scope="col" className="px-6 py-3">{t('doctor_specialization_breakdown')}</th>
-                            <th scope="col" className="px-6 py-3">{t('actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {clientStatsByRep.map(stat => (
-                            <tr key={stat.rep.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
-                                <td className="px-6 py-4 font-medium text-slate-900">{stat.rep.name}</td>
-                                <td className="px-6 py-4 text-center">{stat.doctorCount}</td>
-                                <td className="px-6 py-4 text-center">{stat.pharmacyCount}</td>
-                                <td className="px-6 py-4 text-center font-bold text-slate-800">{stat.totalClients}</td>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-wrap gap-1">
-                                    {Object.entries(stat.specializationCounts).length > 0 ? Object.entries(stat.specializationCounts).map(([spec, count]) => (
-                                      <span key={spec} className="text-xs bg-slate-200 text-slate-700 font-medium px-2 py-1 rounded-full">
-                                        {t(spec as any)}: {count}
-                                      </span>
-                                    )) : <span className="text-xs text-slate-500">{t('no_doctors_assigned')}</span>}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <button onClick={() => setViewingRepClients(stat.rep)} className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-4 py-2 flex items-center gap-2 transition-colors">
-                                        <EyeIcon className="w-4 h-4"/>
-                                        {t('view_clients')}
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {reps.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_data')}</p>}
-            </div>
-        </div>
-      )}
-
+      
+      {activeTab === 'clients' && (<div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden"><h3 className="text-xl font-semibold p-4 flex items-center text-blue-800 bg-white/50 border-b border-white/30"><UserGroupIcon className="w-6 h-6 me-3"/>{t('client_management')}</h3><div className="overflow-x-auto"><table className="w-full text-sm text-start text-gray-500"><thead className="text-xs text-blue-800 uppercase bg-white/50"><tr><th className="px-6 py-3">{t('rep_name')}</th><th className="px-6 py-3">{t('doctors')}</th><th className="px-6 py-3">{t('pharmacies')}</th><th className="px-6 py-3">{t('total_clients')}</th><th className="px-6 py-3">{t('doctor_specialization_breakdown')}</th><th className="px-6 py-3">{t('actions')}</th></tr></thead><tbody>{clientStatsByRep.map(stat => (<tr key={stat.rep.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40"><td className="px-6 py-4 font-medium text-slate-900">{stat.rep.name}</td><td className="px-6 py-4 text-center">{stat.doctorCount}</td><td className="px-6 py-4 text-center">{stat.pharmacyCount}</td><td className="px-6 py-4 text-center font-bold text-slate-800">{stat.totalClients}</td><td className="px-6 py-4"><div className="flex flex-wrap gap-1">{Object.entries(stat.specializationCounts).length > 0 ? Object.entries(stat.specializationCounts).map(([spec, count]) => (<span key={spec} className="text-xs bg-slate-200 text-slate-700 font-medium px-2 py-1 rounded-full">{t(spec as any)}: {count}</span>)) : <span className="text-xs text-slate-500">{t('no_doctors_assigned')}</span>}</div></td><td className="px-6 py-4"><button onClick={() => setViewingRepClients(stat.rep)} className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-4 py-2 flex items-center gap-2 transition-colors"><EyeIcon className="w-4 h-4"/>{t('view_clients')}</button></td></tr>))}</tbody></table>{reps.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_data')}</p>}</div></div>)}
+      
       {activeTab === 'tasks' && (
           <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-              <h3 className="text-xl font-semibold mb-6 text-blue-800 flex items-center gap-2">
-                  <ClipboardListIcon className="w-6 h-6" />
-                  {t('tasks_list')}
-              </h3>
-
-              {/* Create Task Form */}
-              <div className="bg-white/30 p-4 rounded-xl mb-8 border border-white/40">
-                  <h4 className="font-semibold text-lg mb-4 text-slate-700">{t('assign_new_task')}</h4>
-                  <form onSubmit={handleCreateTask} className="flex flex-col md:flex-row gap-4 items-end">
-                      <div className="w-full md:w-1/3 relative">
-                          <label className="block text-sm font-medium text-slate-700 mb-1">{t('select_rep')}</label>
-                          <div className="relative">
-                            <button 
-                                type="button"
-                                onClick={() => setIsTaskRepDropdownOpen(!isTaskRepDropdownOpen)}
-                                className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 text-start flex justify-between items-center focus:ring-blue-500"
-                            >
-                                <span className={selectedRepsForTask.length === 0 ? "text-slate-500" : "text-slate-800"}>
-                                    {selectedRepsForTask.length === 0 
-                                        ? t('select_reps_placeholder') 
-                                        : t('reps_selected', selectedRepsForTask.length)}
-                                </span>
-                                <ChevronDownIcon className="w-4 h-4 text-slate-500"/>
-                            </button>
-                            {isTaskRepDropdownOpen && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                    <div className="p-2 border-b border-slate-100">
-                                        <label className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={selectedRepsForTask.length === reps.length && reps.length > 0}
-                                                onChange={toggleSelectAll}
-                                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                            />
-                                            <span className="ms-2 font-semibold text-sm text-slate-800">{t('select_all')}</span>
-                                        </label>
-                                    </div>
-                                    <div className="p-2 space-y-1">
-                                        {reps.map(rep => (
-                                            <label key={rep.id} className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={selectedRepsForTask.includes(rep.id)}
-                                                    onChange={() => toggleRepSelection(rep.id)}
-                                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <span className="ms-2 text-sm text-slate-700">{rep.name}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                          </div>
-                      </div>
-                      <div className="w-full md:w-1/2">
-                          <label className="block text-sm font-medium text-slate-700 mb-1">{t('task_description')}</label>
-                          <input 
-                              type="text" 
-                              value={newTaskDescription}
-                              onChange={e => setNewTaskDescription(e.target.value)}
-                              className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 focus:ring-blue-500 focus:outline-none"
-                              required
-                              placeholder={t('task_description')}
-                          />
-                      </div>
-                      <button 
-                          type="submit" 
-                          disabled={isCreatingTask}
-                          className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300"
-                      >
-                          {isCreatingTask ? t('creating') : t('create_task')}
-                      </button>
-                  </form>
-                  {taskCreationMessage && (
-                      <p className={`mt-3 text-sm font-medium ${taskCreationMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                          {taskCreationMessage.text}
-                      </p>
-                  )}
-              </div>
-
-              {/* Tasks List */}
-              <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-start">
-                      <thead className="text-xs text-blue-800 uppercase bg-white/50">
-                          <tr>
-                              <th className="px-6 py-3">{t('task_description')}</th>
-                              <th className="px-6 py-3">{t('rep_name')}</th>
-                              <th className="px-6 py-3">{t('status')}</th>
-                              <th className="px-6 py-3">{t('date')}</th>
-                              <th className="px-6 py-3">{t('actions')}</th>
-                          </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/50">
-                          {allTasks.map(task => (
-                              <tr key={task.id} className="bg-white/20 hover:bg-white/40">
-                                  <td className="px-6 py-4 font-medium text-slate-800">{task.description}</td>
-                                  <td className="px-6 py-4">{task.repName}</td>
-                                  <td className="px-6 py-4">
-                                      {task.isCompleted ? (
-                                          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold flex items-center w-fit gap-1">
-                                              <CheckCircleIcon className="w-3 h-3" /> {t('completed')}
-                                          </span>
-                                      ) : (
-                                          <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold w-fit">
-                                              {t('pending')}
-                                          </span>
-                                      )}
-                                  </td>
-                                  <td className="px-6 py-4 text-slate-600">
-                                      {new Date(task.createdAt).toLocaleDateString()}
-                                      {task.completedAt && (
-                                          <div className="text-xs text-green-700 mt-1">
-                                              {t('task_completed_at', new Date(task.completedAt).toLocaleDateString())}
-                                          </div>
-                                      )}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                      <button 
-                                          onClick={() => handleDeleteTask(task.id)}
-                                          className="text-red-600 hover:text-red-800"
-                                          title={t('delete_task')}
-                                      >
-                                          <TrashIcon className="w-5 h-5" />
-                                      </button>
-                                  </td>
-                              </tr>
-                          ))}
-                          {allTasks.length === 0 && (
-                              <tr>
-                                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                                      {t('no_tasks')}
-                                  </td>
-                              </tr>
-                          )}
-                      </tbody>
-                  </table>
-              </div>
+              <h3 className="text-xl font-semibold mb-6 text-blue-800 flex items-center gap-2"><ClipboardListIcon className="w-6 h-6" />{t('tasks_list')}</h3>
+              <div className="bg-white/30 p-4 rounded-xl mb-8 border border-white/40"><h4 className="font-semibold text-lg mb-4 text-slate-700">{t('assign_new_task')}</h4><form onSubmit={handleCreateTask} className="flex flex-col md:flex-row gap-4 items-end"><div className="w-full md:w-1/3 relative"><label className="block text-sm font-medium text-slate-700 mb-1">{t('select_rep')}</label><div className="relative"><button type="button" onClick={() => setIsTaskRepDropdownOpen(!isTaskRepDropdownOpen)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 text-start flex justify-between items-center focus:ring-blue-500"><span className={selectedRepsForTask.length === 0 ? "text-slate-500" : "text-slate-800"}>{selectedRepsForTask.length === 0 ? t('select_reps_placeholder') : t('reps_selected', selectedRepsForTask.length)}</span><ChevronDownIcon className="w-4 h-4 text-slate-500"/></button>{isTaskRepDropdownOpen && (<div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"><div className="p-2 border-b border-slate-100"><label className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" checked={selectedRepsForTask.length === reps.length && reps.length > 0} onChange={toggleSelectAll} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><span className="ms-2 font-semibold text-sm text-slate-800">{t('select_all')}</span></label></div><div className="p-2 space-y-1">{reps.map(rep => (<label key={rep.id} className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" checked={selectedRepsForTask.includes(rep.id)} onChange={() => toggleRepSelection(rep.id)} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><span className="ms-2 text-sm text-slate-700">{rep.name}</span></label>))}</div></div>)}</div></div><div className="w-full md:w-1/2"><label className="block text-sm font-medium text-slate-700 mb-1">{t('task_description')}</label><input type="text" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 focus:ring-blue-500 focus:outline-none" required placeholder={t('task_description')} /></div><button type="submit" disabled={isCreatingTask} className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300">{isCreatingTask ? t('creating') : t('create_task')}</button></form>{taskCreationMessage && (<p className={`mt-3 text-sm font-medium ${taskCreationMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{taskCreationMessage.text}</p>)}</div>
+              <div className="overflow-x-auto"><table className="w-full text-sm text-start"><thead className="text-xs text-blue-800 uppercase bg-white/50"><tr><th className="px-6 py-3">{t('task_description')}</th><th className="px-6 py-3">{t('rep_name')}</th><th className="px-6 py-3">{t('status')}</th><th className="px-6 py-3">{t('date')}</th><th className="px-6 py-3">{t('actions')}</th></tr></thead><tbody className="divide-y divide-slate-200/50">{allTasks.map(task => (<tr key={task.id} className="bg-white/20 hover:bg-white/40"><td className="px-6 py-4 font-medium text-slate-800">{task.description}</td><td className="px-6 py-4">{task.repName}</td><td className="px-6 py-4">{task.isCompleted ? (<span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold flex items-center w-fit gap-1"><CheckCircleIcon className="w-3 h-3" /> {t('completed')}</span>) : (<span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold w-fit">{t('pending')}</span>)}</td><td className="px-6 py-4 text-slate-600">{new Date(task.createdAt).toLocaleDateString()}{task.completedAt && (<div className="text-xs text-green-700 mt-1">{t('task_completed_at', new Date(task.completedAt).toLocaleDateString())}</div>)}</td><td className="px-6 py-4"><button onClick={() => handleDeleteTask(task.id)} className="text-red-600 hover:text-red-800" title={t('delete_task')}><TrashIcon className="w-5 h-5" /></button></td></tr>))}{allTasks.length === 0 && (<tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">{t('no_tasks')}</td></tr>)}</tbody></table></div>
           </div>
       )}
 
-      {activeTab === 'dataImport' && (
-        <DataImport />
-      )}
-
-       {activeTab === 'approvals' && (
-        <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6 relative">
-            <h3 className="text-xl font-semibold mb-4 text-blue-800">{t('pending_rep_plans')}</h3>
-
-            {reviewMessage && (
-                <div className={`p-4 mb-4 text-sm rounded-lg ${reviewMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`} role="alert">
-                    <span className="font-medium">{reviewMessage.text}</span>
-                </div>
-            )}
-
-            {pendingPlans.length > 0 ? (
-                <div className="space-y-6">
-                    {pendingPlans.map(item => (
-                        <div key={item.repId} className="bg-white/30 p-4 rounded-lg shadow border border-white/50">
-                            <h4 className="font-bold text-lg text-slate-800 mb-3">{item.repName}</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
-                                {WEEK_DAYS_ORDERED.map(day => {
-                                    const dayPlan = item.plan[day.index];
-                                    const regionId = dayPlan?.regionId;
-                                    const doctorIds = dayPlan?.doctorIds || [];
-                                    const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day');
-                                    
-                                    return (
-                                        <div key={day.index} className="text-center p-2 bg-slate-100 rounded flex flex-col items-center">
-                                            <p className="font-semibold text-sm text-slate-700">{day.name}</p>
-                                            <p className={`text-xs ${regionId ? 'text-blue-600' : 'text-slate-500'}`}>{regionName}</p>
-                                            {doctorIds.length > 0 && (
-                                                <div className="mt-1 flex flex-wrap justify-center gap-1">
-                                                    {doctorIds.map(docId => (
-                                                        <span key={docId} className="text-xs bg-blue-500/20 text-blue-700 px-1.5 py-0.5 rounded-full">
-                                                            {allDoctorsMap.get(docId)?.name || t('unknown_doctor')}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="flex justify-end items-center gap-3">
-                                <button onClick={() => handleReviewPlan(item.repId, 'rejected')} className="flex items-center gap-2 text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors">
-                                    <XIcon className="w-4 h-4" />
-                                    {t('reject')}
-                                </button>
-                                <button onClick={() => handleReviewPlan(item.repId, 'approved')} className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors">
-                                    <CheckIcon className="w-4 h-4" />
-                                    {t('approve')}
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-center text-slate-600 py-8">{t('no_new_plans_to_review')}</p>
-            )}
-        </div>
-      )}
-
-      {activeTab === 'weeklyPlans' && (
-        <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-            <h3 className="text-xl font-semibold mb-6 text-blue-800">{t('weekly_plans_overview')}</h3>
-            {reviewMessage && ( // Display messages also on the weekly plans tab
-                <div className={`p-4 mb-4 text-sm rounded-lg ${reviewMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`} role="alert">
-                    <span className="font-medium">{reviewMessage.text}</span>
-                </div>
-            )}
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-start border-separate border-spacing-0">
-                    <thead className="text-xs text-blue-800 uppercase bg-white/50">
-                        <tr>
-                            <th scope="col" className="sticky start-0 bg-white/50 px-6 py-3 rounded-se-lg z-10">{t('rep')}</th>
-                            {WEEK_DAYS_ORDERED.map(day => <th key={day.index} scope="col" className="px-4 py-3 text-center">{day.name}</th>)}
-                             <th scope="col" className="rounded-ss-lg"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {reps.map(rep => {
-                            const plan = allPlans[rep.id];
-                            if (!plan) return null; // Should not happen due to data hydration
-
-                            return (
-                                <tr key={rep.id} className="group bg-white/20 border-b border-white/30 hover:bg-white/40">
-                                    <td className="sticky start-0 px-6 py-4 font-medium text-slate-900 whitespace-nowrap bg-white/20 group-hover:bg-white/40">
-                                        <div className="font-semibold">{rep.name}</div>
-                                        <div className="mt-1">{getPlanStatusBadge(plan.status)}</div>
-                                        {user?.role === UserRole.Manager && plan.status === 'approved' && (
-                                            <button 
-                                                onClick={() => handleRevokeApproval(rep.id)}
-                                                className="mt-2 flex items-center gap-1.5 text-sm text-yellow-800 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded-md transition-colors shadow-sm"
-                                            >
-                                                <ReplyIcon className="w-4 h-4" />
-                                                {t('revoke_approval')}
-                                            </button>
-                                        )}
-                                    </td>
-                                    {WEEK_DAYS_ORDERED.map(day => {
-                                        const dayPlan = plan.plan[day.index];
-                                        const regionId = dayPlan?.regionId;
-                                        const doctorIds = dayPlan?.doctorIds || [];
-                                        const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day');
-                                        return (
-                                            <td key={day.index} className={`px-4 py-4 text-center whitespace-nowrap ${regionId ? 'text-blue-600 font-semibold' : 'text-slate-500'}`} title={regionName}>
-                                                {regionName}
-                                                {doctorIds.length > 0 && (
-                                                    <div className="mt-1 flex flex-wrap justify-center gap-1">
-                                                        {doctorIds.map(docId => (
-                                                            <span key={docId} className="text-xs bg-blue-500/20 text-blue-700 px-1 py-0.5 rounded-full">
-                                                                {allDoctorsMap.get(docId)?.name || t('unknown_doctor')}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-      )}
-
-      {activeTab === 'settings' && (
-        <div className="space-y-8">
-            <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-                <h3 className="text-xl font-semibold mb-4 text-blue-800">{t('weekend_settings')}</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
-                    {WEEK_DAYS.map((day, index) => (
-                        <label key={index} className="flex items-center space-x-2 space-x-reverse cursor-pointer p-3 bg-white/30 rounded-lg">
-                            <input 
-                                type="checkbox"
-                                checked={localWeekends.includes(index)}
-                                onChange={() => handleWeekendChange(index)}
-                                className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
-                            />
-                            <span className="font-medium text-slate-800">{day}</span>
-                        </label>
-                    ))}
-                </div>
-            </div>
-            <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-                <h3 className="text-xl font-semibold mb-4 text-blue-800">{t('holidays_settings')}</h3>
-                <div className="flex flex-col sm:flex-row items-center gap-3 mb-4">
-                    <input 
-                        type="date"
-                        value={newHoliday}
-                        onChange={(e) => setNewHoliday(e.target.value)}
-                        className="w-full sm:w-auto flex-grow p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500"
-                    />
-                    <button onClick={handleAddHoliday} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
-                        <CalendarPlusIcon className="w-5 h-5 me-2"/> {t('add_holiday')}
-                    </button>
-                </div>
-                <div className="max-h-60 overflow-y-auto pr-2 space-y-2">
-                    {localHolidays.length > 0 ? localHolidays.map(holiday => (
-                        <div key={holiday} className="flex justify-between items-center p-3 bg-white/30 rounded-lg">
-                            <span className="font-mono text-slate-700">{holiday}</span>
-                            <button onClick={() => handleRemoveHoliday(holiday)} className="text-red-500 hover:text-red-700">
-                                <TrashIcon className="w-5 h-5"/>
-                            </button>
-                        </div>
-                    )) : <p className="text-center text-slate-500 p-4">{t('no_holidays_added')}</p>}
-                </div>
-            </div>
-
-            <div className="flex items-center justify-between mt-6">
-                <div className={`transition-opacity duration-300 ${settingsMessage ? 'opacity-100' : 'opacity-0'}`}>
-                    {settingsMessage && <p className="text-green-700 font-semibold">{settingsMessage}</p>}
-                </div>
-                <button 
-                    onClick={handleSaveSettings} 
-                    disabled={isSavingSettings} // Disable button while saving
-                    className="bg-orange-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:bg-orange-300 flex items-center justify-center"
-                >
-                    {isSavingSettings ? (
-                        <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white me-3"></div>
-                            {t('saving_settings')}
-                        </>
-                    ) : (
-                        t('save_settings')
-                    )}
-                </button>
-            </div>
-        </div>
-      )}
+      {activeTab === 'dataImport' && (<DataImport />)}
+      {activeTab === 'approvals' && (<div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6 relative"><h3 className="text-xl font-semibold mb-4 text-blue-800">{t('pending_rep_plans')}</h3>{reviewMessage && (<div className={`p-4 mb-4 text-sm rounded-lg ${reviewMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`} role="alert"><span className="font-medium">{reviewMessage.text}</span></div>)}{pendingPlans.length > 0 ? (<div className="space-y-6">{pendingPlans.map(item => (<div key={item.repId} className="bg-white/30 p-4 rounded-lg shadow border border-white/50"><h4 className="font-bold text-lg text-slate-800 mb-3">{item.repName}</h4><div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">{WEEK_DAYS_ORDERED.map(day => { const dayPlan = item.plan[day.index]; const regionId = dayPlan?.regionId; const doctorIds = dayPlan?.doctorIds || []; const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day'); return (<div key={day.index} className="text-center p-2 bg-slate-100 rounded flex flex-col items-center"><p className="font-semibold text-sm text-slate-700">{day.name}</p><p className={`text-xs ${regionId ? 'text-blue-600' : 'text-slate-500'}`}>{regionName}</p>{doctorIds.length > 0 && (<div className="mt-1 flex flex-wrap justify-center gap-1">{doctorIds.map(docId => (<span key={docId} className="text-xs bg-blue-500/20 text-blue-700 px-1.5 py-0.5 rounded-full">{allDoctorsMap.get(docId)?.name || t('unknown_doctor')}</span>))}</div>)}</div>); })}</div><div className="flex justify-end items-center gap-3"><button onClick={() => handleReviewPlan(item.repId, 'rejected')} className="flex items-center gap-2 text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors"><XIcon className="w-4 h-4" />{t('reject')}</button><button onClick={() => handleReviewPlan(item.repId, 'approved')} className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors"><CheckIcon className="w-4 h-4" />{t('approve')}</button></div></div>))}</div>) : (<p className="text-center text-slate-600 py-8">{t('no_new_plans_to_review')}</p>)}</div>)}
+      {activeTab === 'weeklyPlans' && (<div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6"><h3 className="text-xl font-semibold mb-6 text-blue-800">{t('weekly_plans_overview')}</h3>{reviewMessage && (<div className={`p-4 mb-4 text-sm rounded-lg ${reviewMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`} role="alert"><span className="font-medium">{reviewMessage.text}</span></div>)}<div className="overflow-x-auto"><table className="w-full text-sm text-start border-separate border-spacing-0"><thead className="text-xs text-blue-800 uppercase bg-white/50"><tr><th scope="col" className="sticky start-0 bg-white/50 px-6 py-3 rounded-se-lg z-10">{t('rep')}</th>{WEEK_DAYS_ORDERED.map(day => <th key={day.index} scope="col" className="px-4 py-3 text-center">{day.name}</th>)}<th scope="col" className="rounded-ss-lg"></th></tr></thead><tbody>{reps.map(rep => { const plan = allPlans[rep.id]; if (!plan) return null; return (<tr key={rep.id} className="group bg-white/20 border-b border-white/30 hover:bg-white/40"><td className="sticky start-0 px-6 py-4 font-medium text-slate-900 whitespace-nowrap bg-white/20 group-hover:bg-white/40"><div className="font-semibold">{rep.name}</div><div className="mt-1">{getPlanStatusBadge(plan.status)}</div>{user?.role === UserRole.Manager && plan.status === 'approved' && (<button onClick={() => handleRevokeApproval(rep.id)} className="mt-2 flex items-center gap-1.5 text-sm text-yellow-800 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded-md transition-colors shadow-sm"><ReplyIcon className="w-4 h-4" />{t('revoke_approval')}</button>)}</td>{WEEK_DAYS_ORDERED.map(day => { const dayPlan = plan.plan[day.index]; const regionId = dayPlan?.regionId; const doctorIds = dayPlan?.doctorIds || []; const regionName = regionId ? regions.find(r => r.id === regionId)?.name : t('rest_day'); return (<td key={day.index} className={`px-4 py-4 text-center whitespace-nowrap ${regionId ? 'text-blue-600 font-semibold' : 'text-slate-500'}`} title={regionName}>{regionName}{doctorIds.length > 0 && (<div className="mt-1 flex flex-wrap justify-center gap-1">{doctorIds.map(docId => (<span key={docId} className="text-xs bg-blue-500/20 text-blue-700 px-1 py-0.5 rounded-full">{allDoctorsMap.get(docId)?.name || t('unknown_doctor')}</span>))}</div>)}</td>); })}</tr>); })}</tbody></table></div></div>)}
+      {activeTab === 'settings' && (<div className="space-y-8"><div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6"><h3 className="text-xl font-semibold mb-4 text-blue-800">{t('weekend_settings')}</h3><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">{WEEK_DAYS.map((day, index) => (<label key={index} className="flex items-center space-x-2 space-x-reverse cursor-pointer p-3 bg-white/30 rounded-lg"><input type="checkbox" checked={localWeekends.includes(index)} onChange={() => handleWeekendChange(index)} className="w-5 h-5 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500" /><span className="font-medium text-slate-800">{day}</span></label>))}</div></div><div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6"><h3 className="text-xl font-semibold mb-4 text-blue-800">{t('holidays_settings')}</h3><div className="flex flex-col sm:flex-row items-center gap-3 mb-4"><input type="date" value={newHoliday} onChange={(e) => setNewHoliday(e.target.value)} className="w-full sm:w-auto flex-grow p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-orange-500 focus:border-orange-500" /><button onClick={handleAddHoliday} className="w-full sm:w-auto flex items-center justify-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"><CalendarPlusIcon className="w-5 h-5 me-2"/> {t('add_holiday')}</button></div><div className="max-h-60 overflow-y-auto pr-2 space-y-2">{localHolidays.length > 0 ? localHolidays.map(holiday => (<div key={holiday} className="flex justify-between items-center p-3 bg-white/30 rounded-lg"><span className="font-mono text-slate-700">{holiday}</span><button onClick={() => handleRemoveHoliday(holiday)} className="text-red-500 hover:text-red-700"><TrashIcon className="w-5 h-5"/></button></div>)) : <p className="text-center text-slate-500 p-4">{t('no_holidays_added')}</p>}</div></div><div className="flex items-center justify-between mt-6"><div className={`transition-opacity duration-300 ${settingsMessage ? 'opacity-100' : 'opacity-0'}`}>{settingsMessage && <p className="text-green-700 font-semibold">{settingsMessage}</p>}</div><button onClick={handleSaveSettings} disabled={isSavingSettings} className="bg-orange-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:bg-orange-300 flex items-center justify-center">{isSavingSettings ? (<><div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white me-3"></div>{t('saving_settings')}</>) : (t('save_settings'))}</button></div></div>)}
 
       {isExportModalOpen && (
-        <Modal 
-          isOpen={isExportModalOpen} 
-          onClose={() => setIsExportModalOpen(false)} 
-          title={t('download_rep_client_lists')}
-        >
+        <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title={t('download_rep_client_lists')}>
           <div className="space-y-4">
             <p className="text-sm text-slate-700">{t('select_reps_to_download')}</p>
-            
             <div className="border border-slate-300/50 rounded-lg">
                 <div className="flex items-center p-3 bg-slate-100/50 rounded-t-lg border-b border-slate-300/50">
-                    <input
-                        type="checkbox"
-                        id="selectAllReps"
-                        onChange={handleSelectAllReps}
-                        checked={reps.length > 0 && selectedRepsForExport.length === reps.length}
-                        className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3"
-                    />
-                    <label htmlFor="selectAllReps" className="text-sm font-medium text-slate-800 cursor-pointer">
-                        {t('select_all')}
-                    </label>
+                    <input type="checkbox" id="selectAllReps" onChange={handleSelectAllReps} checked={reps.length > 0 && selectedRepsForExport.length === reps.length} className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3" />
+                    <label htmlFor="selectAllReps" className="text-sm font-medium text-slate-800 cursor-pointer">{t('select_all')}</label>
                 </div>
                 <div className="max-h-60 overflow-y-auto p-3 space-y-2">
                     {reps.map(rep => (
                         <div key={rep.id} className="flex items-center">
-                            <input
-                                type="checkbox"
-                                id={`rep-${rep.id}`}
-                                value={rep.id}
-                                checked={selectedRepsForExport.includes(rep.id)}
-                                onChange={() => handleRepSelectionChange(rep.id)}
-                                className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3"
-                            />
-                            <label htmlFor={`rep-${rep.id}`} className="text-sm text-slate-800 cursor-pointer">
-                                {rep.name}
-                            </label>
+                            <input type="checkbox" id={`rep-${rep.id}`} value={rep.id} checked={selectedRepsForExport.includes(rep.id)} onChange={() => handleRepSelectionChange(rep.id)} className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 me-3" />
+                            <label htmlFor={`rep-${rep.id}`} className="text-sm text-slate-800 cursor-pointer">{rep.name}</label>
                         </div>
                     ))}
                 </div>
             </div>
-            
             <div className="flex items-center justify-end space-x-2 space-x-reverse pt-4 border-t border-slate-300/50">
-              <button
-                type="button"
-                onClick={() => setIsExportModalOpen(false)}
-                className="text-slate-700 bg-transparent hover:bg-slate-200/50 focus:ring-4 focus:outline-none focus:ring-slate-300 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 hover:text-slate-900 focus:z-10 transition-colors"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmClientListExport}
-                disabled={selectedRepsForExport.length === 0}
-                className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
-              >
-                {t('download_count', selectedRepsForExport.length)}
-              </button>
+              <button type="button" onClick={() => setIsExportModalOpen(false)} className="text-slate-700 bg-transparent hover:bg-slate-200/50 focus:ring-4 focus:outline-none focus:ring-slate-300 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 hover:text-slate-900 focus:z-10 transition-colors">{t('cancel')}</button>
+              <button type="button" onClick={handleConfirmClientListExport} disabled={selectedRepsForExport.length === 0} className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors">{t('download_count', selectedRepsForExport.length)}</button>
             </div>
           </div>
         </Modal>
       )}
 
-       <UserEditModal 
-            isOpen={isUserModalOpen}
-            onClose={() => setIsUserModalOpen(false)}
-            onSuccess={handleUserModalSuccess}
-            userToEdit={editingUser}
-        />
+       <UserEditModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSuccess={handleUserModalSuccess} userToEdit={editingUser} />
 
         {deletingUser && (
             <Modal isOpen={!!deletingUser} onClose={() => setDeletingUser(null)} title={t('confirm_delete_title')}>
                 <div>
                     <p className="text-slate-700">{t('confirm_delete_message', deletingUser.name)}</p>
                     <div className="flex items-center justify-end space-x-2 space-x-reverse pt-6">
-                        <button
-                            type="button"
-                            onClick={() => setDeletingUser(null)}
-                            className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
-                        >
-                            {t('cancel')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleConfirmDelete}
-                            disabled={isDeleting}
-                            className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors"
-                        >
-                            {isDeleting ? t('deleting') : t('confirm')}
-                        </button>
+                        <button type="button" onClick={() => setDeletingUser(null)} className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors">{t('cancel')}</button>
+                        <button type="button" onClick={handleConfirmDelete} disabled={isDeleting} className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors">{isDeleting ? t('deleting') : t('confirm')}</button>
                     </div>
                 </div>
             </Modal>
         )}
         
-        {viewingRepClients && 
-            <ClientListModal 
-                rep={viewingRepClients} 
-                onClose={() => setViewingRepClients(null)} 
-                totalDoctors={totalDoctors}
-                totalPharmacies={totalPharmacies}
-                regions={regions}
-            />
-        }
+        {viewingRepClients && <ClientListModal rep={viewingRepClients} onClose={() => setViewingRepClients(null)} totalDoctors={totalDoctors} totalPharmacies={totalPharmacies} regions={regions} />}
+        {isDailyVisitsDetailModalOpen && <DailyVisitsDetailModal isOpen={isDailyVisitsDetailModalOpen} onClose={() => setIsDailyVisitsDetailModalOpen(false)} reports={allReports} reps={reps} selectedRepId={selectedRepForDailyVisits} />}
+        {isOverdueClientsDetailModalOpen && <OverdueClientsDetailModal isOpen={isOverdueClientsDetailModalOpen} onClose={() => setIsOverdueClientsDetailModalOpen(false)} alerts={overdueAlerts} reps={reps} regions={regions} />}
 
-        {isDailyVisitsDetailModalOpen && (
-            <DailyVisitsDetailModal
-                isOpen={isDailyVisitsDetailModalOpen}
-                onClose={() => setIsDailyVisitsDetailModalOpen(false)}
-                reports={allReports}
-                reps={reps}
-                selectedRepId={selectedRepForDailyVisits}
-            />
-        )}
-
-        {isOverdueClientsDetailModalOpen && (
-          <OverdueClientsDetailModal
-            isOpen={isOverdueClientsDetailModalOpen}
-            onClose={() => setIsOverdueClientsDetailModalOpen(false)}
-            alerts={overdueAlerts} // Pass the full list of overdue alerts
-            reps={reps}
-            regions={regions}
-          />
-        )}
-
-        {/* NEW: Reset Visits Confirmation Modal */}
         {repToReset && (
             <Modal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} title={t('confirm_reset_title')}>
                 <div>
                     <p className="text-slate-700">{t('confirm_reset_message', repToReset.name)}</p>
-                    {reviewMessage && reviewMessage.type === 'error' && (
-                        <p className="text-red-500 text-sm mt-4">{reviewMessage.text}</p>
-                    )}
+                    {reviewMessage && reviewMessage.type === 'error' && (<p className="text-red-500 text-sm mt-4">{reviewMessage.text}</p>)}
                     <div className="flex items-center justify-end space-x-2 space-x-reverse pt-6">
-                        <button
-                            type="button"
-                            onClick={() => setIsResetModalOpen(false)}
-                            className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors"
-                        >
-                            {t('cancel')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleConfirmReset}
-                            disabled={isResetting}
-                            className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors"
-                        >
-                            {isResetting ? t('resetting') : t('confirm_reset')}
-                        </button>
+                        <button type="button" onClick={() => setIsResetModalOpen(false)} className="text-slate-700 bg-transparent hover:bg-slate-200/50 rounded-lg border border-slate-300 text-sm font-medium px-5 py-2.5 transition-colors">{t('cancel')}</button>
+                        <button type="button" onClick={handleConfirmReset} disabled={isResetting} className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-red-300 transition-colors">{isResetting ? t('resetting') : t('confirm_reset')}</button>
                     </div>
                 </div>
             </Modal>
@@ -1874,28 +1307,37 @@ const ManagerDashboard: React.FC = () => {
                 allRegions={regions}
             />
         )}
+        
+        {/* NEW: Frequency Detail Modal */}
+        {selectedFrequencyDetails && (
+          <FrequencyDetailModal
+            isOpen={isFrequencyDetailModalOpen}
+            onClose={() => setIsFrequencyDetailModalOpen(false)}
+            title={selectedFrequencyDetails.title}
+            doctors={selectedFrequencyDetails.doctors}
+            repName={selectedFrequencyDetails.repName}
+            frequencyLabel={selectedFrequencyDetails.frequencyLabel}
+          />
+        )}
     </div>
   );
 };
 
-
-// A sub-component for the client list modal to keep the main component cleaner
+// ... (ClientListModal stays the same)
 interface ClientListModalProps {
     rep: User;
     onClose: () => void;
-    totalDoctors: Doctor[]; // Explicitly passed
-    totalPharmacies: Pharmacy[]; // Explicitly passed
-    regions: Region[]; // Explicitly passed
+    totalDoctors: Doctor[]; 
+    totalPharmacies: Pharmacy[];
+    regions: Region[];
 }
 
 const ClientListModal: React.FC<ClientListModalProps> = ({ rep, onClose, totalDoctors, totalPharmacies, regions }) => {
     const { t } = useLanguage();
-
     const [activeModalTab, setActiveModalTab] = useState<'doctors' | 'pharmacies'>('doctors');
     const repDoctors = useMemo(() => totalDoctors.filter((d: Doctor) => d.repId === rep.id), [rep.id, totalDoctors]);
     const repPharmacies = useMemo(() => totalPharmacies.filter((p: Pharmacy) => p.repId === rep.id), [rep.id, totalPharmacies]);
     const regionMap = useMemo(() => new Map(regions.map((r: Region) => [r.id, r.name])), [regions]);
-
 
     const handleExport = () => {
         exportClientsToExcel(repDoctors, repPharmacies, regions, `clients_${rep.username}`, t);
@@ -1924,40 +1366,18 @@ const ClientListModal: React.FC<ClientListModalProps> = ({ rep, onClose, totalDo
                       repDoctors.length > 0 ? (
                           <table className="w-full text-sm text-start">
                               <thead className="text-xs text-blue-800 uppercase bg-slate-100/50 sticky top-0">
-                                  <tr>
-                                      <th className="px-4 py-2">{t('name')}</th>
-                                      <th className="px-4 py-2">{t('specialization')}</th>
-                                      <th className="px-4 py-2">{t('region')}</th>
-                                  </tr>
+                                  <tr><th className="px-4 py-2">{t('name')}</th><th className="px-4 py-2">{t('specialization')}</th><th className="px-4 py-2">{t('region')}</th></tr>
                               </thead>
-                              <tbody>
-                                  {repDoctors.map(doctor => (
-                                      <tr key={doctor.id} className="border-b border-slate-200/50">
-                                          <td className="px-4 py-2 font-medium text-slate-800">{doctor.name}</td>
-                                          <td className="px-4 py-2">{t(doctor.specialization)}</td>
-                                          <td className="px-4 py-2">{regionMap.get(doctor.regionId) || t('unknown')}</td>
-                                      </tr>
-                                  ))}
-                              </tbody>
+                              <tbody>{repDoctors.map(doctor => (<tr key={doctor.id} className="border-b border-slate-200/50"><td className="px-4 py-2 font-medium text-slate-800">{doctor.name}</td><td className="px-4 py-2">{t(doctor.specialization)}</td><td className="px-4 py-2">{regionMap.get(doctor.regionId) || t('unknown')}</td></tr>))}</tbody>
                           </table>
                       ) : <p className="text-center p-8 text-slate-600">{t('no_doctors_assigned')}</p>
                   ) : (
                       repPharmacies.length > 0 ? (
                            <table className="w-full text-sm text-start">
                               <thead className="text-xs text-orange-800 uppercase bg-slate-100/50 sticky top-0">
-                                  <tr>
-                                      <th className="px-4 py-2">{t('name')}</th>
-                                      <th className="px-4 py-2">{t('region')}</th>
-                                  </tr>
+                                  <tr><th className="px-4 py-2">{t('name')}</th><th className="px-4 py-2">{t('region')}</th></tr>
                               </thead>
-                              <tbody>
-                                  {repPharmacies.map(pharmacy => (
-                                      <tr key={pharmacy.id} className="border-b border-slate-200/50">
-                                          <td className="px-4 py-2 font-medium text-slate-800">{pharmacy.name}</td>
-                                          <td className="px-4 py-2">{regionMap.get(pharmacy.regionId) || t('unknown')}</td>
-                                      </tr>
-                                  ))}
-                              </tbody>
+                              <tbody>{repPharmacies.map(pharmacy => (<tr key={pharmacy.id} className="border-b border-slate-200/50"><td className="px-4 py-2 font-medium text-slate-800">{pharmacy.name}</td><td className="px-4 py-2">{regionMap.get(pharmacy.regionId) || t('unknown')}</td></tr>))}</tbody>
                           </table>
                       ) : <p className="text-center p-8 text-slate-600">{t('no_pharmacies_assigned')}</p>
                   )}
@@ -1966,6 +1386,5 @@ const ClientListModal: React.FC<ClientListModalProps> = ({ rep, onClose, totalDo
       </Modal>
     );
 }
-
 
 export default ManagerDashboard;

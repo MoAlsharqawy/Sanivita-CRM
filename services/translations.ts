@@ -65,6 +65,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total': 'الإجمالي',
     'show_more_options': 'المزيد / بحث متقدم',
     'show_less_options': 'عرض زيارات اليوم فقط',
+    // Frequency Modal
+    'frequency_details_title': 'تفاصيل زيارات الأطباء ({0} - {1})',
+    'visit_count': 'عدد الزيارات',
+    'download_excel': 'تحميل Excel',
     // Plan related
     'weekly_plan': 'الخطة الأسبوعية',
     'create_next_week_plan': 'إنشاء خطة الأسبوع القادم',
@@ -238,6 +242,9 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total': 'Total',
     'show_more_options': 'More / Advanced Search',
     'show_less_options': 'Show Today Only',
+    'frequency_details_title': 'Doctor Visit Frequency ({0} - {1})',
+    'visit_count': 'Visit Count',
+    'download_excel': 'Download Excel',
     'weekly_plan': 'Weekly Plan',
     'create_next_week_plan': 'Create Next Week Plan',
     'planning_time_message': 'It\'s Thursday! Please hurry to prepare and submit the work plan for next week.',
