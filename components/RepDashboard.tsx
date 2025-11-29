@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
 import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan, RepTask } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, MapPinIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
+import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -752,7 +752,7 @@ const RepDashboard: React.FC = () => {
         <Modal 
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)}
-          title={t('New_visit_registration')}
+          title={t('new_visit_registration')}
         >
           <VisitForm 
               user={user} 
