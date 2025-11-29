@@ -177,6 +177,11 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'manage_regions_for': 'إدارة المناطق لـ {0}',
     'select_regions_instruction': 'اختر المناطق التي يغطيها هذا المندوب:',
     'no_regions_selected': 'لم يتم اختيار أي منطقة. سيتمكن المندوب من رؤية جميع المناطق تلقائياً.',
+    // Overdue Alerts
+    'overdue_visits_alert': 'لديك {0} زيارات متأخرة',
+    'overdue_visits_description': 'تجاوز هؤلاء العملاء المدة الموصى بها للزيارة. يرجى المتابعة.',
+    'never_visited': 'لم تتم الزيارة',
+    'days_ago': 'منذ {0} يوم',
   },
   en: {
     'hello': 'Hello, {0}',
@@ -351,5 +356,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'manage_regions_for': 'Manage Regions for {0}',
     'select_regions_instruction': 'Select regions covered by this representative:',
     'no_regions_selected': 'No regions selected. The rep will see ALL regions by default.',
+    // Overdue Alerts
+    'overdue_visits_alert': 'You have {0} overdue visits',
+    'overdue_visits_description': 'These clients have exceeded the recommended visit interval. Please follow up.',
+    'never_visited': 'Never visited',
+    'days_ago': '{0} days ago',
   }
 };

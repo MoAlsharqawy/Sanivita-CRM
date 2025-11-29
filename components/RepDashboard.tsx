@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -372,20 +373,20 @@ const RepDashboard: React.FC = () => {
        {/* Overdue Alerts Section - Prominently Displayed */}
        {alerts.length > 0 && (
         <div className="mb-8 animate-fade-in-up">
-          <div className="bg-red-100/80 border-t-4 border-red-600 rounded-lg text-red-900 shadow-md backdrop-blur-lg overflow-hidden">
+          <div className="bg-gradient-to-br from-red-50 to-red-100 border-s-4 border-red-500 rounded-lg text-red-900 shadow-md backdrop-blur-lg overflow-hidden transition-all hover:shadow-xl">
             <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-start">
-                <div className="py-1 bg-white/50 p-2 rounded-full me-4">
+                <div className="py-1 bg-white/60 p-2 rounded-full me-4 shadow-sm animate-pulse">
                     <WarningIcon className="h-6 w-6 text-red-600 flex-shrink-0"/>
                 </div>
                 <div>
-                  <p className="font-bold text-lg">{t('overdue_visits_alert', alerts.length)}</p>
-                  <p className="text-sm text-red-800 opacity-90">{t('overdue_visits_description')}</p>
+                  <p className="font-bold text-lg text-red-800">{t('overdue_visits_alert', alerts.length)}</p>
+                  <p className="text-sm text-red-700 opacity-90">{t('overdue_visits_description')}</p>
                 </div>
               </div>
               <button 
                 onClick={() => setIsAlertsExpanded(!isAlertsExpanded)}
-                className="flex items-center gap-1 text-sm font-bold text-red-700 hover:text-red-900 bg-white/70 px-4 py-2 rounded-lg border border-red-200 hover:bg-white transition-all whitespace-nowrap self-end sm:self-auto shadow-sm"
+                className="flex items-center gap-1 text-sm font-bold text-red-700 hover:text-red-900 bg-white/60 px-4 py-2 rounded-lg border border-red-200 hover:bg-white transition-all whitespace-nowrap self-end sm:self-auto shadow-sm"
               >
                 {isAlertsExpanded ? (
                     <>
@@ -402,21 +403,23 @@ const RepDashboard: React.FC = () => {
             </div>
             
             {/* Expandable Content */}
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isAlertsExpanded ? 'max-h-[500px] opacity-100 border-t border-red-200' : 'max-h-0 opacity-0'}`}>
-                <div className="p-4 bg-white/40">
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isAlertsExpanded ? 'max-h-[500px] opacity-100 border-t border-red-200/50' : 'max-h-0 opacity-0'}`}>
+                <div className="p-4 bg-white/30">
                     <ul className="space-y-2 max-h-60 overflow-y-auto pe-2">
                         {alerts.map(alert => (
-                            <li key={alert.id} className="flex justify-between items-center p-3 bg-white/80 rounded-lg shadow-sm hover:bg-white transition-colors">
+                            <li key={alert.id} className="flex justify-between items-center p-3 bg-white/80 rounded-lg shadow-sm hover:bg-white transition-colors border border-red-100">
                                 <div>
                                     <div className="flex items-center gap-2">
                                         {alert.type === 'doctor' ? <DoctorIcon className="w-4 h-4 text-blue-600"/> : <PharmacyIcon className="w-4 h-4 text-orange-600"/>}
                                         <span className="font-semibold text-slate-800">{alert.name}</span>
                                     </div>
-                                    <p className="text-xs text-slate-600 mt-0.5 ms-6">
+                                    <p className="text-xs text-slate-600 mt-0.5 ms-6 flex items-center gap-1">
+                                        <span className="opacity-75">{t('region')}:</span>
                                         {regionMap.get(parseInt(alert.regionName, 10)) || alert.regionName}
                                     </p>
                                 </div>
-                                <span className="text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full border border-red-200">
+                                <span className="text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full border border-red-200 flex items-center gap-1">
+                                    <WarningIcon className="w-3 h-3" />
                                     {alert.daysSinceLastVisit === null 
                                         ? t('never_visited')
                                         : t('days_ago', alert.daysSinceLastVisit)
