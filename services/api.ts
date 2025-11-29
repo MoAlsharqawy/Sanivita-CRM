@@ -319,7 +319,17 @@ export const api = {
   getOverdueVisits: async (): Promise<ClientAlert[]> => {
     const { data, error } = await supabase.rpc('get_overdue_visits');
     if (error) handleSupabaseError(error, 'getOverdueVisits');
-    return data || [];
+    
+    // Map snake_case to camelCase
+    return (data || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        repId: item.rep_id || item.repId,
+        repName: item.rep_name || item.repName,
+        regionName: item.region_name || item.regionName || String(item.region_id || ''),
+        daysSinceLastVisit: item.days_since_last_visit ?? item.daysSinceLastVisit
+    }));
   },
 
   // --- WEEKLY PLANS ---

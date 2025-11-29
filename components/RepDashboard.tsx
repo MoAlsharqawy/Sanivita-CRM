@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
 import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan, RepTask } from '../types';
-import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon } from './icons';
+import { DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, UserGroupIcon, DownloadIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, ClipboardCheckIcon, CheckCircleIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, MapPinIcon } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
 import ClientSearch from './ClientSearch';
@@ -413,10 +412,16 @@ const RepDashboard: React.FC = () => {
                                         {alert.type === 'doctor' ? <DoctorIcon className="w-4 h-4 text-blue-600"/> : <PharmacyIcon className="w-4 h-4 text-orange-600"/>}
                                         <span className="font-semibold text-slate-800">{alert.name}</span>
                                     </div>
-                                    <p className="text-xs text-slate-600 mt-0.5 ms-6 flex items-center gap-1">
-                                        <span className="opacity-75">{t('region')}:</span>
-                                        {regionMap.get(parseInt(alert.regionName, 10)) || alert.regionName}
-                                    </p>
+                                    <div className="flex items-center gap-1 mt-1 ms-6 text-xs text-slate-600">
+                                         <MapPinIcon className="w-3 h-3 text-slate-400" />
+                                         <span>{t('region')}:</span>
+                                         <span className="font-medium">
+                                             {/* Attempt to display region name, handling potential ID to Name mapping or direct string display */}
+                                             {(alert.regionName && !isNaN(parseInt(alert.regionName)) 
+                                                ? regionMap.get(parseInt(alert.regionName)) 
+                                                : alert.regionName) || t('unknown')}
+                                         </span>
+                                    </div>
                                 </div>
                                 <span className="text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full border border-red-200 flex items-center gap-1">
                                     <WarningIcon className="w-3 h-3" />
