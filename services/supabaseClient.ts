@@ -1,22 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// CLEANUP: Remove legacy keys to prevent conflicts with the new static client
-try {
-  if (typeof window !== 'undefined') {
-    const keysToRemove = [
-      'sanivita-crm-supabase-url',
-      'sanivita-crm-supabase-key',
-      'sanivita-crm-supabaseUrl',
-      'sanivita-crm-supabaseAnonKey',
-      'supabase.auth.token'
-    ];
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-  }
-} catch (e) {
-  // Ignore errors during cleanup
-}
-
 // Safely access environment variables from various sources (Vite or Process)
 const getEnvVar = (key: string): string | undefined => {
     let value: string | undefined;
@@ -24,7 +8,7 @@ const getEnvVar = (key: string): string | undefined => {
     // 1. Try import.meta.env (Vite standard)
     try {
         // @ts-ignore
-        if (import.meta && import.meta.env) {
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
             // @ts-ignore
             value = import.meta.env[key];
         }
@@ -40,7 +24,7 @@ const getEnvVar = (key: string): string | undefined => {
     }
 
     // Treat empty strings or 'undefined' string as undefined
-    if (value === '' || value === 'undefined' || value === 'null') {
+    if (!value || value === '' || value === 'undefined' || value === 'null') {
         return undefined;
     }
 
@@ -59,11 +43,10 @@ export const isSupabaseConfigured =
 
 // Log warning for debugging if keys are missing
 if (!isSupabaseConfigured) {
-  console.warn('Supabase URL or Anon Key is missing or invalid. The app will run in offline/demo mode where possible, or show a setup screen.');
+  console.warn('Supabase URL or Anon Key is missing or invalid. The app will run in offline/demo mode where possible.');
 }
 
 // Create a single static client instance
-// Use fallbacks to ensure createClient never throws "supabaseUrl is required" crash
 export const supabase = createClient(
   isSupabaseConfigured ? supabaseUrl! : 'https://placeholder.supabase.co',
   isSupabaseConfigured ? supabaseAnonKey! : 'placeholder-key',
