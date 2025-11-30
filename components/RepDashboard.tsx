@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -15,6 +16,7 @@ import { exportClientsToExcel, exportToExcel } from '../services/exportService';
 import WeeklyView from './WeeklyView';
 import PlanEditor from './PlanEditor';
 import Spinner from './Spinner';
+import FrequencyDetailModal from './FrequencyDetailModal';
 
 const RepDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -41,6 +43,15 @@ const RepDashboard: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
+
+  // Frequency Modal State
+  const [isFrequencyDetailModalOpen, setIsFrequencyDetailModalOpen] = useState(false);
+  const [selectedFrequencyDetails, setSelectedFrequencyDetails] = useState<{
+      title: string;
+      doctors: { name: string; region: string; specialization: string; visits: number }[];
+      repName: string;
+      frequencyLabel: string;
+  } | null>(null);
 
   // Calculate Planning Time Logic
   const today = new Date();
@@ -161,6 +172,61 @@ const RepDashboard: React.FC = () => {
       } catch (error) {
           console.error("Failed to complete task", error);
       }
+  };
+
+  const handleFrequencyClick = (freqType: 'f1' | 'f2' | 'f3') => {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      
+      const visitCounts: Record<string, { count: number, region: string, specialization: string }> = {};
+
+      // Filter reports for this month & doctors only
+      const reports = recentVisits.filter(visit => {
+          const visitDate = new Date(visit.date);
+          return visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT';
+      });
+
+      // Count visits per doctor
+      reports.forEach(visit => {
+          const key = visit.targetName;
+          if (!visitCounts[key]) {
+              // Try to find region/specialization from visit or fallback to empty
+              visitCounts[key] = { 
+                  count: 0, 
+                  region: visit.regionName, 
+                  specialization: visit.targetSpecialization || '' 
+              };
+          }
+          visitCounts[key].count++;
+      });
+
+      // Filter based on frequency type
+      const filteredDoctors = Object.entries(visitCounts)
+          .filter(([_, data]) => {
+              if (freqType === 'f1') return data.count === 1;
+              if (freqType === 'f2') return data.count === 2;
+              if (freqType === 'f3') return data.count >= 3;
+              return false;
+          })
+          .map(([name, data]) => ({
+              name,
+              region: data.region,
+              specialization: data.specialization,
+              visits: data.count
+          }));
+      
+      let freqLabel = '';
+      if (freqType === 'f1') freqLabel = t('freq_1_mo');
+      else if (freqType === 'f2') freqLabel = t('freq_2_mo');
+      else freqLabel = t('freq_3_mo');
+
+      setSelectedFrequencyDetails({
+          title: t('frequency_details_title', user?.name || '', freqLabel),
+          doctors: filteredDoctors,
+          repName: user?.name || '',
+          frequencyLabel: freqLabel
+      });
+      setIsFrequencyDetailModalOpen(true);
   };
   
   const displayVisits = useMemo(() => {
@@ -592,15 +658,30 @@ const RepDashboard: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="flex flex-col items-center">
-                         <p className="text-2xl font-bold text-slate-800">{visitFrequency.freq1}</p>
+                         <button 
+                            onClick={() => handleFrequencyClick('f1')} 
+                            className="text-2xl font-bold text-slate-800 hover:text-blue-600 hover:underline transition-all"
+                         >
+                            {visitFrequency.freq1}
+                         </button>
                          <p className="text-xs text-slate-600 font-semibold">{t('freq_1_mo')}</p>
                     </div>
                     <div className="flex flex-col items-center border-x border-slate-300/50">
-                         <p className="text-2xl font-bold text-blue-800">{visitFrequency.freq2}</p>
+                         <button 
+                            onClick={() => handleFrequencyClick('f2')} 
+                            className="text-2xl font-bold text-blue-800 hover:text-blue-600 hover:underline transition-all"
+                         >
+                            {visitFrequency.freq2}
+                         </button>
                          <p className="text-xs text-slate-600 font-semibold">{t('freq_2_mo')}</p>
                     </div>
                     <div className="flex flex-col items-center">
-                         <p className="text-2xl font-bold text-green-800">{visitFrequency.freq3}</p>
+                         <button 
+                            onClick={() => handleFrequencyClick('f3')} 
+                            className="text-2xl font-bold text-green-800 hover:text-green-600 hover:underline transition-all"
+                         >
+                            {visitFrequency.freq3}
+                         </button>
                          <p className="text-xs text-slate-600 font-semibold">{t('freq_3_mo')}</p>
                     </div>
                 </div>
@@ -826,6 +907,18 @@ const RepDashboard: React.FC = () => {
                   </div>
               </div>
           </Modal>
+      )}
+
+      {/* NEW: Frequency Detail Modal */}
+      {selectedFrequencyDetails && (
+        <FrequencyDetailModal
+          isOpen={isFrequencyDetailModalOpen}
+          onClose={() => setIsFrequencyDetailModalOpen(false)}
+          title={selectedFrequencyDetails.title}
+          doctors={selectedFrequencyDetails.doctors}
+          repName={selectedFrequencyDetails.repName}
+          frequencyLabel={selectedFrequencyDetails.frequencyLabel}
+        />
       )}
     </div>
   );
