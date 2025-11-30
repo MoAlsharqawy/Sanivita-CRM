@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, ReactNode, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
@@ -19,16 +19,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   
-  // Use a ref to track the current user ID processing to prevent race conditions
-  // between getSession() and onAuthStateChange()
-  const currentUserIdRef = useRef<string | null>(null);
+  // Use a ref to track initialization status to prevent double execution in Strict Mode
+  const initRef = useRef(false);
 
-  const fetchAndSetProfile = useCallback(async (userId: string) => {
-    // If we are already displaying this user, skip fetching
-    if (currentUserIdRef.current === userId && user) return;
-    
-    currentUserIdRef.current = userId;
-    
+  const fetchProfile = async (userId: string) => {
     try {
       const profile = await api.getUserProfile(userId);
       setUser(profile);
@@ -38,16 +32,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error.message === 'rls_error') {
         setAuthError('rls_error');
       } else if (error.message === 'profile_not_found') {
-        // Valid auth session but no profile data -> Force logout
-        await supabase.auth.signOut();
+        // Valid auth session but no profile data -> Force local logout
         setUser(null);
-        currentUserIdRef.current = null;
+        // Do not await this, just fire and forget to avoid blocking UI
+        supabase.auth.signOut().catch(() => {});
       } else {
-        // Generic error
         setAuthError('db_error_title');
       }
     }
-  }, [user]);
+  };
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -58,8 +51,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let mounted = true;
 
     const initAuth = async () => {
+      // Prevent double invocation
+      if (initRef.current) return;
+      initRef.current = true;
+
       try {
-        // 1. Get initial session
+        // 1. Get initial session with a timeout
         // We use a timeout to prevent the app from hanging indefinitely if Supabase is unreachable
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('auth_timeout')), 7000)
@@ -74,11 +71,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const session = result.data.session;
 
         if (session?.user) {
-          if (mounted) await fetchAndSetProfile(session.user.id);
+          if (mounted) await fetchProfile(session.user.id);
         } else {
           if (mounted) {
             setUser(null);
-            currentUserIdRef.current = null;
           }
         }
 
@@ -87,9 +83,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (mounted) {
           if (error.message === 'auth_timeout' || error === 'auth_timeout') {
             setAuthError('auth_timeout_error');
-            await supabase.auth.signOut();
+            // CRITICAL FIX: Do NOT await signOut here. If the network is down (causing timeout),
+            // signOut will also hang/timeout, preventing the finally block from executing.
+            supabase.auth.signOut().catch(() => {});
           } else {
-             // Don't set global error for generic session missing, just logged out
+             // For generic errors, just ensure user is null so app can load public route
              setUser(null);
           }
         }
@@ -106,18 +104,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-           // This prevents double fetching if initAuth already handled it
-           if (currentUserIdRef.current !== session.user.id) {
-             await fetchAndSetProfile(session.user.id);
-           }
-           if (mounted) setLoading(false);
+           // Optimistic check to avoid refetching if we already have the correct user loaded
+           setUser(prev => {
+             if (prev && prev.id === session.user.id) return prev;
+             // If different user or no user, fetch profile
+             fetchProfile(session.user.id);
+             return prev;
+           });
         }
       } else if (event === 'SIGNED_OUT') {
         if (mounted) {
           setUser(null);
           setAuthError(null);
           setLoading(false);
-          currentUserIdRef.current = null;
         }
       }
     });
@@ -126,14 +125,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchAndSetProfile]);
+  }, []);
 
   const login = async (username: string, password: string) => {
     setAuthError(null);
     const user = await api.login(username, password);
     // login api returns the user profile directly, update state immediately
     setUser(user);
-    currentUserIdRef.current = user.id;
     return user;
   };
 
@@ -143,10 +141,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error("Error signing out:", error);
     } finally {
-      // Optimistic update
       setUser(null);
       setAuthError(null);
-      currentUserIdRef.current = null;
     }
   };
 
