@@ -1,4 +1,5 @@
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -182,6 +183,14 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'overdue_visits_description': 'تجاوز هؤلاء العملاء المدة الموصى بها للزيارة. يرجى المتابعة.',
     'never_visited': 'لم تتم الزيارة',
     'days_ago': 'منذ {0} يوم',
+    // Vacations
+    'vacations': 'الأجازات',
+    'vacation_stats': 'إحصائيات الأجازات والغياب',
+    'select_month': 'اختر الشهر',
+    'total_working_days': 'أيام العمل',
+    'days_worked': 'الأيام المحققة',
+    'absent_days': 'أيام الغياب / الأجازة',
+    'vacation_stats_info': 'يتم حساب الغياب بناءً على الأيام التي لم يسجل فيها المندوب أي زيارة رغم كونها أيام عمل رسمية (ليست عطلة أسبوعية أو رسمية).',
   },
   en: {
     'hello': 'Hello, {0}',
@@ -361,5 +370,13 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'overdue_visits_description': 'These clients have exceeded the recommended visit interval. Please follow up.',
     'never_visited': 'Never visited',
     'days_ago': '{0} days ago',
+    // Vacations
+    'vacations': 'Vacations',
+    'vacation_stats': 'Vacation & Absence Statistics',
+    'select_month': 'Select Month',
+    'total_working_days': 'Working Days',
+    'days_worked': 'Days Worked',
+    'absent_days': 'Absent/Vacation Days',
+    'vacation_stats_info': 'Absence is calculated based on days where the rep did not record any visits despite it being an official working day (not a weekend or holiday).',
   }
 };

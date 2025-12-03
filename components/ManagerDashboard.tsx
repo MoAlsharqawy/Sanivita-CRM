@@ -1,9 +1,11 @@
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon, ClipboardCheckIcon, CheckCircleIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon, ClipboardCheckIcon, CheckCircleIcon, SunIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage, TranslationFunction } from '../hooks/useLanguage';
@@ -92,7 +94,7 @@ const ManagerDashboard: React.FC = () => {
   ], [t]);
 
 
-  type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport' | 'tasks';
+  type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport' | 'tasks' | 'vacations';
 
 
   // Tab and Modal states
@@ -128,6 +130,9 @@ const ManagerDashboard: React.FC = () => {
       repName: string;
       frequencyLabel: string;
   } | null>(null);
+  
+  // Vacation Stats State
+  const [selectedVacationMonth, setSelectedVacationMonth] = useState<string>(toYYYYMMDD(new Date()).substring(0, 7)); // YYYY-MM
 
 
   // Settings tab local state
@@ -436,6 +441,62 @@ const ManagerDashboard: React.FC = () => {
 
     return result;
   }, [allReports, reps, selectedRep]);
+
+  // Vacation Stats Logic
+  const vacationStats = useMemo(() => {
+    if (!systemSettings) return [];
+
+    const [yearStr, monthStr] = selectedVacationMonth.split('-');
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr) - 1; // 0-indexed
+
+    // Calculate days in the selected month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const workingDaysSet = new Set<string>();
+
+    // Identify working days
+    for (let day = 1; day <= daysInMonth; day++) {
+        const current = new Date(year, month, day);
+        const dateStr = toYYYYMMDD(current);
+        const dayIndex = current.getDay();
+
+        // Check if weekend or holiday
+        const isWeekend = systemSettings.weekends.includes(dayIndex);
+        const isHoliday = systemSettings.holidays.includes(dateStr);
+
+        if (!isWeekend && !isHoliday) {
+            workingDaysSet.add(dateStr);
+        }
+    }
+
+    const totalWorkingDays = workingDaysSet.size;
+    const stats = reps.map(rep => {
+        // Find days the rep actually worked (submitted at least one report)
+        const workedDaysSet = new Set<string>();
+        allReports.forEach(report => {
+            if (report.repName === rep.name) {
+                const reportDate = toYYYYMMDD(new Date(report.date));
+                if (workingDaysSet.has(reportDate)) {
+                    workedDaysSet.add(reportDate);
+                }
+            }
+        });
+
+        const daysWorked = workedDaysSet.size;
+        // Vacation/Absence = Working Days - Days Worked
+        const vacationDays = totalWorkingDays - daysWorked;
+
+        return {
+            repName: rep.name,
+            totalWorkingDays,
+            daysWorked,
+            vacationDays: Math.max(0, vacationDays) // Ensure non-negative
+        };
+    });
+
+    return stats;
+  }, [selectedVacationMonth, systemSettings, allReports, reps]);
+
 
   const handleFrequencyClick = (repName: string, freqType: 'f1' | 'f2' | 'f3') => {
       const today = new Date();
@@ -870,6 +931,15 @@ const ManagerDashboard: React.FC = () => {
                       {t('view_weekly_plans')}
                   </button>
               </li>
+              <li className="me-2">
+                  <button 
+                      onClick={() => setActiveTab('vacations')}
+                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'vacations' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                  >
+                      <SunIcon className="w-5 h-5 me-2" />
+                      {t('vacations')}
+                  </button>
+              </li>
               {user?.role === UserRole.Manager && (
                 <li className="me-2">
                     <button 
@@ -1234,6 +1304,63 @@ const ManagerDashboard: React.FC = () => {
               <div className="bg-white/30 p-4 rounded-xl mb-8 border border-white/40"><h4 className="font-semibold text-lg mb-4 text-slate-700">{t('assign_new_task')}</h4><form onSubmit={handleCreateTask} className="flex flex-col md:flex-row gap-4 items-end"><div className="w-full md:w-1/3 relative"><label className="block text-sm font-medium text-slate-700 mb-1">{t('select_rep')}</label><div className="relative"><button type="button" onClick={() => setIsTaskRepDropdownOpen(!isTaskRepDropdownOpen)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 text-start flex justify-between items-center focus:ring-blue-500"><span className={selectedRepsForTask.length === 0 ? "text-slate-500" : "text-slate-800"}>{selectedRepsForTask.length === 0 ? t('select_reps_placeholder') : t('reps_selected', selectedRepsForTask.length)}</span><ChevronDownIcon className="w-4 h-4 text-slate-500"/></button>{isTaskRepDropdownOpen && (<div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"><div className="p-2 border-b border-slate-100"><label className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" checked={selectedRepsForTask.length === reps.length && reps.length > 0} onChange={toggleSelectAll} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><span className="ms-2 font-semibold text-sm text-slate-800">{t('select_all')}</span></label></div><div className="p-2 space-y-1">{reps.map(rep => (<label key={rep.id} className="flex items-center p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" checked={selectedRepsForTask.includes(rep.id)} onChange={() => toggleRepSelection(rep.id)} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><span className="ms-2 text-sm text-slate-700">{rep.name}</span></label>))}</div></div>)}</div></div><div className="w-full md:w-1/2"><label className="block text-sm font-medium text-slate-700 mb-1">{t('task_description')}</label><input type="text" value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white/50 focus:ring-blue-500 focus:outline-none" required placeholder={t('task_description')} /></div><button type="submit" disabled={isCreatingTask} className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300">{isCreatingTask ? t('creating') : t('create_task')}</button></form>{taskCreationMessage && (<p className={`mt-3 text-sm font-medium ${taskCreationMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{taskCreationMessage.text}</p>)}</div>
               <div className="overflow-x-auto"><table className="w-full text-sm text-start"><thead className="text-xs text-blue-800 uppercase bg-white/50"><tr><th className="px-6 py-3">{t('task_description')}</th><th className="px-6 py-3">{t('rep_name')}</th><th className="px-6 py-3">{t('status')}</th><th className="px-6 py-3">{t('date')}</th><th className="px-6 py-3">{t('actions')}</th></tr></thead><tbody className="divide-y divide-slate-200/50">{allTasks.map(task => (<tr key={task.id} className="bg-white/20 hover:bg-white/40"><td className="px-6 py-4 font-medium text-slate-800">{task.description}</td><td className="px-6 py-4">{task.repName}</td><td className="px-6 py-4">{task.isCompleted ? (<span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold flex items-center w-fit gap-1"><CheckCircleIcon className="w-3 h-3" /> {t('completed')}</span>) : (<span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold w-fit">{t('pending')}</span>)}</td><td className="px-6 py-4 text-slate-600">{new Date(task.createdAt).toLocaleDateString()}{task.completedAt && (<div className="text-xs text-green-700 mt-1">{t('task_completed_at', new Date(task.completedAt).toLocaleDateString())}</div>)}</td><td className="px-6 py-4"><button onClick={() => handleDeleteTask(task.id)} className="text-red-600 hover:text-red-800" title={t('delete_task')}><TrashIcon className="w-5 h-5" /></button></td></tr>))}{allTasks.length === 0 && (<tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">{t('no_tasks')}</td></tr>)}</tbody></table></div>
           </div>
+      )}
+
+      {activeTab === 'vacations' && (
+        <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
+            <h3 className="text-xl font-semibold mb-6 text-blue-800 flex items-center gap-2">
+                <SunIcon className="w-6 h-6" />
+                {t('vacation_stats')}
+            </h3>
+
+            <div className="flex flex-col sm:flex-row items-center gap-4 mb-6 p-4 bg-white/50 rounded-lg">
+                 <div>
+                    <label htmlFor="vacationMonth" className="block text-sm font-medium text-slate-700 mb-1">{t('select_month')}</label>
+                    <input 
+                        type="month" 
+                        id="vacationMonth"
+                        value={selectedVacationMonth}
+                        onChange={(e) => setSelectedVacationMonth(e.target.value)}
+                        className="p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    />
+                 </div>
+                 <p className="text-sm text-slate-600 italic mt-auto pb-2">
+                    {t('vacation_stats_info')}
+                 </p>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-start">
+                    <thead className="text-xs text-blue-800 uppercase bg-white/50">
+                        <tr>
+                            <th className="px-6 py-3">{t('rep_name')}</th>
+                            <th className="px-6 py-3 text-center">{t('total_working_days')}</th>
+                            <th className="px-6 py-3 text-center">{t('days_worked')}</th>
+                            <th className="px-6 py-3 text-center">{t('absent_days')}</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/50">
+                        {vacationStats.map((stat, idx) => (
+                            <tr key={idx} className="bg-white/20 hover:bg-white/40">
+                                <td className="px-6 py-4 font-medium text-slate-800">{stat.repName}</td>
+                                <td className="px-6 py-4 text-center">{stat.totalWorkingDays}</td>
+                                <td className="px-6 py-4 text-center font-bold text-green-700">{stat.daysWorked}</td>
+                                <td className="px-6 py-4 text-center">
+                                    <span className={`inline-block px-3 py-1 rounded-full font-bold ${stat.vacationDays > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                        {stat.vacationDays}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                         {vacationStats.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">{t('no_data')}</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
       )}
 
       {activeTab === 'dataImport' && (<DataImport />)}
