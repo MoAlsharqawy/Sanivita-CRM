@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask } from '../types';
@@ -17,6 +19,7 @@ import DailyVisitsDetailModal from './DailyVisitsDetailModal';
 import OverdueClientsDetailModal from './OverdueClientsDetailModal';
 import UserRegionsModal from './UserRegionsModal';
 import FrequencyDetailModal from './FrequencyDetailModal';
+import AbsentDetailsModal from './AbsentDetailsModal';
 
 // Helper functions for dates (YYYY-MM-DD format)
 const toYYYYMMDD = (date: Date): string => {
@@ -133,6 +136,8 @@ const ManagerDashboard: React.FC = () => {
   
   // Vacation Stats State
   const [selectedVacationMonth, setSelectedVacationMonth] = useState<string>(toYYYYMMDD(new Date()).substring(0, 7)); // YYYY-MM
+  const [isAbsentDetailModalOpen, setIsAbsentDetailModalOpen] = useState(false);
+  const [selectedAbsentDetails, setSelectedAbsentDetails] = useState<{ repName: string; dates: string[] } | null>(null);
 
 
   // Settings tab local state
@@ -442,7 +447,7 @@ const ManagerDashboard: React.FC = () => {
     return result;
   }, [allReports, reps, selectedRep]);
 
-  // Vacation Stats Logic
+  // Vacation Stats Logic - UPDATED for Daily Calculation
   const vacationStats = useMemo(() => {
     if (!systemSettings) return [];
 
@@ -450,47 +455,70 @@ const ManagerDashboard: React.FC = () => {
     const year = parseInt(yearStr);
     const month = parseInt(monthStr) - 1; // 0-indexed
 
-    // Calculate days in the selected month
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const workingDaysSet = new Set<string>();
+    const today = new Date();
+    today.setHours(0,0,0,0);
 
-    // Identify working days
-    for (let day = 1; day <= daysInMonth; day++) {
-        const current = new Date(year, month, day);
-        const dateStr = toYYYYMMDD(current);
-        const dayIndex = current.getDay();
-
-        // Check if weekend or holiday
-        const isWeekend = systemSettings.weekends.includes(dayIndex);
-        const isHoliday = systemSettings.holidays.includes(dateStr);
-
-        if (!isWeekend && !isHoliday) {
-            workingDaysSet.add(dateStr);
-        }
+    // Determine the end of calculation range:
+    // If selecting current month, calculate up to today.
+    // If selecting past month, calculate up to end of that month.
+    // If selecting future month, calculation stops at 0.
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    
+    // Effective end date is the earlier of Today or Month End
+    // If monthStart is in future, calculation range is invalid/empty.
+    let calculationEndDate = monthEnd;
+    if (today < monthEnd) {
+        calculationEndDate = today;
     }
 
-    const totalWorkingDays = workingDaysSet.size;
-    const stats = reps.map(rep => {
-        // Find days the rep actually worked (submitted at least one report)
-        const workedDaysSet = new Set<string>();
-        allReports.forEach(report => {
-            if (report.repName === rep.name) {
-                const reportDate = toYYYYMMDD(new Date(report.date));
-                if (workingDaysSet.has(reportDate)) {
-                    workedDaysSet.add(reportDate);
-                }
-            }
-        });
+    // Pre-process reports into a set of "RepName-YYYY-MM-DD" for O(1) lookup
+    const workMap = new Set<string>();
+    allReports.forEach(r => {
+        const d = new Date(r.date);
+        const dateKey = toYYYYMMDD(d);
+        workMap.add(`${r.repName}-${dateKey}`);
+    });
 
-        const daysWorked = workedDaysSet.size;
-        // Vacation/Absence = Working Days - Days Worked
-        const vacationDays = totalWorkingDays - daysWorked;
+    const stats = reps.map(rep => {
+        let totalWorkingDaysPassed = 0;
+        let daysWorked = 0;
+        const absentDates: string[] = [];
+
+        // Iterate day by day from start of month up to calculationEndDate
+        if (monthStart <= calculationEndDate) {
+            const current = new Date(monthStart);
+            while (current <= calculationEndDate) {
+                const dateStr = toYYYYMMDD(current);
+                const dayIndex = current.getDay();
+
+                const isWeekend = systemSettings.weekends.includes(dayIndex);
+                const isHoliday = systemSettings.holidays.includes(dateStr);
+                
+                // Only count as a "Working Day" if it's not a weekend and not a holiday
+                if (!isWeekend && !isHoliday) {
+                    totalWorkingDaysPassed++;
+                    
+                    // Check if rep worked
+                    const hasReport = workMap.has(`${rep.name}-${dateStr}`);
+                    if (hasReport) {
+                        daysWorked++;
+                    } else {
+                        // Mark as absent
+                        absentDates.push(dateStr);
+                    }
+                }
+
+                current.setDate(current.getDate() + 1);
+            }
+        }
 
         return {
             repName: rep.name,
-            totalWorkingDays,
+            totalWorkingDaysPassed,
             daysWorked,
-            vacationDays: Math.max(0, vacationDays) // Ensure non-negative
+            absentDays: absentDates.length,
+            absentDatesList: absentDates
         };
     });
 
@@ -844,6 +872,11 @@ const ManagerDashboard: React.FC = () => {
         const { textKey, color } = statusMap[status];
         return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{t(textKey)}</span>;
     };
+    
+    const handleAbsentDaysClick = (repName: string, dates: string[]) => {
+      setSelectedAbsentDetails({ repName, dates });
+      setIsAbsentDetailModalOpen(true);
+    };
 
 
   if (loading) {
@@ -1154,9 +1187,9 @@ const ManagerDashboard: React.FC = () => {
                                 <div key={stat.rep.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/30 p-3 rounded-lg border border-white/40 hover:bg-white/50 transition-colors">
                                     <div className="font-bold text-slate-800 mb-2 sm:mb-0 sm:w-1/4 truncate" title={stat.rep.name}>{stat.rep.name}</div>
                                     <div className="flex flex-wrap gap-2 flex-grow sm:justify-end">
-                                        <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold border border-blue-200">{t('total')}: {stat.doctorCount}</span>
+                                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold border border-blue-200">{t('total')}: {stat.doctorCount}</span>
                                         {Object.entries(stat.specializationCounts).map(([spec, count]) => (
-                                            <span key={spec} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full border border-slate-200">{t(spec)}: <span className="font-bold text-slate-800">{count}</span></span>
+                                            <span key={spec} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full border border-slate-200">{t(spec)}: <span className="font-bold text-slate-800">{count}</span></span>
                                         ))}
                                     </div>
                                 </div>
@@ -1334,7 +1367,7 @@ const ManagerDashboard: React.FC = () => {
                     <thead className="text-xs text-blue-800 uppercase bg-white/50">
                         <tr>
                             <th className="px-6 py-3">{t('rep_name')}</th>
-                            <th className="px-6 py-3 text-center">{t('total_working_days')}</th>
+                            <th className="px-6 py-3 text-center">{t('total_working_days_passed')}</th>
                             <th className="px-6 py-3 text-center">{t('days_worked')}</th>
                             <th className="px-6 py-3 text-center">{t('absent_days')}</th>
                         </tr>
@@ -1343,12 +1376,20 @@ const ManagerDashboard: React.FC = () => {
                         {vacationStats.map((stat, idx) => (
                             <tr key={idx} className="bg-white/20 hover:bg-white/40">
                                 <td className="px-6 py-4 font-medium text-slate-800">{stat.repName}</td>
-                                <td className="px-6 py-4 text-center">{stat.totalWorkingDays}</td>
+                                <td className="px-6 py-4 text-center">{stat.totalWorkingDaysPassed}</td>
                                 <td className="px-6 py-4 text-center font-bold text-green-700">{stat.daysWorked}</td>
                                 <td className="px-6 py-4 text-center">
-                                    <span className={`inline-block px-3 py-1 rounded-full font-bold ${stat.vacationDays > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                        {stat.vacationDays}
-                                    </span>
+                                    <button
+                                        onClick={() => stat.absentDays > 0 ? handleAbsentDaysClick(stat.repName, stat.absentDatesList) : null}
+                                        disabled={stat.absentDays === 0}
+                                        className={`inline-block px-3 py-1 rounded-full font-bold transition-all ${
+                                            stat.absentDays > 0 
+                                            ? 'bg-red-100 text-red-700 hover:bg-red-200 cursor-pointer underline decoration-dotted' 
+                                            : 'bg-green-100 text-green-700 cursor-default'
+                                        }`}
+                                    >
+                                        {stat.absentDays}
+                                    </button>
                                 </td>
                             </tr>
                         ))}
@@ -1445,6 +1486,16 @@ const ManagerDashboard: React.FC = () => {
             repName={selectedFrequencyDetails.repName}
             frequencyLabel={selectedFrequencyDetails.frequencyLabel}
           />
+        )}
+
+        {/* NEW: Absent Details Modal */}
+        {selectedAbsentDetails && (
+            <AbsentDetailsModal
+                isOpen={isAbsentDetailModalOpen}
+                onClose={() => setIsAbsentDetailModalOpen(false)}
+                repName={selectedAbsentDetails.repName}
+                absentDates={selectedAbsentDetails.dates}
+            />
         )}
     </div>
   );
