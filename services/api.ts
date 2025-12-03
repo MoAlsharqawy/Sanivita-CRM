@@ -1,5 +1,6 @@
+
 import { supabase } from './supabaseClient';
-import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask } from '../types';
+import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask, RepAbsence } from '../types';
 
 // Helper to handle Supabase errors
 const handleSupabaseError = (error: any, context: string) => {
@@ -403,6 +404,36 @@ export const api = {
   deleteTask: async (taskId: string): Promise<void> => {
       const { error } = await supabase.from('rep_tasks').delete().eq('id', taskId);
       if (error) handleSupabaseError(error, 'deleteTask');
+  },
+
+  // --- ABSENCES ---
+  getRepAbsences: async (): Promise<RepAbsence[]> => {
+    const { data, error } = await supabase.from('rep_absences').select('*');
+    if (error) {
+       console.warn("Could not fetch absences. Table 'rep_absences' might not exist.", error.message);
+       return [];
+    }
+    return (data || []).map((a: any) => ({
+      id: a.id,
+      repId: a.rep_id,
+      date: a.date,
+      reason: a.reason
+    }));
+  },
+
+  addRepAbsence: async (repId: string, date: string, reason: string): Promise<RepAbsence> => {
+    const { data, error } = await supabase.from('rep_absences').insert({
+      rep_id: repId,
+      date: date,
+      reason: reason
+    }).select().single();
+    if (error) handleSupabaseError(error, 'addRepAbsence');
+    return { id: data.id, repId: data.rep_id, date: data.date, reason: data.reason };
+  },
+
+  deleteRepAbsence: async (id: number): Promise<void> => {
+    const { error } = await supabase.from('rep_absences').delete().eq('id', id);
+    if (error) handleSupabaseError(error, 'deleteRepAbsence');
   },
 
   // --- SYSTEM SETTINGS ---

@@ -1,5 +1,7 @@
 
 
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -190,12 +192,26 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total_working_days_passed': 'أيام العمل المنقضية',
     'days_worked': 'الأيام المحققة',
     'absent_days': 'أيام الغياب',
-    'vacation_stats_info': 'يتم حساب الغياب بناءً على الأيام المنقضية من الشهر (باستثناء الإجازات) والتي لم يسجل فيها المندوب أي زيارة.',
+    'vacation_stats_info': 'يتم حساب الغياب تلقائياً (في حالة عدم وجود زيارات في أيام العمل) بالإضافة إلى الغياب المسجل يدوياً.',
     'absent_details_title': 'تفاصيل الغياب لـ {0}',
     'absent_dates_list': 'تواريخ الغياب',
     'day_name': 'اليوم',
+    'register_absence': 'تسجيل غياب',
+    'register_absence_title': 'تسجيل غياب جديد',
+    'absence_date': 'تاريخ الغياب',
+    'reason': 'السبب',
+    'reason_optional': 'السبب (اختياري)',
+    'meeting_absence': 'اجتماع',
+    'sick_leave': 'أجازة مرضية',
+    'regular_leave': 'أجازة اعتيادية',
+    'other': 'أخرى',
+    'manual_absence': 'غياب مسجل يدوياً',
+    'auto_absence': 'عدم تسجيل زيارات',
+    'confirm_delete_absence': 'حذف',
+    'absence_added_success': 'تم تسجيل الغياب بنجاح',
   },
   en: {
+    // General
     'hello': 'Hello, {0}',
     'logout': 'Logout',
     'unknown': 'Unknown',
@@ -380,9 +396,22 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'total_working_days_passed': 'Working Days Passed',
     'days_worked': 'Days Worked',
     'absent_days': 'Absent Days',
-    'vacation_stats_info': 'Absence is calculated based on days passed in the month (excluding holidays/weekends) where the rep did not record any visits.',
+    'vacation_stats_info': 'Absence is calculated automatically (no visits on working days) plus any manually registered absences.',
     'absent_details_title': 'Absence Details for {0}',
     'absent_dates_list': 'Absent Dates',
     'day_name': 'Day',
+    'register_absence': 'Register Absence',
+    'register_absence_title': 'Register New Absence',
+    'absence_date': 'Absence Date',
+    'reason': 'Reason',
+    'reason_optional': 'Reason (Optional)',
+    'meeting_absence': 'Meeting',
+    'sick_leave': 'Sick Leave',
+    'regular_leave': 'Regular Leave',
+    'other': 'Other',
+    'manual_absence': 'Manually Registered',
+    'auto_absence': 'No Visits Recorded',
+    'confirm_delete_absence': 'Delete',
+    'absence_added_success': 'Absence registered successfully',
   }
 };

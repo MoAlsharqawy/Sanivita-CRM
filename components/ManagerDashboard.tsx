@@ -3,9 +3,11 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
-import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask } from '../types';
+import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
 import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon, ClipboardCheckIcon, CheckCircleIcon, SunIcon } from './icons';
 import Modal from './Modal';
@@ -137,7 +139,16 @@ const ManagerDashboard: React.FC = () => {
   // Vacation Stats State
   const [selectedVacationMonth, setSelectedVacationMonth] = useState<string>(toYYYYMMDD(new Date()).substring(0, 7)); // YYYY-MM
   const [isAbsentDetailModalOpen, setIsAbsentDetailModalOpen] = useState(false);
-  const [selectedAbsentDetails, setSelectedAbsentDetails] = useState<{ repName: string; dates: string[] } | null>(null);
+  const [selectedAbsentDetails, setSelectedAbsentDetails] = useState<{ repName: string; details: { id?: number; date: string; reason: string; isManual: boolean }[] } | null>(null);
+  const [repAbsences, setRepAbsences] = useState<RepAbsence[]>([]);
+  const [isRegisterAbsenceModalOpen, setIsRegisterAbsenceModalOpen] = useState(false);
+  
+  // Register Absence Form State
+  const [absenceFormRepId, setAbsenceFormRepId] = useState('');
+  const [absenceFormDate, setAbsenceFormDate] = useState(getTodayDateString());
+  const [absenceFormReason, setAbsenceFormReason] = useState('');
+  const [isRegisteringAbsence, setIsRegisteringAbsence] = useState(false);
+  const [registerAbsenceMessage, setRegisterAbsenceMessage] = useState('');
 
 
   // Settings tab local state
@@ -159,7 +170,7 @@ const ManagerDashboard: React.FC = () => {
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     try {
-      const [reportsData, usersData, regionsData, doctorsData, pharmaciesData, alertsData, settingsData, plansData, tasksData] = await Promise.all([
+      const [reportsData, usersData, regionsData, doctorsData, pharmaciesData, alertsData, settingsData, plansData, tasksData, absencesData] = await Promise.all([
         api.getAllVisitReports(),
         api.getUsers(),
         api.getRegions(),
@@ -168,7 +179,8 @@ const ManagerDashboard: React.FC = () => {
         api.getOverdueVisits(),
         api.getSystemSettings(),
         api.getAllPlans(),
-        api.getAllTasks()
+        api.getAllTasks(),
+        api.getRepAbsences()
       ]);
       setAllReports(reportsData);
       setFilteredReports(reportsData);
@@ -186,6 +198,7 @@ const ManagerDashboard: React.FC = () => {
       setAllPlans(plansData);
       setAllDoctorsMap(new Map(doctorsData.map(doc => [doc.id, doc])));
       setAllTasks(tasksData);
+      setRepAbsences(absencesData);
     } catch (error) {
       console.error("Failed to fetch initial data", error);
     } finally {
@@ -447,7 +460,7 @@ const ManagerDashboard: React.FC = () => {
     return result;
   }, [allReports, reps, selectedRep]);
 
-  // Vacation Stats Logic - UPDATED for Daily Calculation
+  // Vacation Stats Logic - UPDATED with Manual Absences
   const vacationStats = useMemo(() => {
     if (!systemSettings) return [];
 
@@ -459,20 +472,15 @@ const ManagerDashboard: React.FC = () => {
     today.setHours(0,0,0,0);
 
     // Determine the end of calculation range:
-    // If selecting current month, calculate up to today.
-    // If selecting past month, calculate up to end of that month.
-    // If selecting future month, calculation stops at 0.
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
     
-    // Effective end date is the earlier of Today or Month End
-    // If monthStart is in future, calculation range is invalid/empty.
     let calculationEndDate = monthEnd;
     if (today < monthEnd) {
         calculationEndDate = today;
     }
 
-    // Pre-process reports into a set of "RepName-YYYY-MM-DD" for O(1) lookup
+    // Pre-process reports
     const workMap = new Set<string>();
     allReports.forEach(r => {
         const d = new Date(r.date);
@@ -480,12 +488,20 @@ const ManagerDashboard: React.FC = () => {
         workMap.add(`${r.repName}-${dateKey}`);
     });
 
+    // Map manual absences for quick lookup: RepId -> Set<Date>
+    const manualAbsenceMap = new Map<string, Map<string, {reason: string, id: number}>>();
+    repAbsences.forEach(abs => {
+        if (!manualAbsenceMap.has(abs.repId)) {
+            manualAbsenceMap.set(abs.repId, new Map());
+        }
+        manualAbsenceMap.get(abs.repId)!.set(abs.date, {reason: abs.reason || '', id: abs.id});
+    });
+
     const stats = reps.map(rep => {
         let totalWorkingDaysPassed = 0;
         let daysWorked = 0;
-        const absentDates: string[] = [];
+        const absentDetails: { id?: number; date: string; reason: string; isManual: boolean }[] = [];
 
-        // Iterate day by day from start of month up to calculationEndDate
         if (monthStart <= calculationEndDate) {
             const current = new Date(monthStart);
             while (current <= calculationEndDate) {
@@ -494,18 +510,36 @@ const ManagerDashboard: React.FC = () => {
 
                 const isWeekend = systemSettings.weekends.includes(dayIndex);
                 const isHoliday = systemSettings.holidays.includes(dateStr);
-                
-                // Only count as a "Working Day" if it's not a weekend and not a holiday
-                if (!isWeekend && !isHoliday) {
+                const manualAbsence = manualAbsenceMap.get(rep.id)?.get(dateStr);
+
+                // Priority: 
+                // 1. Manual Absence Record exists -> Mark Absent
+                // 2. Weekend/Holiday -> Skip
+                // 3. Regular working day -> Check visits
+
+                if (manualAbsence) {
+                    // Manually registered absence takes precedence, even on holidays/weekends
+                    // However, conceptually, if it's a holiday, 'totalWorkingDaysPassed' might not increment.
+                    // But if they are marked absent explicitly, it counts as an absence.
+                    absentDetails.push({ 
+                        id: manualAbsence.id,
+                        date: dateStr, 
+                        reason: manualAbsence.reason || t('manual_absence'),
+                        isManual: true
+                    });
+                } else if (!isWeekend && !isHoliday) {
                     totalWorkingDaysPassed++;
                     
-                    // Check if rep worked
                     const hasReport = workMap.has(`${rep.name}-${dateStr}`);
                     if (hasReport) {
                         daysWorked++;
                     } else {
-                        // Mark as absent
-                        absentDates.push(dateStr);
+                        // Mark as auto absent
+                        absentDetails.push({
+                            date: dateStr,
+                            reason: t('auto_absence'),
+                            isManual: false
+                        });
                     }
                 }
 
@@ -517,13 +551,13 @@ const ManagerDashboard: React.FC = () => {
             repName: rep.name,
             totalWorkingDaysPassed,
             daysWorked,
-            absentDays: absentDates.length,
-            absentDatesList: absentDates
+            absentDays: absentDetails.length,
+            absentDetailsList: absentDetails
         };
     });
 
     return stats;
-  }, [selectedVacationMonth, systemSettings, allReports, reps]);
+  }, [selectedVacationMonth, systemSettings, allReports, reps, repAbsences, t]);
 
 
   const handleFrequencyClick = (repName: string, freqType: 'f1' | 'f2' | 'f3') => {
@@ -531,13 +565,11 @@ const ManagerDashboard: React.FC = () => {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const visitCounts: Record<string, { count: number, region: string, specialization: string }> = {};
 
-      // 1. Filter reports for this month & doctors only & specific rep
       const reports = allReports.filter(visit => {
           const visitDate = new Date(visit.date);
           return visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT' && visit.repName === repName;
       });
 
-      // 2. Count visits per doctor and store details
       reports.forEach(visit => {
           const key = visit.targetName;
           if (!visitCounts[key]) {
@@ -546,7 +578,6 @@ const ManagerDashboard: React.FC = () => {
           visitCounts[key].count++;
       });
 
-      // 3. Filter based on frequency type
       const filteredDoctors = Object.entries(visitCounts)
           .filter(([_, data]) => {
               if (freqType === 'f1') return data.count === 1;
@@ -873,9 +904,38 @@ const ManagerDashboard: React.FC = () => {
         return <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${color}`}>{t(textKey)}</span>;
     };
     
-    const handleAbsentDaysClick = (repName: string, dates: string[]) => {
-      setSelectedAbsentDetails({ repName, dates });
+    const handleAbsentDaysClick = (repName: string, details: { id?: number; date: string; reason: string; isManual: boolean }[]) => {
+      setSelectedAbsentDetails({ repName, details });
       setIsAbsentDetailModalOpen(true);
+    };
+
+    const handleRegisterAbsenceSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!absenceFormRepId || !absenceFormDate) return;
+        
+        setIsRegisteringAbsence(true);
+        setRegisterAbsenceMessage('');
+        try {
+            const newAbsence = await api.addRepAbsence(absenceFormRepId, absenceFormDate, absenceFormReason);
+            setRepAbsences(prev => [...prev, newAbsence]);
+            setRegisterAbsenceMessage(t('absence_added_success'));
+            // Reset fields but keep modal open for a moment
+            setAbsenceFormReason('');
+            setTimeout(() => {
+                setIsRegisterAbsenceModalOpen(false);
+                setRegisterAbsenceMessage('');
+            }, 1000);
+        } catch (error) {
+            console.error("Failed to add absence", error);
+            setRegisterAbsenceMessage(t('error_unexpected'));
+        } finally {
+            setIsRegisteringAbsence(false);
+        }
+    };
+
+    // Callback to refresh data after deleting an absence
+    const handleAbsenceUpdate = () => {
+        api.getRepAbsences().then(setRepAbsences);
     };
 
 
@@ -1111,7 +1171,7 @@ const ManagerDashboard: React.FC = () => {
                </div>
           </div>
 
-          {/* Visits Frequency Card - UPDATED INTERACTIVITY */}
+          {/* Visits Frequency Card */}
           <div className="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/50 mb-8 animate-fade-in-up" style={{ animationDelay: '650ms' }}>
                 <div className="flex items-center mb-4">
                     <div className="bg-indigo-500/20 text-indigo-700 p-3 rounded-full me-3">
@@ -1357,9 +1417,18 @@ const ManagerDashboard: React.FC = () => {
                         className="p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                     />
                  </div>
-                 <p className="text-sm text-slate-600 italic mt-auto pb-2">
-                    {t('vacation_stats_info')}
-                 </p>
+                 <div className="flex-grow">
+                     <p className="text-sm text-slate-600 italic">
+                        {t('vacation_stats_info')}
+                     </p>
+                 </div>
+                 <button
+                    onClick={() => setIsRegisterAbsenceModalOpen(true)}
+                    className="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-all shadow-md flex items-center gap-2"
+                 >
+                    <CalendarPlusIcon className="w-5 h-5" />
+                    {t('register_absence')}
+                 </button>
             </div>
 
             <div className="overflow-x-auto">
@@ -1380,7 +1449,7 @@ const ManagerDashboard: React.FC = () => {
                                 <td className="px-6 py-4 text-center font-bold text-green-700">{stat.daysWorked}</td>
                                 <td className="px-6 py-4 text-center">
                                     <button
-                                        onClick={() => stat.absentDays > 0 ? handleAbsentDaysClick(stat.repName, stat.absentDatesList) : null}
+                                        onClick={() => stat.absentDays > 0 ? handleAbsentDaysClick(stat.repName, stat.absentDetailsList) : null}
                                         disabled={stat.absentDays === 0}
                                         className={`inline-block px-3 py-1 rounded-full font-bold transition-all ${
                                             stat.absentDays > 0 
@@ -1494,8 +1563,95 @@ const ManagerDashboard: React.FC = () => {
                 isOpen={isAbsentDetailModalOpen}
                 onClose={() => setIsAbsentDetailModalOpen(false)}
                 repName={selectedAbsentDetails.repName}
-                absentDates={selectedAbsentDetails.dates}
+                absentDetails={selectedAbsentDetails.details}
+                onUpdate={handleAbsenceUpdate}
             />
+        )}
+
+        {/* NEW: Register Absence Modal */}
+        {isRegisterAbsenceModalOpen && (
+            <Modal 
+                isOpen={isRegisterAbsenceModalOpen} 
+                onClose={() => setIsRegisterAbsenceModalOpen(false)} 
+                title={t('register_absence_title')}
+            >
+                <form onSubmit={handleRegisterAbsenceSubmit} className="space-y-4">
+                    <div>
+                        <label htmlFor="absenceRep" className="block text-sm font-medium text-slate-800 mb-1">{t('select_rep')}</label>
+                        <select
+                            id="absenceRep"
+                            value={absenceFormRepId}
+                            onChange={(e) => setAbsenceFormRepId(e.target.value)}
+                            required
+                            className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="" disabled>{t('select_rep')}</option>
+                            {reps.map(rep => (
+                                <option key={rep.id} value={rep.id}>{rep.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label htmlFor="absenceDate" className="block text-sm font-medium text-slate-800 mb-1">{t('absence_date')}</label>
+                        <input
+                            type="date"
+                            id="absenceDate"
+                            value={absenceFormDate}
+                            onChange={(e) => setAbsenceFormDate(e.target.value)}
+                            required
+                            className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="absenceReason" className="block text-sm font-medium text-slate-800 mb-1">{t('reason')}</label>
+                        <select
+                             id="absenceReason"
+                             value={absenceFormReason}
+                             onChange={(e) => setAbsenceFormReason(e.target.value)}
+                             className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500 mb-2"
+                        >
+                            <option value="">{t('reason_optional')}</option>
+                            <option value={t('meeting_absence')}>{t('meeting_absence')}</option>
+                            <option value={t('sick_leave')}>{t('sick_leave')}</option>
+                            <option value={t('regular_leave')}>{t('regular_leave')}</option>
+                            <option value={t('other')}>{t('other')}</option>
+                        </select>
+                        {/* Allow custom reason typing if needed, for simplicity using select + text input if "Other"? For now simple text input fallback if not selected */}
+                         <input
+                            type="text"
+                            placeholder={t('reason_optional')}
+                            value={absenceFormReason}
+                            onChange={(e) => setAbsenceFormReason(e.target.value)}
+                            className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
+                    {registerAbsenceMessage && (
+                        <p className={`text-sm font-medium ${registerAbsenceMessage === t('error_unexpected') ? 'text-red-600' : 'text-green-600'}`}>
+                            {registerAbsenceMessage}
+                        </p>
+                    )}
+
+                    <div className="flex justify-end pt-4 border-t border-slate-200/50 gap-2">
+                         <button
+                            type="button"
+                            onClick={() => setIsRegisterAbsenceModalOpen(false)}
+                            className="text-slate-700 bg-transparent hover:bg-slate-100 border border-slate-300 rounded-lg text-sm font-medium px-5 py-2.5 transition-colors"
+                        >
+                            {t('cancel')}
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isRegisteringAbsence || !absenceFormRepId}
+                            className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300"
+                        >
+                            {isRegisteringAbsence ? t('saving') : t('save')}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         )}
     </div>
   );

@@ -1,4 +1,5 @@
 
+
 export enum UserRole {
   Manager = 'MANAGER',
   Supervisor = 'SUPERVISOR',
@@ -117,4 +118,11 @@ export interface RepTask {
   isCompleted: boolean;
   createdAt: string;
   completedAt?: string;
+}
+
+export interface RepAbsence {
+  id: number;
+  repId: string;
+  date: string; // YYYY-MM-DD
+  reason?: string;
 }
