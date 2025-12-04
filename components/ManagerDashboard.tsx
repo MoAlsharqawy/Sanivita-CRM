@@ -11,10 +11,12 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
-import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel } from '../services/exportService';
+import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel, exportVacationStatsToExcel } from '../services/exportService';
 import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon, ClipboardCheckIcon, CheckCircleIcon, SunIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
@@ -837,6 +839,10 @@ const ManagerDashboard: React.FC = () => {
     setSelectedRepsForExport([]);
   };
 
+  const handleExportVacationStats = () => {
+      exportVacationStatsToExcel(vacationStats, `vacation_stats_${selectedVacationMonth}`, t);
+  };
+
   const handleWeekendChange = (dayIndex: number) => {
     setLocalWeekends(prev =>
         prev.includes(dayIndex)
@@ -1533,13 +1539,22 @@ const ManagerDashboard: React.FC = () => {
                             {t('vacation_stats_info')}
                         </p>
                     </div>
-                    <button
-                        onClick={handleOpenAbsenceModal}
-                        className="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-all shadow-md flex items-center gap-2"
-                    >
-                        <CalendarPlusIcon className="w-5 h-5" />
-                        {t('register_absence')}
-                    </button>
+                    <div className="flex gap-2">
+                         <button
+                            onClick={handleExportVacationStats}
+                            className="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 transition-all shadow-md flex items-center gap-2"
+                        >
+                            <DownloadIcon className="w-5 h-5" />
+                            {t('download_excel')}
+                        </button>
+                        <button
+                            onClick={handleOpenAbsenceModal}
+                            className="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-all shadow-md flex items-center gap-2"
+                        >
+                            <CalendarPlusIcon className="w-5 h-5" />
+                            {t('register_absence')}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
