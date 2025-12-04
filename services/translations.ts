@@ -2,6 +2,8 @@
 
 
 
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -209,6 +211,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'auto_absence': 'عدم تسجيل زيارات',
     'confirm_delete_absence': 'حذف',
     'absence_added_success': 'تم تسجيل الغياب بنجاح',
+    'absence_already_exists': 'عفواً، تم تسجيل غياب لهذا المندوب في هذا التاريخ مسبقاً.',
   },
   en: {
     // General
@@ -413,5 +416,6 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'auto_absence': 'No Visits Recorded',
     'confirm_delete_absence': 'Delete',
     'absence_added_success': 'Absence registered successfully',
+    'absence_already_exists': 'Absence already registered for this rep on this date.',
   }
 };

@@ -5,6 +5,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
@@ -146,7 +148,8 @@ const ManagerDashboard: React.FC = () => {
   // Register Absence Form State
   const [absenceFormRepId, setAbsenceFormRepId] = useState('');
   const [absenceFormDate, setAbsenceFormDate] = useState(getTodayDateString());
-  const [absenceFormReason, setAbsenceFormReason] = useState('');
+  const [absenceReasonSelect, setAbsenceReasonSelect] = useState('');
+  const [absenceReasonText, setAbsenceReasonText] = useState('');
   const [isRegisteringAbsence, setIsRegisteringAbsence] = useState(false);
   const [registerAbsenceMessage, setRegisterAbsenceMessage] = useState('');
 
@@ -909,25 +912,43 @@ const ManagerDashboard: React.FC = () => {
       setIsAbsentDetailModalOpen(true);
     };
 
+    const handleOpenAbsenceModal = () => {
+      setIsRegisterAbsenceModalOpen(true);
+      setAbsenceReasonSelect('');
+      setAbsenceReasonText('');
+      setRegisterAbsenceMessage('');
+    }
+
     const handleRegisterAbsenceSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!absenceFormRepId || !absenceFormDate) return;
+
+        // Prevent duplicates locally if possible
+        const existing = repAbsences.find(a => a.repId === absenceFormRepId && a.date === absenceFormDate);
+        if (existing) {
+            setRegisterAbsenceMessage(t('absence_already_exists'));
+            return;
+        }
         
+        const finalReason = absenceReasonSelect === 'Other' ? absenceReasonText : (absenceReasonSelect ? t(absenceReasonSelect) : '');
+
         setIsRegisteringAbsence(true);
         setRegisterAbsenceMessage('');
         try {
-            const newAbsence = await api.addRepAbsence(absenceFormRepId, absenceFormDate, absenceFormReason);
+            const newAbsence = await api.addRepAbsence(absenceFormRepId, absenceFormDate, finalReason);
             setRepAbsences(prev => [...prev, newAbsence]);
             setRegisterAbsenceMessage(t('absence_added_success'));
             // Reset fields but keep modal open for a moment
-            setAbsenceFormReason('');
+            setAbsenceReasonSelect('');
+            setAbsenceReasonText('');
             setTimeout(() => {
                 setIsRegisterAbsenceModalOpen(false);
                 setRegisterAbsenceMessage('');
             }, 1000);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to add absence", error);
-            setRegisterAbsenceMessage(t('error_unexpected'));
+            // Display actual error message from backend if available, otherwise generic
+            setRegisterAbsenceMessage(error.message || t('error_unexpected'));
         } finally {
             setIsRegisteringAbsence(false);
         }
@@ -1423,7 +1444,7 @@ const ManagerDashboard: React.FC = () => {
                      </p>
                  </div>
                  <button
-                    onClick={() => setIsRegisterAbsenceModalOpen(true)}
+                    onClick={handleOpenAbsenceModal}
                     className="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-all shadow-md flex items-center gap-2"
                  >
                     <CalendarPlusIcon className="w-5 h-5" />
@@ -1605,31 +1626,38 @@ const ManagerDashboard: React.FC = () => {
                     </div>
 
                     <div>
-                        <label htmlFor="absenceReason" className="block text-sm font-medium text-slate-800 mb-1">{t('reason')}</label>
+                        <label htmlFor="absenceReasonSelect" className="block text-sm font-medium text-slate-800 mb-1">{t('reason')}</label>
                         <select
-                             id="absenceReason"
-                             value={absenceFormReason}
-                             onChange={(e) => setAbsenceFormReason(e.target.value)}
+                             id="absenceReasonSelect"
+                             value={absenceReasonSelect}
+                             onChange={(e) => setAbsenceReasonSelect(e.target.value)}
                              className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500 mb-2"
                         >
                             <option value="">{t('reason_optional')}</option>
-                            <option value={t('meeting_absence')}>{t('meeting_absence')}</option>
-                            <option value={t('sick_leave')}>{t('sick_leave')}</option>
-                            <option value={t('regular_leave')}>{t('regular_leave')}</option>
-                            <option value={t('other')}>{t('other')}</option>
+                            <option value="Meeting">{t('meeting_absence')}</option>
+                            <option value="Sick Leave">{t('sick_leave')}</option>
+                            <option value="Regular Leave">{t('regular_leave')}</option>
+                            <option value="Other">{t('other')}</option>
                         </select>
-                        {/* Allow custom reason typing if needed, for simplicity using select + text input if "Other"? For now simple text input fallback if not selected */}
-                         <input
-                            type="text"
-                            placeholder={t('reason_optional')}
-                            value={absenceFormReason}
-                            onChange={(e) => setAbsenceFormReason(e.target.value)}
-                            className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        />
+                        
+                        {absenceReasonSelect === 'Other' && (
+                            <input
+                                type="text"
+                                placeholder={t('reason_optional')}
+                                value={absenceReasonText}
+                                onChange={(e) => setAbsenceReasonText(e.target.value)}
+                                className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500 animate-fade-in"
+                                required
+                            />
+                        )}
                     </div>
 
                     {registerAbsenceMessage && (
-                        <p className={`text-sm font-medium ${registerAbsenceMessage === t('error_unexpected') ? 'text-red-600' : 'text-green-600'}`}>
+                        <p className={`text-sm font-medium p-2 rounded ${
+                             registerAbsenceMessage === t('absence_added_success') 
+                             ? 'text-green-700 bg-green-100' 
+                             : 'text-red-700 bg-red-100'
+                        }`}>
                             {registerAbsenceMessage}
                         </p>
                     )}
