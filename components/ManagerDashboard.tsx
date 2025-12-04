@@ -7,6 +7,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
@@ -152,6 +154,7 @@ const ManagerDashboard: React.FC = () => {
   const [absenceReasonText, setAbsenceReasonText] = useState('');
   const [isRegisteringAbsence, setIsRegisteringAbsence] = useState(false);
   const [registerAbsenceMessage, setRegisterAbsenceMessage] = useState('');
+  const [pendingLeaveMessage, setPendingLeaveMessage] = useState('');
 
 
   // Settings tab local state
@@ -491,13 +494,13 @@ const ManagerDashboard: React.FC = () => {
         workMap.add(`${r.repName}-${dateKey}`);
     });
 
-    // Map manual absences for quick lookup: RepId -> Set<Date>
-    const manualAbsenceMap = new Map<string, Map<string, {reason: string, id: number}>>();
-    repAbsences.forEach(abs => {
-        if (!manualAbsenceMap.has(abs.repId)) {
-            manualAbsenceMap.set(abs.repId, new Map());
+    // Map APPROVED absences for quick lookup: RepId -> Set<Date>
+    const approvedAbsenceMap = new Map<string, Map<string, {reason: string, id: number}>>();
+    repAbsences.filter(a => a.status === 'APPROVED').forEach(abs => {
+        if (!approvedAbsenceMap.has(abs.repId)) {
+            approvedAbsenceMap.set(abs.repId, new Map());
         }
-        manualAbsenceMap.get(abs.repId)!.set(abs.date, {reason: abs.reason || '', id: abs.id});
+        approvedAbsenceMap.get(abs.repId)!.set(abs.date, {reason: abs.reason || '', id: abs.id});
     });
 
     const stats = reps.map(rep => {
@@ -513,21 +516,19 @@ const ManagerDashboard: React.FC = () => {
 
                 const isWeekend = systemSettings.weekends.includes(dayIndex);
                 const isHoliday = systemSettings.holidays.includes(dateStr);
-                const manualAbsence = manualAbsenceMap.get(rep.id)?.get(dateStr);
+                const approvedAbsence = approvedAbsenceMap.get(rep.id)?.get(dateStr);
 
                 // Priority: 
-                // 1. Manual Absence Record exists -> Mark Absent
+                // 1. Approved Absence Record exists -> Mark Absent
                 // 2. Weekend/Holiday -> Skip
                 // 3. Regular working day -> Check visits
 
-                if (manualAbsence) {
-                    // Manually registered absence takes precedence, even on holidays/weekends
-                    // However, conceptually, if it's a holiday, 'totalWorkingDaysPassed' might not increment.
-                    // But if they are marked absent explicitly, it counts as an absence.
+                if (approvedAbsence) {
+                    // Approved absence counts as an absence record regardless of work day status
                     absentDetails.push({ 
-                        id: manualAbsence.id,
+                        id: approvedAbsence.id,
                         date: dateStr, 
-                        reason: manualAbsence.reason || t('manual_absence'),
+                        reason: approvedAbsence.reason || t('manual_absence'),
                         isManual: true
                     });
                 } else if (!isWeekend && !isHoliday) {
@@ -561,6 +562,16 @@ const ManagerDashboard: React.FC = () => {
 
     return stats;
   }, [selectedVacationMonth, systemSettings, allReports, reps, repAbsences, t]);
+
+  const pendingLeaveRequests = useMemo(() => {
+      return repAbsences.filter(a => a.status === 'PENDING').map(req => {
+          const rep = reps.find(r => r.id === req.repId);
+          return {
+              ...req,
+              repName: rep?.name || t('unknown')
+          };
+      });
+  }, [repAbsences, reps, t]);
 
 
   const handleFrequencyClick = (repName: string, freqType: 'f1' | 'f2' | 'f3') => {
@@ -924,7 +935,7 @@ const ManagerDashboard: React.FC = () => {
         if (!absenceFormRepId || !absenceFormDate) return;
 
         // Prevent duplicates locally if possible
-        const existing = repAbsences.find(a => a.repId === absenceFormRepId && a.date === absenceFormDate);
+        const existing = repAbsences.find(a => a.repId === absenceFormRepId && a.date === absenceFormDate && a.status === 'APPROVED');
         if (existing) {
             setRegisterAbsenceMessage(t('absence_already_exists'));
             return;
@@ -935,7 +946,8 @@ const ManagerDashboard: React.FC = () => {
         setIsRegisteringAbsence(true);
         setRegisterAbsenceMessage('');
         try {
-            const newAbsence = await api.addRepAbsence(absenceFormRepId, absenceFormDate, finalReason);
+            // Manager registration always sets status to APPROVED
+            const newAbsence = await api.addRepAbsence(absenceFormRepId, absenceFormDate, finalReason, 'APPROVED');
             setRepAbsences(prev => [...prev, newAbsence]);
             setRegisterAbsenceMessage(t('absence_added_success'));
             // Reset fields but keep modal open for a moment
@@ -953,6 +965,21 @@ const ManagerDashboard: React.FC = () => {
             setIsRegisteringAbsence(false);
         }
     };
+    
+    const handleLeaveStatusUpdate = async (id: number, status: 'APPROVED' | 'REJECTED') => {
+        setPendingLeaveMessage('');
+        try {
+            await api.updateRepAbsenceStatus(id, status);
+            setRepAbsences(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+            setPendingLeaveMessage(status === 'APPROVED' ? t('request_approved_success') : t('request_rejected_success'));
+        } catch (error) {
+            console.error("Failed to update leave status", error);
+            setPendingLeaveMessage(t('status_update_error'));
+        } finally {
+            setTimeout(() => setPendingLeaveMessage(''), 3000);
+        }
+    };
+
 
     // Callback to refresh data after deleting an absence
     const handleAbsenceUpdate = () => {
@@ -1051,7 +1078,7 @@ const ManagerDashboard: React.FC = () => {
                       className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'vacations' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                   >
                       <SunIcon className="w-5 h-5 me-2" />
-                      {t('vacations')}
+                      {t('vacations')} {pendingLeaveRequests.length > 0 && <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ms-2">{pendingLeaveRequests.length}</span>}
                   </button>
               </li>
               {user?.role === UserRole.Manager && (
@@ -1421,75 +1448,133 @@ const ManagerDashboard: React.FC = () => {
       )}
 
       {activeTab === 'vacations' && (
-        <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
-            <h3 className="text-xl font-semibold mb-6 text-blue-800 flex items-center gap-2">
-                <SunIcon className="w-6 h-6" />
-                {t('vacation_stats')}
-            </h3>
+        <div className="space-y-6">
+            {/* Pending Requests Section */}
+            <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
+                <h3 className="text-xl font-semibold mb-4 text-blue-800 flex items-center gap-2">
+                    <ClipboardListIcon className="w-6 h-6" />
+                    {t('pending_requests')}
+                    {pendingLeaveRequests.length > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{pendingLeaveRequests.length}</span>}
+                </h3>
+                
+                {pendingLeaveMessage && (
+                    <div className="mb-4 p-2 bg-blue-100 text-blue-800 rounded-lg text-sm">{pendingLeaveMessage}</div>
+                )}
 
-            <div className="flex flex-col sm:flex-row items-center gap-4 mb-6 p-4 bg-white/50 rounded-lg">
-                 <div>
-                    <label htmlFor="vacationMonth" className="block text-sm font-medium text-slate-700 mb-1">{t('select_month')}</label>
-                    <input 
-                        type="month" 
-                        id="vacationMonth"
-                        value={selectedVacationMonth}
-                        onChange={(e) => setSelectedVacationMonth(e.target.value)}
-                        className="p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                    />
-                 </div>
-                 <div className="flex-grow">
-                     <p className="text-sm text-slate-600 italic">
-                        {t('vacation_stats_info')}
-                     </p>
-                 </div>
-                 <button
-                    onClick={handleOpenAbsenceModal}
-                    className="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-all shadow-md flex items-center gap-2"
-                 >
-                    <CalendarPlusIcon className="w-5 h-5" />
-                    {t('register_absence')}
-                 </button>
+                {pendingLeaveRequests.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-start">
+                            <thead className="text-xs text-blue-800 uppercase bg-white/50">
+                                <tr>
+                                    <th className="px-6 py-3">{t('rep_name')}</th>
+                                    <th className="px-6 py-3">{t('date')}</th>
+                                    <th className="px-6 py-3">{t('leave_type')}</th>
+                                    <th className="px-6 py-3 text-center">{t('actions')}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200/50">
+                                {pendingLeaveRequests.map(req => (
+                                    <tr key={req.id} className="bg-white/20 hover:bg-white/40">
+                                        <td className="px-6 py-4 font-medium text-slate-900">{req.repName}</td>
+                                        <td className="px-6 py-4">{req.date}</td>
+                                        <td className="px-6 py-4">{req.reason}</td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex justify-center gap-2">
+                                                <button 
+                                                    onClick={() => handleLeaveStatusUpdate(req.id, 'APPROVED')}
+                                                    className="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded-lg text-xs font-bold transition-colors"
+                                                >
+                                                    {t('approve')}
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleLeaveStatusUpdate(req.id, 'REJECTED')}
+                                                    className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded-lg text-xs font-bold transition-colors"
+                                                >
+                                                    {t('reject')}
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <p className="text-slate-500 text-center py-4 bg-white/30 rounded-lg">{t('no_pending_leave_requests')}</p>
+                )}
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-start">
-                    <thead className="text-xs text-blue-800 uppercase bg-white/50">
-                        <tr>
-                            <th className="px-6 py-3">{t('rep_name')}</th>
-                            <th className="px-6 py-3 text-center">{t('total_working_days_passed')}</th>
-                            <th className="px-6 py-3 text-center">{t('days_worked')}</th>
-                            <th className="px-6 py-3 text-center">{t('absent_days')}</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200/50">
-                        {vacationStats.map((stat, idx) => (
-                            <tr key={idx} className="bg-white/20 hover:bg-white/40">
-                                <td className="px-6 py-4 font-medium text-slate-800">{stat.repName}</td>
-                                <td className="px-6 py-4 text-center">{stat.totalWorkingDaysPassed}</td>
-                                <td className="px-6 py-4 text-center font-bold text-green-700">{stat.daysWorked}</td>
-                                <td className="px-6 py-4 text-center">
-                                    <button
-                                        onClick={() => stat.absentDays > 0 ? handleAbsentDaysClick(stat.repName, stat.absentDetailsList) : null}
-                                        disabled={stat.absentDays === 0}
-                                        className={`inline-block px-3 py-1 rounded-full font-bold transition-all ${
-                                            stat.absentDays > 0 
-                                            ? 'bg-red-100 text-red-700 hover:bg-red-200 cursor-pointer underline decoration-dotted' 
-                                            : 'bg-green-100 text-green-700 cursor-default'
-                                        }`}
-                                    >
-                                        {stat.absentDays}
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                         {vacationStats.length === 0 && (
+            {/* Existing Vacation Stats Section */}
+            <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
+                <h3 className="text-xl font-semibold mb-6 text-blue-800 flex items-center gap-2">
+                    <SunIcon className="w-6 h-6" />
+                    {t('vacation_stats')}
+                </h3>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 mb-6 p-4 bg-white/50 rounded-lg">
+                    <div>
+                        <label htmlFor="vacationMonth" className="block text-sm font-medium text-slate-700 mb-1">{t('select_month')}</label>
+                        <input 
+                            type="month" 
+                            id="vacationMonth"
+                            value={selectedVacationMonth}
+                            onChange={(e) => setSelectedVacationMonth(e.target.value)}
+                            className="p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                    <div className="flex-grow">
+                        <p className="text-sm text-slate-600 italic">
+                            {t('vacation_stats_info')}
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleOpenAbsenceModal}
+                        className="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-all shadow-md flex items-center gap-2"
+                    >
+                        <CalendarPlusIcon className="w-5 h-5" />
+                        {t('register_absence')}
+                    </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-start">
+                        <thead className="text-xs text-blue-800 uppercase bg-white/50">
                             <tr>
-                                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">{t('no_data')}</td>
+                                <th className="px-6 py-3">{t('rep_name')}</th>
+                                <th className="px-6 py-3 text-center">{t('total_working_days_passed')}</th>
+                                <th className="px-6 py-3 text-center">{t('days_worked')}</th>
+                                <th className="px-6 py-3 text-center">{t('absent_days')}</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/50">
+                            {vacationStats.map((stat, idx) => (
+                                <tr key={idx} className="bg-white/20 hover:bg-white/40">
+                                    <td className="px-6 py-4 font-medium text-slate-800">{stat.repName}</td>
+                                    <td className="px-6 py-4 text-center">{stat.totalWorkingDaysPassed}</td>
+                                    <td className="px-6 py-4 text-center font-bold text-green-700">{stat.daysWorked}</td>
+                                    <td className="px-6 py-4 text-center">
+                                        <button
+                                            onClick={() => stat.absentDays > 0 ? handleAbsentDaysClick(stat.repName, stat.absentDetailsList) : null}
+                                            disabled={stat.absentDays === 0}
+                                            className={`inline-block px-3 py-1 rounded-full font-bold transition-all ${
+                                                stat.absentDays > 0 
+                                                ? 'bg-red-100 text-red-700 hover:bg-red-200 cursor-pointer underline decoration-dotted' 
+                                                : 'bg-green-100 text-green-700 cursor-default'
+                                            }`}
+                                        >
+                                            {stat.absentDays}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {vacationStats.length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">{t('no_data')}</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
       )}
@@ -1626,18 +1711,19 @@ const ManagerDashboard: React.FC = () => {
                     </div>
 
                     <div>
-                        <label htmlFor="absenceReasonSelect" className="block text-sm font-medium text-slate-800 mb-1">{t('reason')}</label>
+                        <label htmlFor="absenceReasonSelect" className="block text-sm font-medium text-slate-800 mb-1">{t('leave_type')}</label>
                         <select
                              id="absenceReasonSelect"
                              value={absenceReasonSelect}
                              onChange={(e) => setAbsenceReasonSelect(e.target.value)}
+                             required
                              className="w-full p-2 border border-slate-300/50 bg-white/50 rounded-md focus:ring-blue-500 focus:border-blue-500 mb-2"
                         >
-                            <option value="">{t('reason_optional')}</option>
-                            <option value="Meeting">{t('meeting_absence')}</option>
-                            <option value="Sick Leave">{t('sick_leave')}</option>
-                            <option value="Regular Leave">{t('regular_leave')}</option>
-                            <option value="Other">{t('other')}</option>
+                            <option value="">{t('select_leave_type')}</option>
+                            <option value="casual_leave">{t('casual_leave')}</option>
+                            <option value="regular_leave">{t('regular_leave')}</option>
+                            <option value="sick_leave">{t('sick_leave')}</option>
+                            <option value="other">{t('other')}</option>
                         </select>
                         
                         {absenceReasonSelect === 'Other' && (

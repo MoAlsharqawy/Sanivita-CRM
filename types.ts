@@ -120,9 +120,12 @@ export interface RepTask {
   completedAt?: string;
 }
 
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
 export interface RepAbsence {
   id: number;
   repId: string;
   date: string; // YYYY-MM-DD
-  reason?: string;
+  reason?: string; // Will store Leave Type (Casual, Regular, Sick)
+  status: LeaveStatus;
 }

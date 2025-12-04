@@ -1,13 +1,15 @@
 
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
-import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan, RepTask } from '../types';
+import { Doctor, Pharmacy, Product, VisitReport, Region, ClientAlert, SystemSettings, WeeklyPlan, RepTask, RepAbsence } from '../types';
 import { 
     DoctorIcon, PharmacyIcon, CalendarIcon, SearchIcon, WarningIcon, 
     UserGroupIcon, DownloadIcon, ChartBarIcon, GraphIcon, CalendarPlusIcon, 
-    ClipboardCheckIcon, CheckCircleIcon, ChevronDownIcon, ChevronUpIcon, MapPinIcon 
+    ClipboardCheckIcon, CheckCircleIcon, ChevronDownIcon, ChevronUpIcon, MapPinIcon, SunIcon 
 } from './icons';
 import Modal from './Modal';
 import VisitForm from './VisitForm';
@@ -52,6 +54,14 @@ const RepDashboard: React.FC = () => {
       repName: string;
       frequencyLabel: string;
   } | null>(null);
+  
+  // Leaves/Vacation State
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [myLeaves, setMyLeaves] = useState<RepAbsence[]>([]);
+  const [leaveDate, setLeaveDate] = useState('');
+  const [leaveType, setLeaveType] = useState('');
+  const [leaveMessage, setLeaveMessage] = useState('');
+  const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
 
   // Calculate Planning Time Logic
   const today = new Date();
@@ -77,7 +87,7 @@ const RepDashboard: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [doctorsData, pharmaciesData, productsData, visitsData, regionsData, overdueData, settingsData, planData, tasksData] = await Promise.all([
+      const [doctorsData, pharmaciesData, productsData, visitsData, regionsData, overdueData, settingsData, planData, tasksData, leavesData] = await Promise.all([
         api.getDoctorsForRep(user.id),
         api.getPharmaciesForRep(user.id),
         api.getProducts(),
@@ -86,7 +96,8 @@ const RepDashboard: React.FC = () => {
         api.getOverdueVisits(),
         api.getSystemSettings(),
         api.getRepPlan(user.id),
-        api.getPendingTasksForRep(user.id)
+        api.getPendingTasksForRep(user.id),
+        api.getRepAbsencesForRep(user.id)
       ]);
       setDoctors(doctorsData);
       setPharmacies(pharmaciesData);
@@ -101,6 +112,7 @@ const RepDashboard: React.FC = () => {
       setSystemSettings(settingsData);
       setPlan(planData);
       setPendingTasks(tasksData);
+      setMyLeaves(leavesData);
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
@@ -171,6 +183,27 @@ const RepDashboard: React.FC = () => {
           setPendingTasks(prev => prev.filter(t => t.id !== taskId));
       } catch (error) {
           console.error("Failed to complete task", error);
+      }
+  };
+  
+  const handleSubmitLeaveRequest = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!user || !leaveDate || !leaveType) return;
+      
+      setIsSubmittingLeave(true);
+      setLeaveMessage('');
+      try {
+          const newLeave = await api.addRepAbsence(user.id, leaveDate, t(leaveType), 'PENDING');
+          setMyLeaves(prev => [...prev, newLeave]);
+          setLeaveMessage(t('leave_request_sent'));
+          setLeaveDate('');
+          setLeaveType('');
+      } catch (error) {
+          console.error("Failed to submit leave request", error);
+          setLeaveMessage(t('error_unexpected'));
+      } finally {
+          setIsSubmittingLeave(false);
+          setTimeout(() => setLeaveMessage(''), 3000);
       }
   };
 
@@ -560,6 +593,13 @@ const RepDashboard: React.FC = () => {
             <DownloadIcon className="w-5 h-5"/>
             <span className="hidden sm:inline">{t('download_list')}</span>
           </button>
+           <button 
+            onClick={() => setIsLeaveModalOpen(true)}
+            className="bg-pink-600 text-white font-bold py-2 px-4 sm:px-6 rounded-lg hover:bg-pink-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
+          >
+            <SunIcon className="w-5 h-5"/>
+            <span className="hidden sm:inline">{t('my_leaves')}</span>
+          </button>
           <button 
             onClick={handleExportVisitsClick}
             className="bg-teal-600 text-white font-bold py-2 px-4 sm:px-6 rounded-lg hover:bg-teal-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center gap-2"
@@ -861,6 +901,107 @@ const RepDashboard: React.FC = () => {
               onSuccess={handleFormSuccess}
               onCancel={() => setIsModalOpen(false)}
             />
+        </Modal>
+      )}
+      
+      {/* Leave Request Modal */}
+      {isLeaveModalOpen && (
+        <Modal isOpen={isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} title={t('my_leaves')}>
+            <div className="space-y-6">
+                {/* Request Form */}
+                <div className="bg-slate-50/50 p-4 rounded-lg border border-slate-200">
+                    <h4 className="font-bold text-slate-800 mb-3">{t('request_leave_title')}</h4>
+                    <form onSubmit={handleSubmitLeaveRequest} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">{t('absence_date')}</label>
+                                <input 
+                                    type="date" 
+                                    value={leaveDate}
+                                    onChange={(e) => setLeaveDate(e.target.value)}
+                                    required
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">{t('leave_type')}</label>
+                                <select
+                                    value={leaveType}
+                                    onChange={(e) => setLeaveType(e.target.value)}
+                                    required
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="" disabled>{t('select_leave_type')}</option>
+                                    <option value="casual_leave">{t('casual_leave')}</option>
+                                    <option value="regular_leave">{t('regular_leave')}</option>
+                                    <option value="sick_leave">{t('sick_leave')}</option>
+                                    <option value="other">{t('other')}</option>
+                                </select>
+                            </div>
+                        </div>
+                        {leaveMessage && (
+                            <p className={`text-sm font-medium ${leaveMessage === t('leave_request_sent') ? 'text-green-600' : 'text-red-600'}`}>
+                                {leaveMessage}
+                            </p>
+                        )}
+                        <div className="flex justify-end">
+                            <button 
+                                type="submit" 
+                                disabled={isSubmittingLeave}
+                                className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300"
+                            >
+                                {isSubmittingLeave ? t('loading') : t('submit_request')}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                {/* Leave History List */}
+                <div>
+                    <h4 className="font-bold text-slate-800 mb-3">{t('absent_dates_list')}</h4>
+                    {myLeaves.length > 0 ? (
+                        <div className="max-h-60 overflow-y-auto">
+                            <table className="w-full text-sm text-start text-slate-600">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
+                                    <tr>
+                                        <th className="px-4 py-2">{t('date')}</th>
+                                        <th className="px-4 py-2">{t('leave_type')}</th>
+                                        <th className="px-4 py-2 text-center">{t('status')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200">
+                                    {[...myLeaves].sort((a,b) => b.date.localeCompare(a.date)).map((leave) => {
+                                        let statusColor = 'bg-gray-100 text-gray-800';
+                                        if (leave.status === 'APPROVED') statusColor = 'bg-green-100 text-green-800';
+                                        else if (leave.status === 'REJECTED') statusColor = 'bg-red-100 text-red-800';
+                                        else if (leave.status === 'PENDING') statusColor = 'bg-yellow-100 text-yellow-800';
+                                        
+                                        return (
+                                            <tr key={leave.id} className="bg-white hover:bg-slate-50">
+                                                <td className="px-4 py-2 font-medium">{leave.date}</td>
+                                                <td className="px-4 py-2">{leave.reason}</td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${statusColor}`}>
+                                                        {t(`leave_status_${leave.status}`)}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-center text-slate-500 py-4 border border-dashed border-slate-300 rounded-lg">{t('no_data')}</p>
+                    )}
+                </div>
+                
+                <div className="flex justify-end pt-2 border-t border-slate-200">
+                    <button onClick={() => setIsLeaveModalOpen(false)} className="text-slate-700 hover:text-slate-900 font-medium">
+                        {t('close')}
+                    </button>
+                </div>
+            </div>
         </Modal>
       )}
 

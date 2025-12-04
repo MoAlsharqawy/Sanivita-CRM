@@ -1,6 +1,8 @@
 
+
+
 import { supabase } from './supabaseClient';
-import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask, RepAbsence } from '../types';
+import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask, RepAbsence, LeaveStatus } from '../types';
 
 // Helper to handle Supabase errors
 const handleSupabaseError = (error: any, context: string) => {
@@ -417,18 +419,37 @@ export const api = {
       id: a.id,
       repId: a.rep_id,
       date: a.date,
-      reason: a.reason
+      reason: a.reason,
+      status: a.status || 'APPROVED' // Default to APPROVED for backward compatibility if column is missing/null
+    }));
+  },
+  
+  getRepAbsencesForRep: async (repId: string): Promise<RepAbsence[]> => {
+    const { data, error } = await supabase.from('rep_absences').select('*').eq('rep_id', repId);
+    if (error) handleSupabaseError(error, 'getRepAbsencesForRep');
+    return (data || []).map((a: any) => ({
+      id: a.id,
+      repId: a.rep_id,
+      date: a.date,
+      reason: a.reason,
+      status: a.status || 'APPROVED'
     }));
   },
 
-  addRepAbsence: async (repId: string, date: string, reason: string): Promise<RepAbsence> => {
+  addRepAbsence: async (repId: string, date: string, reason: string, status: LeaveStatus = 'PENDING'): Promise<RepAbsence> => {
     const { data, error } = await supabase.from('rep_absences').insert({
       rep_id: repId,
       date: date,
-      reason: reason
+      reason: reason,
+      status: status
     }).select().single();
     if (error) handleSupabaseError(error, 'addRepAbsence');
-    return { id: data.id, repId: data.rep_id, date: data.date, reason: data.reason };
+    return { id: data.id, repId: data.rep_id, date: data.date, reason: data.reason, status: data.status };
+  },
+
+  updateRepAbsenceStatus: async (id: number, status: LeaveStatus): Promise<void> => {
+      const { error } = await supabase.from('rep_absences').update({ status }).eq('id', id);
+      if (error) handleSupabaseError(error, 'updateRepAbsenceStatus');
   },
 
   deleteRepAbsence: async (id: number): Promise<void> => {
