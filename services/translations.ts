@@ -6,6 +6,8 @@
 
 
 
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -17,6 +19,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'date': 'التاريخ',
     'visit_type': 'نوع الزيارة',
     'rep_name': 'اسم المندوب',
+    'rep_code': 'كود المندوب',
     'region': 'المنطقة',
     'client': 'العميل',
     'product': 'المنتج',
@@ -243,6 +246,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'date': 'Date',
     'visit_type': 'Visit Type',
     'rep_name': 'Rep Name',
+    'rep_code': 'Rep Code',
     'region': 'Region',
     'client': 'Client',
     'product': 'Product',

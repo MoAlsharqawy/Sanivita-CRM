@@ -9,6 +9,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
@@ -553,6 +555,7 @@ const ManagerDashboard: React.FC = () => {
 
         return {
             repName: rep.name,
+            repUsername: rep.username,
             totalWorkingDaysPassed,
             daysWorked,
             absentDays: absentDetails.length,
@@ -568,7 +571,8 @@ const ManagerDashboard: React.FC = () => {
           const rep = reps.find(r => r.id === req.repId);
           return {
               ...req,
-              repName: rep?.name || t('unknown')
+              repName: rep?.name || t('unknown'),
+              repUsername: rep?.username || ''
           };
       });
   }, [repAbsences, reps, t]);
@@ -1467,6 +1471,7 @@ const ManagerDashboard: React.FC = () => {
                             <thead className="text-xs text-blue-800 uppercase bg-white/50">
                                 <tr>
                                     <th className="px-6 py-3">{t('rep_name')}</th>
+                                    <th className="px-6 py-3">{t('rep_code')}</th>
                                     <th className="px-6 py-3">{t('date')}</th>
                                     <th className="px-6 py-3">{t('leave_type')}</th>
                                     <th className="px-6 py-3 text-center">{t('actions')}</th>
@@ -1476,6 +1481,7 @@ const ManagerDashboard: React.FC = () => {
                                 {pendingLeaveRequests.map(req => (
                                     <tr key={req.id} className="bg-white/20 hover:bg-white/40">
                                         <td className="px-6 py-4 font-medium text-slate-900">{req.repName}</td>
+                                        <td className="px-6 py-4 text-slate-600 font-mono text-xs">{req.repUsername}</td>
                                         <td className="px-6 py-4">{req.date}</td>
                                         <td className="px-6 py-4">{req.reason}</td>
                                         <td className="px-6 py-4 text-center">
@@ -1541,6 +1547,7 @@ const ManagerDashboard: React.FC = () => {
                         <thead className="text-xs text-blue-800 uppercase bg-white/50">
                             <tr>
                                 <th className="px-6 py-3">{t('rep_name')}</th>
+                                <th className="px-6 py-3">{t('rep_code')}</th>
                                 <th className="px-6 py-3 text-center">{t('total_working_days_passed')}</th>
                                 <th className="px-6 py-3 text-center">{t('days_worked')}</th>
                                 <th className="px-6 py-3 text-center">{t('absent_days')}</th>
@@ -1550,6 +1557,7 @@ const ManagerDashboard: React.FC = () => {
                             {vacationStats.map((stat, idx) => (
                                 <tr key={idx} className="bg-white/20 hover:bg-white/40">
                                     <td className="px-6 py-4 font-medium text-slate-800">{stat.repName}</td>
+                                    <td className="px-6 py-4 text-slate-600 font-mono text-xs">{stat.repUsername}</td>
                                     <td className="px-6 py-4 text-center">{stat.totalWorkingDaysPassed}</td>
                                     <td className="px-6 py-4 text-center font-bold text-green-700">{stat.daysWorked}</td>
                                     <td className="px-6 py-4 text-center">
@@ -1569,7 +1577,7 @@ const ManagerDashboard: React.FC = () => {
                             ))}
                             {vacationStats.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">{t('no_data')}</td>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">{t('no_data')}</td>
                                 </tr>
                             )}
                         </tbody>
