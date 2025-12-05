@@ -2,6 +2,8 @@
 
 
 
+
+
 import { VisitReport, Doctor, Pharmacy, Region, User, Specialization } from "../types";
 import { TranslationFunction } from "../hooks/useLanguage";
 
@@ -117,7 +119,7 @@ export const exportVacationStatsToExcel = (stats: any[], fileName: string, t: Tr
                  [t('rep_name')]: stat.repName,
                  [t('rep_code')]: stat.repUsername,
                  [t('date')]: detail.date,
-                 [t('leave_type')]: detail.reason
+                 [t('leave_type')]: detail.reason 
              });
         });
     }
