@@ -1,5 +1,7 @@
 
 
+
+
 import { VisitReport, Doctor, Pharmacy, Region, User, Specialization } from "../types";
 import { TranslationFunction } from "../hooks/useLanguage";
 
@@ -97,7 +99,8 @@ export const exportDoctorsListToExcel = (doctors: { name: string; region: string
 };
 
 export const exportVacationStatsToExcel = (stats: any[], fileName: string, t: TranslationFunction) => {
-  const data = stats.map(stat => ({
+  // Summary Data
+  const summaryData = stats.map(stat => ({
     [t('rep_name')]: stat.repName,
     [t('rep_code')]: stat.repUsername,
     [t('total_working_days_passed')]: stat.totalWorkingDaysPassed,
@@ -105,9 +108,31 @@ export const exportVacationStatsToExcel = (stats: any[], fileName: string, t: Tr
     [t('absent_days')]: stat.absentDays,
   }));
 
-  const worksheet = XLSX.utils.json_to_sheet(data);
+  // Details Data
+  const detailsData: any[] = [];
+  stats.forEach(stat => {
+    if (stat.absentDetailsList && Array.isArray(stat.absentDetailsList)) {
+        stat.absentDetailsList.forEach((detail: any) => {
+             detailsData.push({
+                 [t('rep_name')]: stat.repName,
+                 [t('rep_code')]: stat.repUsername,
+                 [t('date')]: detail.date,
+                 [t('leave_type')]: detail.reason
+             });
+        });
+    }
+  });
+
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, t('vacation_stats'));
+  
+  const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(workbook, summarySheet, t('summary'));
+
+  if(detailsData.length > 0) {
+      const detailsSheet = XLSX.utils.json_to_sheet(detailsData);
+      XLSX.utils.book_append_sheet(workbook, detailsSheet, t('details'));
+  }
+
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 

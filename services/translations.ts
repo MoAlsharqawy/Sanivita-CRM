@@ -8,6 +8,8 @@
 
 
 
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -235,6 +237,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'request_approved_success': 'تم قبول الطلب',
     'request_rejected_success': 'تم رفض الطلب',
     'status_update_error': 'حدث خطأ أثناء تحديث الحالة',
+    'summary': 'الملخص',
+    'details': 'التفاصيل',
   },
   en: {
     // General
@@ -459,5 +463,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'request_approved_success': 'Request approved',
     'request_rejected_success': 'Request rejected',
     'status_update_error': 'Error updating status',
+    'summary': 'Summary',
+    'details': 'Details',
   }
 };
