@@ -1,22 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
@@ -111,7 +92,7 @@ const ManagerDashboard: React.FC = () => {
   ], [t]);
 
 
-  type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport' | 'tasks' | 'vacations';
+  type ManagerTab = 'reports' | 'users' | 'clients' | 'approvals' | 'settings' | 'weeklyPlans' | 'dataImport' | 'tasks' | 'vacations' | 'rep_performance';
 
 
   // Tab and Modal states
@@ -163,6 +144,9 @@ const ManagerDashboard: React.FC = () => {
   const [isRegisteringAbsence, setIsRegisteringAbsence] = useState(false);
   const [registerAbsenceMessage, setRegisterAbsenceMessage] = useState('');
   const [pendingLeaveMessage, setPendingLeaveMessage] = useState('');
+
+  // Rep Performance View State
+  const [selectedRepForAnalysis, setSelectedRepForAnalysis] = useState<string>('');
 
 
   // Settings tab local state
@@ -307,6 +291,57 @@ const ManagerDashboard: React.FC = () => {
       pharmacyCount: totalPharmacies.filter(p => p.repId === repId).length,
     };
   }, [selectedRep, allReports, totalDoctors, totalPharmacies, reps]);
+
+  // Specific Rep Stats Logic
+  const repSpecificStats = useMemo(() => {
+      if (!selectedRepForAnalysis || !reps.find(r => r.id === selectedRepForAnalysis)) return null;
+
+      const repId = selectedRepForAnalysis;
+      const rep = reps.find(r => r.id === repId);
+      const repName = rep?.name || '';
+      
+      const repReports = allReports.filter(r => r.repName === repName);
+      
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      // Monthly Visits
+      const monthlyVisits = repReports.filter(visit => {
+          const visitDate = new Date(visit.date);
+          return visitDate >= startOfMonth && visitDate <= today;
+      });
+
+      // Total Assigned Clients
+      const assignedDoctors = totalDoctors.filter(d => d.repId === repId);
+      const assignedPharmacies = totalPharmacies.filter(p => p.repId === repId);
+      const totalAssigned = assignedDoctors.length + assignedPharmacies.length;
+
+      // Coverage
+      const uniqueVisitedDoctors = new Set(monthlyVisits.filter(v => v.type === 'DOCTOR_VISIT').map(v => v.targetName));
+      const coveragePercent = totalAssigned > 0 
+          ? ((uniqueVisitedDoctors.size) / assignedDoctors.length * 100).toFixed(1) 
+          : '0';
+
+      // Avg Per Day
+      const uniqueDays = new Set(monthlyVisits.map(r => new Date(r.date).toDateString())).size;
+      const avgPerDay = uniqueDays > 0 ? (monthlyVisits.length / uniqueDays).toFixed(1) : '0';
+
+      // Plan Status for current week
+      const plan = allPlans[repId];
+
+      return {
+          monthlyVisitsCount: monthlyVisits.length,
+          totalAssigned,
+          assignedDoctorsCount: assignedDoctors.length,
+          assignedPharmaciesCount: assignedPharmacies.length,
+          coveragePercent,
+          avgPerDay,
+          repReports,
+          planStatus: plan?.status || 'draft',
+          monthlyVisits // passing the array for charts
+      };
+  }, [selectedRepForAnalysis, allReports, totalDoctors, totalPharmacies, reps, allPlans]);
+
 
   const dailyVisitCounts = useMemo(() => {
     const todayStr = new Date().toDateString();
@@ -1061,6 +1096,15 @@ const ManagerDashboard: React.FC = () => {
                       {t('reports')}
                   </button>
               </li>
+               <li className="me-2">
+                  <button 
+                      onClick={() => setActiveTab('rep_performance')}
+                      className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group ${activeTab === 'rep_performance' ? 'text-blue-600 border-blue-600' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                  >
+                      <UserGroupIcon className="w-5 h-5 me-2" />
+                      {t('rep_performance_view')}
+                  </button>
+              </li>
               {user?.role === UserRole.Manager && (
                 <>
                   <li className="me-2">
@@ -1470,6 +1514,117 @@ const ManagerDashboard: React.FC = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* NEW: Rep Performance Tab */}
+      {activeTab === 'rep_performance' && (
+          <div className="space-y-6">
+              <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
+                   <h3 className="text-xl font-semibold mb-6 text-blue-800 flex items-center gap-2">
+                        <ChartBarIcon className="w-6 h-6" />
+                        {t('rep_performance_view')}
+                    </h3>
+                    
+                    <div className="mb-6 max-w-md">
+                        <label htmlFor="repAnalysisSelect" className="block text-sm font-medium text-slate-700 mb-2">{t('select_rep_to_view')}</label>
+                        <select
+                            id="repAnalysisSelect"
+                            value={selectedRepForAnalysis}
+                            onChange={(e) => setSelectedRepForAnalysis(e.target.value)}
+                            className="w-full p-2.5 bg-white/50 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                        >
+                            <option value="">{t('select_rep')}</option>
+                            {reps.map(rep => (
+                                <option key={rep.id} value={rep.id}>{rep.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {repSpecificStats ? (
+                        <div className="space-y-8 animate-fade-in">
+                            {/* Top Stats Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-blue-50/80 p-4 rounded-xl border border-blue-100 shadow-sm">
+                                    <p className="text-sm text-blue-600 font-medium mb-1">{t('visits_this_month')}</p>
+                                    <p className="text-3xl font-bold text-blue-800">{repSpecificStats.monthlyVisitsCount}</p>
+                                </div>
+                                <div className="bg-green-50/80 p-4 rounded-xl border border-green-100 shadow-sm">
+                                    <p className="text-sm text-green-600 font-medium mb-1">{t('total_clients')}</p>
+                                    <p className="text-3xl font-bold text-green-800">{repSpecificStats.totalAssigned}</p>
+                                    <p className="text-xs text-green-600 mt-1">{repSpecificStats.assignedDoctorsCount} {t('doctors')} / {repSpecificStats.assignedPharmaciesCount} {t('pharmacies')}</p>
+                                </div>
+                                <div className="bg-purple-50/80 p-4 rounded-xl border border-purple-100 shadow-sm">
+                                    <p className="text-sm text-purple-600 font-medium mb-1">{t('coverage_percentage')}</p>
+                                    <p className="text-3xl font-bold text-purple-800">{repSpecificStats.coveragePercent}%</p>
+                                    <p className="text-xs text-purple-600 mt-1">{t('coverage_info')}</p>
+                                </div>
+                                <div className="bg-orange-50/80 p-4 rounded-xl border border-orange-100 shadow-sm">
+                                    <p className="text-sm text-orange-600 font-medium mb-1">{t('visits_per_working_day')}</p>
+                                    <p className="text-3xl font-bold text-orange-800">{repSpecificStats.avgPerDay}</p>
+                                    <p className="text-xs text-orange-600 mt-1">{t('this_month')}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Charts Section */}
+                                <div>
+                                    <h4 className="text-lg font-semibold text-slate-700 mb-3">{t('visit_distribution')}</h4>
+                                    <div className="bg-white/50 p-4 rounded-xl shadow-sm border border-slate-200">
+                                         <AnalyticsCharts reports={repSpecificStats.monthlyVisits} />
+                                    </div>
+                                </div>
+                                
+                                {/* Frequency Section */}
+                                <div>
+                                    <h4 className="text-lg font-semibold text-slate-700 mb-3">{t('visit_frequency_monthly')}</h4>
+                                     <div className="bg-white/50 p-4 rounded-xl shadow-sm border border-slate-200">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {repFrequencyStats.filter(s => s.name === reps.find(r => r.id === selectedRepForAnalysis)?.name).map((stat, idx) => (
+                                                <React.Fragment key={idx}>
+                                                    <div className="text-center p-3 bg-red-50 rounded-lg">
+                                                        <p className="text-2xl font-bold text-red-700">{stat.f0}</p>
+                                                        <p className="text-xs text-red-600 font-semibold">{t('freq_0_mo')}</p>
+                                                        <button onClick={() => handleFrequencyClick(stat.name, 'f0')} className="text-[10px] text-red-500 underline mt-1">{t('view_details')}</button>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-gray-50 rounded-lg">
+                                                        <p className="text-2xl font-bold text-slate-700">{stat.f1}</p>
+                                                        <p className="text-xs text-slate-600 font-semibold">{t('freq_1_mo')}</p>
+                                                        <button onClick={() => handleFrequencyClick(stat.name, 'f1')} className="text-[10px] text-blue-500 underline mt-1">{t('view_details')}</button>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                                                        <p className="text-2xl font-bold text-blue-700">{stat.f2}</p>
+                                                        <p className="text-xs text-blue-600 font-semibold">{t('freq_2_mo')}</p>
+                                                        <button onClick={() => handleFrequencyClick(stat.name, 'f2')} className="text-[10px] text-blue-500 underline mt-1">{t('view_details')}</button>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                                                        <p className="text-2xl font-bold text-green-700">{stat.f3}</p>
+                                                        <p className="text-xs text-green-600 font-semibold">{t('freq_3_mo')}</p>
+                                                        <button onClick={() => handleFrequencyClick(stat.name, 'f3')} className="text-[10px] text-green-500 underline mt-1">{t('view_details')}</button>
+                                                    </div>
+                                                </React.Fragment>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Plan Status */}
+                                    <div className="mt-6">
+                                        <h4 className="text-lg font-semibold text-slate-700 mb-3">{t('weekly_plan')}</h4>
+                                         <div className="bg-white/50 p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                                            <span className="text-slate-600 font-medium">{t('status')}</span>
+                                            {getPlanStatusBadge(repSpecificStats.planStatus)}
+                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 bg-slate-50/50 rounded-xl border border-dashed border-slate-300">
+                             <UsersIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                             <p className="text-slate-500">{t('select_rep_to_view')}</p>
+                        </div>
+                    )}
+              </div>
+          </div>
       )}
 
       {/* ... Other Tabs (Users, Clients, Tasks, DataImport, Approvals, WeeklyPlans, Settings) ... */}
