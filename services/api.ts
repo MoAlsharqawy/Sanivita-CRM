@@ -283,6 +283,11 @@ export const api = {
   },
 
   deleteDoctor: async (id: number): Promise<void> => {
+    // Manually delete visits first to avoid Foreign Key Constraint violations
+    // This fixes the issue where the delete button "doesn't work"
+    const { error: visitsError } = await supabase.from('doctor_visits').delete().eq('doctor_id', id);
+    if (visitsError) handleSupabaseError(visitsError, 'deleteDoctor (visits)');
+
     const { error } = await supabase.from('doctors').delete().eq('id', id);
     if (error) handleSupabaseError(error, 'deleteDoctor');
   },
@@ -322,6 +327,10 @@ export const api = {
   },
 
   deletePharmacy: async (id: number): Promise<void> => {
+    // Manually delete visits first to avoid Foreign Key Constraint violations
+    const { error: visitsError } = await supabase.from('pharmacy_visits').delete().eq('pharmacy_id', id);
+    if (visitsError) handleSupabaseError(visitsError, 'deletePharmacy (visits)');
+
     const { error } = await supabase.from('pharmacies').delete().eq('id', id);
     if (error) handleSupabaseError(error, 'deletePharmacy');
   },
