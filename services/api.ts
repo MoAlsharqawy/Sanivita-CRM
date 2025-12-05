@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from './supabaseClient';
 import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask, RepAbsence, LeaveStatus } from '../types';
 
@@ -250,6 +247,7 @@ export const api = {
     return data || [];
   },
 
+  // --- DOCTOR MANAGEMENT (CRUD) ---
   getAllDoctors: async (): Promise<Doctor[]> => {
     const { data, error } = await supabase.from('doctors').select('*');
     if (error) handleSupabaseError(error, 'getAllDoctors');
@@ -262,6 +260,34 @@ export const api = {
     return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
   },
 
+  addDoctor: async (doctor: { name: string, regionId: number, repId: string, specialization: string }): Promise<Doctor> => {
+    const { data, error } = await supabase.from('doctors').insert({
+      name: doctor.name,
+      region_id: doctor.regionId,
+      rep_id: doctor.repId,
+      specialization: doctor.specialization
+    }).select().single();
+    
+    if (error) handleSupabaseError(error, 'addDoctor');
+    return { ...data, regionId: data.region_id, repId: data.rep_id };
+  },
+
+  updateDoctor: async (id: number, updates: Partial<{ name: string, regionId: number, specialization: string }>): Promise<void> => {
+    const dbUpdates: any = {};
+    if (updates.name) dbUpdates.name = updates.name;
+    if (updates.regionId) dbUpdates.region_id = updates.regionId;
+    if (updates.specialization) dbUpdates.specialization = updates.specialization;
+
+    const { error } = await supabase.from('doctors').update(dbUpdates).eq('id', id);
+    if (error) handleSupabaseError(error, 'updateDoctor');
+  },
+
+  deleteDoctor: async (id: number): Promise<void> => {
+    const { error } = await supabase.from('doctors').delete().eq('id', id);
+    if (error) handleSupabaseError(error, 'deleteDoctor');
+  },
+
+  // --- PHARMACY MANAGEMENT (CRUD) ---
   getAllPharmacies: async (): Promise<Pharmacy[]> => {
     const { data, error } = await supabase.from('pharmacies').select('*');
     if (error) handleSupabaseError(error, 'getAllPharmacies');
@@ -272,6 +298,32 @@ export const api = {
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
     if (error) handleSupabaseError(error, 'getPharmaciesForRep');
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
+  },
+
+  addPharmacy: async (pharmacy: { name: string, regionId: number, repId: string }): Promise<Pharmacy> => {
+    const { data, error } = await supabase.from('pharmacies').insert({
+      name: pharmacy.name,
+      region_id: pharmacy.regionId,
+      rep_id: pharmacy.repId,
+      specialization: Specialization.Pharmacy
+    }).select().single();
+    
+    if (error) handleSupabaseError(error, 'addPharmacy');
+    return { ...data, regionId: data.region_id, repId: data.rep_id };
+  },
+
+  updatePharmacy: async (id: number, updates: Partial<{ name: string, regionId: number }>): Promise<void> => {
+    const dbUpdates: any = {};
+    if (updates.name) dbUpdates.name = updates.name;
+    if (updates.regionId) dbUpdates.region_id = updates.regionId;
+
+    const { error } = await supabase.from('pharmacies').update(dbUpdates).eq('id', id);
+    if (error) handleSupabaseError(error, 'updatePharmacy');
+  },
+
+  deletePharmacy: async (id: number): Promise<void> => {
+    const { error } = await supabase.from('pharmacies').delete().eq('id', id);
+    if (error) handleSupabaseError(error, 'deletePharmacy');
   },
 
   // --- VISITS & REPORTS ---

@@ -15,6 +15,7 @@ import OverdueClientsDetailModal from './OverdueClientsDetailModal';
 import UserRegionsModal from './UserRegionsModal';
 import FrequencyDetailModal from './FrequencyDetailModal';
 import AbsentDetailsModal from './AbsentDetailsModal';
+import RepClientManager from './RepClientManager';
 
 // Helper functions for dates (YYYY-MM-DD format)
 const toYYYYMMDD = (date: Date): string => {
@@ -106,6 +107,7 @@ const ManagerDashboard: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // RepClientManager View State
   const [viewingRepClients, setViewingRepClients] = useState<User | null>(null);
   
   // Reset visits functionality
@@ -211,6 +213,13 @@ const ManagerDashboard: React.FC = () => {
   useEffect(() => {
     fetchInitialData();
   }, [activeTab, fetchInitialData]);
+
+  // When switching tabs, clear specific states if needed
+  useEffect(() => {
+      if (activeTab !== 'clients') {
+          setViewingRepClients(null);
+      }
+  }, [activeTab]);
 
   useMemo(() => {
     let reports = allReports;
@@ -1669,7 +1678,50 @@ const ManagerDashboard: React.FC = () => {
         </>
       )}
       
-      {activeTab === 'clients' && (<div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden"><h3 className="text-xl font-semibold p-4 flex items-center text-blue-800 bg-white/50 border-b border-white/30"><UserGroupIcon className="w-6 h-6 me-3"/>{t('client_management')}</h3><div className="overflow-x-auto"><table className="w-full text-sm text-start text-gray-500"><thead className="text-xs text-blue-800 uppercase bg-white/50"><tr><th className="px-6 py-3">{t('rep_name')}</th><th className="px-6 py-3">{t('doctors')}</th><th className="px-6 py-3">{t('pharmacies')}</th><th className="px-6 py-3">{t('total_clients')}</th><th className="px-6 py-3">{t('doctor_specialization_breakdown')}</th><th className="px-6 py-3">{t('actions')}</th></tr></thead><tbody>{clientStatsByRep.map(stat => (<tr key={stat.rep.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40"><td className="px-6 py-4 font-medium text-slate-900">{stat.rep.name}</td><td className="px-6 py-4 text-center">{stat.doctorCount}</td><td className="px-6 py-4 text-center">{stat.pharmacyCount}</td><td className="px-6 py-4 text-center font-bold text-slate-800">{stat.totalClients}</td><td className="px-6 py-4"><div className="flex flex-wrap gap-1">{Object.entries(stat.specializationCounts).length > 0 ? Object.entries(stat.specializationCounts).map(([spec, count]) => (<span key={spec} className="text-xs bg-slate-200 text-slate-700 font-medium px-2 py-1 rounded-full">{t(spec as any)}: {count}</span>)) : <span className="text-xs text-slate-500">{t('no_doctors_assigned')}</span>}</div></td><td className="px-6 py-4"><button onClick={() => setViewingRepClients(stat.rep)} className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-4 py-2 flex items-center gap-2 transition-colors"><EyeIcon className="w-4 h-4"/>{t('view_clients')}</button></td></tr>))}</tbody></table>{reps.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_data')}</p>}</div></div>)}
+      {activeTab === 'clients' && (
+        <>
+          {viewingRepClients ? (
+            <RepClientManager 
+              rep={viewingRepClients} 
+              allDoctors={totalDoctors}
+              allPharmacies={totalPharmacies}
+              regions={regions}
+              onBack={() => setViewingRepClients(null)}
+              onDataChange={fetchInitialData}
+            />
+          ) : (
+            <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 overflow-hidden">
+                <h3 className="text-xl font-semibold p-4 flex items-center text-blue-800 bg-white/50 border-b border-white/30"><UserGroupIcon className="w-6 h-6 me-3"/>{t('client_management')}</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-start text-gray-500">
+                        <thead className="text-xs text-blue-800 uppercase bg-white/50">
+                            <tr><th className="px-6 py-3">{t('rep_name')}</th><th className="px-6 py-3">{t('doctors')}</th><th className="px-6 py-3">{t('pharmacies')}</th><th className="px-6 py-3">{t('total_clients')}</th><th className="px-6 py-3">{t('doctor_specialization_breakdown')}</th><th className="px-6 py-3">{t('actions')}</th></tr>
+                        </thead>
+                        <tbody>
+                            {clientStatsByRep.map(stat => (
+                                <tr key={stat.rep.id} className="bg-white/20 border-b border-white/30 hover:bg-white/40">
+                                    <td className="px-6 py-4 font-medium text-slate-900">{stat.rep.name}</td>
+                                    <td className="px-6 py-4 text-center">{stat.doctorCount}</td>
+                                    <td className="px-6 py-4 text-center">{stat.pharmacyCount}</td>
+                                    <td className="px-6 py-4 text-center font-bold text-slate-800">{stat.totalClients}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-wrap gap-1">
+                                            {Object.entries(stat.specializationCounts).length > 0 ? Object.entries(stat.specializationCounts).map(([spec, count]) => (<span key={spec} className="text-xs bg-slate-200 text-slate-700 font-medium px-2 py-1 rounded-full">{t(spec as any)}: {count}</span>)) : <span className="text-xs text-slate-500">{t('no_doctors_assigned')}</span>}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <button onClick={() => setViewingRepClients(stat.rep)} className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-4 py-2 flex items-center gap-2 transition-colors"><EyeIcon className="w-4 h-4"/>{t('view_clients')}</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {reps.length === 0 && <p className="text-center p-8 text-slate-600">{t('no_data')}</p>}
+                </div>
+            </div>
+          )}
+        </>
+      )}
       
       {activeTab === 'tasks' && (
           <div className="bg-white/40 backdrop-blur-lg rounded-2xl shadow-lg border border-white/50 p-6">
@@ -1869,7 +1921,6 @@ const ManagerDashboard: React.FC = () => {
             </Modal>
         )}
         
-        {viewingRepClients && <ClientListModal rep={viewingRepClients} onClose={() => setViewingRepClients(null)} totalDoctors={totalDoctors} totalPharmacies={totalPharmacies} regions={regions} />}
         {isDailyVisitsDetailModalOpen && <DailyVisitsDetailModal isOpen={isDailyVisitsDetailModalOpen} onClose={() => setIsDailyVisitsDetailModalOpen(false)} reports={allReports} reps={reps} selectedRepId={selectedRepForDailyVisits} />}
         {isOverdueClientsDetailModalOpen && <OverdueClientsDetailModal isOpen={isOverdueClientsDetailModalOpen} onClose={() => setIsOverdueClientsDetailModalOpen(false)} alerts={overdueAlerts} reps={reps} regions={regions} />}
 
@@ -2015,69 +2066,5 @@ const ManagerDashboard: React.FC = () => {
     </div>
   );
 };
-
-// ... (ClientListModal stays the same)
-interface ClientListModalProps {
-    rep: User;
-    onClose: () => void;
-    totalDoctors: Doctor[]; 
-    totalPharmacies: Pharmacy[];
-    regions: Region[];
-}
-
-const ClientListModal: React.FC<ClientListModalProps> = ({ rep, onClose, totalDoctors, totalPharmacies, regions }) => {
-    const { t } = useLanguage();
-    const [activeModalTab, setActiveModalTab] = useState<'doctors' | 'pharmacies'>('doctors');
-    const repDoctors = useMemo(() => totalDoctors.filter((d: Doctor) => d.repId === rep.id), [rep.id, totalDoctors]);
-    const repPharmacies = useMemo(() => totalPharmacies.filter((p: Pharmacy) => p.repId === rep.id), [rep.id, totalPharmacies]);
-    const regionMap = useMemo(() => new Map(regions.map((r: Region) => [r.id, r.name])), [regions]);
-
-    const handleExport = () => {
-        exportClientsToExcel(repDoctors, repPharmacies, regions, `clients_${rep.username}`, t);
-    };
-
-    return (
-      <Modal isOpen={true} onClose={onClose} title={t('clients_for_rep', rep.name)}>
-          <div className="space-y-4">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-300/50">
-                  <div role="tablist" className="grid grid-cols-2 gap-1 rounded-lg p-1 bg-slate-200/60">
-                      <button type="button" role="tab" aria-selected={activeModalTab === 'doctors'} onClick={() => setActiveModalTab('doctors')} className={`flex items-center justify-center gap-2 w-full p-2 rounded-md text-sm font-semibold transition-colors duration-200 ${activeModalTab === 'doctors' ? 'bg-blue-600 text-white shadow' : 'text-slate-700 hover:bg-white/50'}`}>
-                          <DoctorIcon className="w-5 h-5"/> {t('doctors')} ({repDoctors.length})
-                      </button>
-                      <button type="button" role="tab" aria-selected={activeModalTab === 'pharmacies'} onClick={() => setActiveModalTab('pharmacies')} className={`flex items-center justify-center gap-2 w-full p-2 rounded-md text-sm font-semibold transition-colors duration-200 ${activeModalTab === 'pharmacies' ? 'bg-orange-500 text-white shadow' : 'text-slate-700 hover:bg-white/50'}`}>
-                          <PharmacyIcon className="w-5 h-5"/> {t('pharmacies')} ({repPharmacies.length})
-                      </button>
-                  </div>
-                  <button onClick={handleExport} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-all shadow flex items-center gap-2">
-                      <DownloadIcon className="w-5 h-5"/>
-                      <span>{t('download_list')}</span>
-                  </button>
-              </div>
-
-              <div className="max-h-96 overflow-y-auto">
-                  {activeModalTab === 'doctors' ? (
-                      repDoctors.length > 0 ? (
-                          <table className="w-full text-sm text-start">
-                              <thead className="text-xs text-blue-800 uppercase bg-slate-100/50 sticky top-0">
-                                  <tr><th className="px-4 py-2">{t('name')}</th><th className="px-4 py-2">{t('specialization')}</th><th className="px-4 py-2">{t('region')}</th></tr>
-                              </thead>
-                              <tbody>{repDoctors.map(doctor => (<tr key={doctor.id} className="border-b border-slate-200/50"><td className="px-4 py-2 font-medium text-slate-800">{doctor.name}</td><td className="px-4 py-2">{t(doctor.specialization)}</td><td className="px-4 py-2">{regionMap.get(doctor.regionId) || t('unknown')}</td></tr>))}</tbody>
-                          </table>
-                      ) : <p className="text-center p-8 text-slate-600">{t('no_doctors_assigned')}</p>
-                  ) : (
-                      repPharmacies.length > 0 ? (
-                           <table className="w-full text-sm text-start">
-                              <thead className="text-xs text-orange-800 uppercase bg-slate-100/50 sticky top-0">
-                                  <tr><th className="px-4 py-2">{t('name')}</th><th className="px-4 py-2">{t('region')}</th></tr>
-                              </thead>
-                              <tbody>{repPharmacies.map(pharmacy => (<tr key={pharmacy.id} className="border-b border-slate-200/50"><td className="px-4 py-2 font-medium text-slate-800">{pharmacy.name}</td><td className="px-4 py-2">{regionMap.get(pharmacy.regionId) || t('unknown')}</td></tr>))}</tbody>
-                          </table>
-                      ) : <p className="text-center p-8 text-slate-600">{t('no_pharmacies_assigned')}</p>
-                  )}
-              </div>
-          </div>
-      </Modal>
-    );
-}
 
 export default ManagerDashboard;

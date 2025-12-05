@@ -16,6 +16,8 @@
 
 
 
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -349,6 +351,22 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'no_plans_in_system': 'لا توجد خطط مسجلة في النظام',
     'visit_count_label': 'عدد الزيارات',
     'no_data_for_charts': 'لا توجد بيانات كافية للرسوم البيانية',
+    // Client Management CRUD
+    'add_client': 'إضافة عميل',
+    'edit_client': 'تعديل بيانات العميل',
+    'add_new_doctor': 'إضافة طبيب جديد',
+    'add_new_pharmacy': 'إضافة صيدلية جديدة',
+    'client_added_success': 'تم إضافة العميل بنجاح',
+    'client_updated_success': 'تم تحديث بيانات العميل',
+    'client_deleted_success': 'تم حذف العميل',
+    'delete_client_confirm_title': 'حذف العميل',
+    'delete_client_confirm_message': 'هل أنت متأكد من حذف {0}؟ سيتم حذف جميع الزيارات المرتبطة.',
+    'client_type': 'نوع العميل',
+    'search_by_name': 'بحث بالاسم...',
+    'error_name_required': 'اسم العميل مطلوب',
+    'error_region_required': 'المنطقة مطلوبة',
+    'select_specialization': 'اختر التخصص',
+    'select_region': 'اختر المنطقة',
   },
   en: {
     // General
@@ -679,5 +697,21 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'no_plans_in_system': 'No plans recorded in the system',
     'visit_count_label': 'Visit Count',
     'no_data_for_charts': 'Not enough data for charts',
+    // Client Management CRUD
+    'add_client': 'Add Client',
+    'edit_client': 'Edit Client',
+    'add_new_doctor': 'Add New Doctor',
+    'add_new_pharmacy': 'Add New Pharmacy',
+    'client_added_success': 'Client added successfully',
+    'client_updated_success': 'Client updated successfully',
+    'client_deleted_success': 'Client deleted successfully',
+    'delete_client_confirm_title': 'Delete Client',
+    'delete_client_confirm_message': 'Are you sure you want to delete {0}? All related visits will be removed.',
+    'client_type': 'Client Type',
+    'search_by_name': 'Search by name...',
+    'error_name_required': 'Client name is required',
+    'error_region_required': 'Region is required',
+    'select_specialization': 'Select Specialization',
+    'select_region': 'Select Region',
   }
 };
