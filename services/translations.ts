@@ -13,6 +13,8 @@
 
 
 
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -105,6 +107,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'to_date': 'إلى تاريخ',
     'export': 'تصدير',
     'export_reports': 'تصدير التقارير ({0})',
+    // Filtered Stats
+    'filtered_stats_title': 'إحصائيات النتائج المصفاة',
+    'active_days': 'أيام العمل',
+    'avg_per_day': 'المتوسط / يوم',
     // DB Error Screen
     'db_error_title': 'خطأ في الاتصال بقاعدة البيانات',
     'db_error_rls_explanation_1': 'تعذر الوصول إلى ملف تعريف المستخدم الخاص بك.',
@@ -332,6 +338,10 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'to_date': 'To Date',
     'export': 'Export',
     'export_reports': 'Export Reports ({0})',
+    // Filtered Stats
+    'filtered_stats_title': 'Filtered Results Statistics',
+    'active_days': 'Active Days',
+    'avg_per_day': 'Avg/Day',
     // DB Error Screen
     'db_error_title': 'Database Connection Error',
     'db_error_rls_explanation_1': 'Unable to access your user profile.',

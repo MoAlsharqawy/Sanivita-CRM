@@ -15,11 +15,13 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
 import { exportToExcel, exportToPdf, exportUsersToExcel, exportMultipleRepClientsToExcel, exportClientsToExcel, exportVacationStatsToExcel } from '../services/exportService';
-import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon, ClipboardCheckIcon, CheckCircleIcon, SunIcon } from './icons';
+import { FilterIcon, DownloadIcon, CalendarIcon, DoctorIcon, PharmacyIcon, WarningIcon, UserIcon as UsersIcon, ChartBarIcon, CogIcon, CalendarPlusIcon, TrashIcon, MapPinIcon, CheckIcon, XIcon, UploadIcon, EditIcon, PlusIcon, UserGroupIcon, GraphIcon, EyeIcon, ReplyIcon, ClipboardListIcon, ChevronDownIcon, ChevronUpIcon, CheckCircleIcon, SunIcon } from './icons';
 import Modal from './Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage, TranslationFunction } from '../hooks/useLanguage';
@@ -588,6 +590,17 @@ const ManagerDashboard: React.FC = () => {
           };
       });
   }, [repAbsences, reps, t]);
+  
+  // Calculate Filtered Reports Stats
+  const filteredStats = useMemo(() => {
+    const total = filteredReports.length;
+    const doctorVisits = filteredReports.filter(r => r.type === 'DOCTOR_VISIT').length;
+    const pharmacyVisits = filteredReports.filter(r => r.type === 'PHARMACY_VISIT').length;
+    const uniqueDays = new Set(filteredReports.map(r => new Date(r.date).toDateString())).size;
+    const avgPerDay = uniqueDays > 0 ? (total / uniqueDays).toFixed(1) : "0";
+
+    return { total, doctorVisits, pharmacyVisits, avgPerDay, uniqueDays };
+  }, [filteredReports]);
 
 
   const handleFrequencyClick = (repName: string, freqType: 'f0' | 'f1' | 'f2' | 'f3') => {
@@ -1390,6 +1403,30 @@ const ManagerDashboard: React.FC = () => {
                 </div>
             )}
           </div>
+
+          {/* Filtered Reports Summary Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 animate-fade-in">
+                <div className="bg-white/40 border border-white/50 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm hover:bg-white/60 transition-colors">
+                    <span className="text-xs text-slate-500 font-medium uppercase mb-1">{t('total')}</span>
+                    <span className="text-2xl font-bold text-slate-800">{filteredStats.total}</span>
+                </div>
+                <div className="bg-white/40 border border-white/50 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm hover:bg-white/60 transition-colors">
+                    <span className="text-xs text-blue-600 font-medium uppercase mb-1 flex items-center gap-1"><DoctorIcon className="w-3 h-3"/> {t('doctors')}</span>
+                    <span className="text-2xl font-bold text-blue-700">{filteredStats.doctorVisits}</span>
+                </div>
+                <div className="bg-white/40 border border-white/50 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm hover:bg-white/60 transition-colors">
+                    <span className="text-xs text-orange-600 font-medium uppercase mb-1 flex items-center gap-1"><PharmacyIcon className="w-3 h-3"/> {t('pharmacies')}</span>
+                    <span className="text-2xl font-bold text-orange-700">{filteredStats.pharmacyVisits}</span>
+                </div>
+                <div className="bg-white/40 border border-white/50 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm hover:bg-white/60 transition-colors">
+                     <span className="text-xs text-purple-600 font-medium uppercase mb-1">{t('active_days')}</span>
+                    <span className="text-2xl font-bold text-purple-700">{filteredStats.uniqueDays}</span>
+                </div>
+                <div className="bg-white/40 border border-white/50 p-3 rounded-xl flex flex-col items-center justify-center shadow-sm hover:bg-white/60 transition-colors col-span-2 md:col-span-1">
+                    <span className="text-xs text-teal-600 font-medium uppercase mb-1">{t('avg_per_day')}</span>
+                    <span className="text-2xl font-bold text-teal-700">{filteredStats.avgPerDay}</span>
+                </div>
+            </div>
 
           {/* Alerts Table ... */}
           {filteredAlerts.length > 0 && (
