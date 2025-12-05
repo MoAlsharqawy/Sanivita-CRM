@@ -13,6 +13,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
@@ -437,11 +439,12 @@ const ManagerDashboard: React.FC = () => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    const statsMap: Record<string, { f1: number, f2: number, f3: number }> = {};
+    const statsMap: Record<string, { f0: number, f1: number, f2: number, f3: number }> = {};
     reps.forEach(r => {
-        statsMap[r.name] = { f1: 0, f2: 0, f3: 0 };
+        statsMap[r.name] = { f0: 0, f1: 0, f2: 0, f3: 0 };
     });
 
+    // 1. Calculate visit counts per doctor per rep
     const visitCounts = new Map<string, number>();
 
     allReports.forEach(visit => {
@@ -452,13 +455,20 @@ const ManagerDashboard: React.FC = () => {
         }
     });
 
-    visitCounts.forEach((count, key) => {
-        const repName = key.split('_')[0];
-        if (statsMap[repName]) {
-            if (count === 1) statsMap[repName].f1++;
-            else if (count === 2) statsMap[repName].f2++;
-            else if (count >= 3) statsMap[repName].f3++;
-        }
+    // 2. Iterate through ALL doctors to assign them to frequency buckets (including 0)
+    reps.forEach(rep => {
+         const repDoctors = totalDoctors.filter(d => d.repId === rep.id);
+         repDoctors.forEach(doc => {
+             const key = `${rep.name}_${doc.name}`;
+             const count = visitCounts.get(key) || 0;
+             
+             if (statsMap[rep.name]) {
+                 if (count === 0) statsMap[rep.name].f0++;
+                 else if (count === 1) statsMap[rep.name].f1++;
+                 else if (count === 2) statsMap[rep.name].f2++;
+                 else if (count >= 3) statsMap[rep.name].f3++;
+             }
+         });
     });
 
     let result = Object.entries(statsMap).map(([name, counts]) => ({ name, ...counts }));
@@ -468,7 +478,7 @@ const ManagerDashboard: React.FC = () => {
     }
 
     return result;
-  }, [allReports, reps, selectedRep]);
+  }, [allReports, reps, selectedRep, totalDoctors]);
 
   // Vacation Stats Logic - UPDATED with Manual Absences
   const vacationStats = useMemo(() => {
@@ -580,11 +590,16 @@ const ManagerDashboard: React.FC = () => {
   }, [repAbsences, reps, t]);
 
 
-  const handleFrequencyClick = (repName: string, freqType: 'f1' | 'f2' | 'f3') => {
+  const handleFrequencyClick = (repName: string, freqType: 'f0' | 'f1' | 'f2' | 'f3') => {
       const today = new Date();
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      
+      const rep = reps.find(r => r.name === repName);
+      if (!rep) return;
+
       const visitCounts: Record<string, { count: number, region: string, specialization: string }> = {};
 
+      // 1. Get visited doctors from reports
       const reports = allReports.filter(visit => {
           const visitDate = new Date(visit.date);
           return visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT' && visit.repName === repName;
@@ -597,23 +612,32 @@ const ManagerDashboard: React.FC = () => {
           }
           visitCounts[key].count++;
       });
+      
+      // 2. Get ALL doctors for this rep to check for 0 visits
+      const repDoctors = totalDoctors.filter(d => d.repId === rep.id);
+      
+      const allDoctorsStatus = repDoctors.map(doc => {
+          const visitedData = visitCounts[doc.name];
+          const regionName = regions.find(r => r.id === doc.regionId)?.name || t('unknown');
+          return {
+              name: doc.name,
+              region: regionName,
+              specialization: doc.specialization,
+              visits: visitedData ? visitedData.count : 0
+          };
+      });
 
-      const filteredDoctors = Object.entries(visitCounts)
-          .filter(([_, data]) => {
-              if (freqType === 'f1') return data.count === 1;
-              if (freqType === 'f2') return data.count === 2;
-              if (freqType === 'f3') return data.count >= 3;
+      const filteredDoctors = allDoctorsStatus.filter(data => {
+              if (freqType === 'f0') return data.visits === 0;
+              if (freqType === 'f1') return data.visits === 1;
+              if (freqType === 'f2') return data.visits === 2;
+              if (freqType === 'f3') return data.visits >= 3;
               return false;
-          })
-          .map(([name, data]) => ({
-              name,
-              region: data.region,
-              specialization: data.specialization,
-              visits: data.count
-          }));
+          });
       
       let freqLabel = '';
-      if (freqType === 'f1') freqLabel = t('freq_1_mo');
+      if (freqType === 'f0') freqLabel = t('freq_0_mo');
+      else if (freqType === 'f1') freqLabel = t('freq_1_mo');
       else if (freqType === 'f2') freqLabel = t('freq_2_mo');
       else freqLabel = t('freq_3_mo');
 
@@ -1243,6 +1267,7 @@ const ManagerDashboard: React.FC = () => {
                         <thead className="text-xs text-slate-500 uppercase bg-slate-100/50">
                             <tr>
                                 <th scope="col" className="px-4 py-3 text-start">{t('rep_name')}</th>
+                                <th scope="col" className="px-4 py-3 text-red-800">{t('freq_0_mo')}</th>
                                 <th scope="col" className="px-4 py-3 text-slate-800">{t('freq_1_mo')}</th>
                                 <th scope="col" className="px-4 py-3 text-blue-800">{t('freq_2_mo')}</th>
                                 <th scope="col" className="px-4 py-3 text-green-800">{t('freq_3_mo')}</th>
@@ -1252,6 +1277,11 @@ const ManagerDashboard: React.FC = () => {
                             {repFrequencyStats.map((stat, idx) => (
                                 <tr key={idx} className="hover:bg-white/40 transition-colors">
                                     <td className="px-4 py-3 font-medium text-slate-900 text-start">{stat.name}</td>
+                                    <td className="px-4 py-3">
+                                        <button onClick={() => handleFrequencyClick(stat.name, 'f0')} className="font-bold text-red-700 hover:text-red-900 hover:underline">
+                                            {stat.f0}
+                                        </button>
+                                    </td>
                                     <td className="px-4 py-3">
                                         <button onClick={() => handleFrequencyClick(stat.name, 'f1')} className="font-bold text-slate-600 hover:text-blue-600 hover:underline">
                                             {stat.f1}
@@ -1271,7 +1301,7 @@ const ManagerDashboard: React.FC = () => {
                             ))}
                             {repFrequencyStats.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-4 py-4 text-center text-slate-500 italic">{t('no_data')}</td>
+                                    <td colSpan={5} className="px-4 py-4 text-center text-slate-500 italic">{t('no_data')}</td>
                                 </tr>
                             )}
                         </tbody>

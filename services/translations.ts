@@ -10,6 +10,8 @@
 
 
 
+
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -67,6 +69,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'visits_per_working_day_info': 'متوسط عدد الزيارات في أيام العمل الفعلية لهذا الشهر.',
     'auth_timeout_error': 'انتهت مهلة عملية المصادقة. يرجى محاولة تحديث الصفحة.',
     'visit_frequency_monthly': 'تكرار الزيارات / شهر',
+    'freq_0_mo': 'بدون زيارات',
     'freq_1_mo': '1/الشهر',
     'freq_2_mo': '2/الشهر',
     'freq_3_mo': '3/الشهر',
@@ -296,6 +299,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'visits_per_working_day_info': 'Average number of visits on actual working days this month.',
     'auth_timeout_error': 'Authentication timed out. Please refresh the page.',
     'visit_frequency_monthly': 'Visit Frequency / Month',
+    'freq_0_mo': 'No Visits',
     'freq_1_mo': '1/Mo',
     'freq_2_mo': '2/Mo',
     'freq_3_mo': '3/Mo',

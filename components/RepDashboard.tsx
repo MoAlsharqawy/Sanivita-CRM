@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -207,7 +209,7 @@ const RepDashboard: React.FC = () => {
       }
   };
 
-  const handleFrequencyClick = (freqType: 'f1' | 'f2' | 'f3') => {
+  const handleFrequencyClick = (freqType: 'f0' | 'f1' | 'f2' | 'f3') => {
       const today = new Date();
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       
@@ -219,7 +221,7 @@ const RepDashboard: React.FC = () => {
           return visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT';
       });
 
-      // Count visits per doctor
+      // Count visits per doctor from reports
       reports.forEach(visit => {
           const key = visit.targetName;
           if (!visitCounts[key]) {
@@ -232,24 +234,33 @@ const RepDashboard: React.FC = () => {
           }
           visitCounts[key].count++;
       });
+      
+      // Get statuses for ALL assigned doctors
+      const allDoctorsStatus = doctors.map(doc => {
+          const visitedData = visitCounts[doc.name];
+          // Find region name
+          const regionName = regions.find(r => r.id === doc.regionId)?.name || '';
+
+          return {
+              name: doc.name,
+              region: regionName,
+              specialization: doc.specialization,
+              visits: visitedData ? visitedData.count : 0
+          };
+      });
 
       // Filter based on frequency type
-      const filteredDoctors = Object.entries(visitCounts)
-          .filter(([_, data]) => {
-              if (freqType === 'f1') return data.count === 1;
-              if (freqType === 'f2') return data.count === 2;
-              if (freqType === 'f3') return data.count >= 3;
+      const filteredDoctors = allDoctorsStatus.filter(data => {
+              if (freqType === 'f0') return data.visits === 0;
+              if (freqType === 'f1') return data.visits === 1;
+              if (freqType === 'f2') return data.visits === 2;
+              if (freqType === 'f3') return data.visits >= 3;
               return false;
-          })
-          .map(([name, data]) => ({
-              name,
-              region: data.region,
-              specialization: data.specialization,
-              visits: data.count
-          }));
+          });
       
       let freqLabel = '';
-      if (freqType === 'f1') freqLabel = t('freq_1_mo');
+      if (freqType === 'f0') freqLabel = t('freq_0_mo');
+      else if (freqType === 'f1') freqLabel = t('freq_1_mo');
       else if (freqType === 'f2') freqLabel = t('freq_2_mo');
       else freqLabel = t('freq_3_mo');
 
@@ -369,6 +380,7 @@ const RepDashboard: React.FC = () => {
     
     const visitCounts: Record<string, number> = {};
     
+    // Count actual visits
     recentVisits.forEach(visit => {
         const visitDate = new Date(visit.date);
         if (visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT') {
@@ -376,19 +388,23 @@ const RepDashboard: React.FC = () => {
             visitCounts[key] = (visitCounts[key] || 0) + 1;
         }
     });
-
+    
+    let freq0 = 0;
     let freq1 = 0;
     let freq2 = 0;
     let freq3 = 0;
 
-    Object.values(visitCounts).forEach(count => {
-        if (count === 1) freq1++;
+    // Check ALL assigned doctors
+    doctors.forEach(doc => {
+        const count = visitCounts[doc.name] || 0;
+        if (count === 0) freq0++;
+        else if (count === 1) freq1++;
         else if (count === 2) freq2++;
         else if (count >= 3) freq3++;
     });
 
-    return { freq1, freq2, freq3 };
-  }, [recentVisits]);
+    return { freq0, freq1, freq2, freq3 };
+  }, [recentVisits, doctors]);
 
   const specializationCounts = useMemo(() => {
       const counts: Record<string, number> = {};
@@ -696,33 +712,42 @@ const RepDashboard: React.FC = () => {
                     </div>
                     <p className="text-slate-600 text-md font-medium">{t('visit_frequency_monthly')}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-4 gap-1 text-center">
                     <div className="flex flex-col items-center">
                          <button 
+                            onClick={() => handleFrequencyClick('f0')} 
+                            className="text-xl font-bold text-red-700 hover:text-red-900 hover:underline transition-all"
+                         >
+                            {visitFrequency.freq0}
+                         </button>
+                         <p className="text-[10px] text-slate-600 font-semibold">{t('freq_0_mo')}</p>
+                    </div>
+                    <div className="flex flex-col items-center border-s border-slate-300/50">
+                         <button 
                             onClick={() => handleFrequencyClick('f1')} 
-                            className="text-2xl font-bold text-slate-800 hover:text-blue-600 hover:underline transition-all"
+                            className="text-xl font-bold text-slate-800 hover:text-blue-600 hover:underline transition-all"
                          >
                             {visitFrequency.freq1}
                          </button>
-                         <p className="text-xs text-slate-600 font-semibold">{t('freq_1_mo')}</p>
+                         <p className="text-[10px] text-slate-600 font-semibold">{t('freq_1_mo')}</p>
                     </div>
-                    <div className="flex flex-col items-center border-x border-slate-300/50">
+                    <div className="flex flex-col items-center border-s border-slate-300/50">
                          <button 
                             onClick={() => handleFrequencyClick('f2')} 
-                            className="text-2xl font-bold text-blue-800 hover:text-blue-600 hover:underline transition-all"
+                            className="text-xl font-bold text-blue-800 hover:text-blue-600 hover:underline transition-all"
                          >
                             {visitFrequency.freq2}
                          </button>
-                         <p className="text-xs text-slate-600 font-semibold">{t('freq_2_mo')}</p>
+                         <p className="text-[10px] text-slate-600 font-semibold">{t('freq_2_mo')}</p>
                     </div>
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center border-s border-slate-300/50">
                          <button 
                             onClick={() => handleFrequencyClick('f3')} 
-                            className="text-2xl font-bold text-green-800 hover:text-green-600 hover:underline transition-all"
+                            className="text-xl font-bold text-green-800 hover:text-green-600 hover:underline transition-all"
                          >
                             {visitFrequency.freq3}
                          </button>
-                         <p className="text-xs text-slate-600 font-semibold">{t('freq_3_mo')}</p>
+                         <p className="text-[10px] text-slate-600 font-semibold">{t('freq_3_mo')}</p>
                     </div>
                 </div>
             </div>
