@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { Region, User, VisitReport, UserRole, Doctor, Pharmacy, ClientAlert, SystemSettings, WeeklyPlan, Specialization, RepTask, RepAbsence } from '../types';
@@ -126,7 +127,7 @@ const ManagerDashboard: React.FC = () => {
   const [isFrequencyDetailModalOpen, setIsFrequencyDetailModalOpen] = useState(false);
   const [selectedFrequencyDetails, setSelectedFrequencyDetails] = useState<{
       title: string;
-      doctors: { name: string; region: string; specialization: string; visits: number }[];
+      doctors: { name: string; region: string; specialization: string; visits: number; lastVisitDate?: string | null }[];
       repName: string;
       frequencyLabel: string;
   } | null>(null);
@@ -655,13 +656,16 @@ const ManagerDashboard: React.FC = () => {
       if (!rep) return;
 
       const visitCounts: Record<string, { count: number, region: string, specialization: string }> = {};
+      const lastVisitDates = new Map<string, string>();
 
       // 1. Get visited doctors from reports
+      // Filter for this month for frequency count
       const reports = allReports.filter(visit => {
           const visitDate = new Date(visit.date);
           return visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT' && visit.repName === repName;
       });
 
+      // Calculate counts for this month
       reports.forEach(visit => {
           const key = visit.targetName;
           if (!visitCounts[key]) {
@@ -669,8 +673,18 @@ const ManagerDashboard: React.FC = () => {
           }
           visitCounts[key].count++;
       });
+
+      // 2. Get LAST VISIT DATE from *all* reports (not just this month)
+      // Since allReports is sorted descending by date, the first entry for a doctor is the latest
+      allReports.forEach(visit => {
+          if (visit.type === 'DOCTOR_VISIT' && visit.repName === repName) {
+              if (!lastVisitDates.has(visit.targetName)) {
+                  lastVisitDates.set(visit.targetName, visit.date);
+              }
+          }
+      });
       
-      // 2. Get ALL doctors for this rep to check for 0 visits
+      // 3. Get ALL doctors for this rep to check for 0 visits
       const repDoctors = totalDoctors.filter(d => d.repId === rep.id);
       
       const allDoctorsStatus = repDoctors.map(doc => {
@@ -680,7 +694,8 @@ const ManagerDashboard: React.FC = () => {
               name: doc.name,
               region: regionName,
               specialization: doc.specialization,
-              visits: visitedData ? visitedData.count : 0
+              visits: visitedData ? visitedData.count : 0,
+              lastVisitDate: lastVisitDates.get(doc.name) || null
           };
       });
 

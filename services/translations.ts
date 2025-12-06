@@ -1,3 +1,4 @@
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -69,6 +70,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     // Frequency Modal
     'frequency_details_title': 'تفاصيل زيارات الأطباء ({0} - {1})',
     'visit_count': 'عدد الزيارات',
+    'last_visit_date': 'تاريخ آخر زيارة',
     'download_excel': 'تحميل Excel',
     // Plan related
     'weekly_plan': 'الخطة الأسبوعية',
@@ -417,6 +419,7 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'show_less_options': 'Show Today Only',
     'frequency_details_title': 'Doctor Visit Frequency ({0} - {1})',
     'visit_count': 'Visit Count',
+    'last_visit_date': 'Last Visit Date',
     'download_excel': 'Download Excel',
     'weekly_plan': 'Weekly Plan',
     'create_next_week_plan': 'Create Next Week Plan',

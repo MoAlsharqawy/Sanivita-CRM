@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 import Modal from './Modal';
 import { useLanguage } from '../hooks/useLanguage';
@@ -9,7 +11,7 @@ interface FrequencyDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  doctors: { name: string; region: string; specialization: string; visits: number }[];
+  doctors: { name: string; region: string; specialization: string; visits: number; lastVisitDate?: string | null }[];
   repName: string;
   frequencyLabel: string;
 }
@@ -50,6 +52,7 @@ const FrequencyDetailModal: React.FC<FrequencyDetailModalProps> = ({
                   <th className="px-4 py-3">{t('name')}</th>
                   <th className="px-4 py-3">{t('specialization')}</th>
                   <th className="px-4 py-3">{t('region')}</th>
+                  <th className="px-4 py-3 text-center">{t('last_visit_date')}</th>
                   <th className="px-4 py-3 text-center">{t('visit_count')}</th>
                 </tr>
               </thead>
@@ -59,6 +62,9 @@ const FrequencyDetailModal: React.FC<FrequencyDetailModalProps> = ({
                     <td className="px-4 py-3 font-medium text-slate-800">{doc.name}</td>
                     <td className="px-4 py-3">{t(doc.specialization)}</td>
                     <td className="px-4 py-3">{doc.region}</td>
+                    <td className="px-4 py-3 text-center text-xs">
+                        {doc.lastVisitDate ? new Date(doc.lastVisitDate).toLocaleDateString(t('locale')) : '-'}
+                    </td>
                     <td className="px-4 py-3 text-center font-bold text-blue-600">{doc.visits}</td>
                   </tr>
                 ))}

@@ -4,6 +4,8 @@
 
 
 
+
+
 import { VisitReport, Doctor, Pharmacy, Region, User, Specialization } from "../types";
 import { TranslationFunction } from "../hooks/useLanguage";
 
@@ -86,12 +88,13 @@ export const exportUsersToExcel = (users: User[], fileName: string, t: Translati
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 
-export const exportDoctorsListToExcel = (doctors: { name: string; region: string; specialization: string; visits: number }[], fileName: string, t: TranslationFunction) => {
+export const exportDoctorsListToExcel = (doctors: { name: string; region: string; specialization: string; visits: number, lastVisitDate?: string | null }[], fileName: string, t: TranslationFunction) => {
   const data = doctors.map(d => ({
     [t('name')]: d.name,
     [t('specialization')]: t(d.specialization),
     [t('region')]: d.region,
-    [t('visit_count')]: d.visits
+    [t('visit_count')]: d.visits,
+    [t('last_visit_date')]: d.lastVisitDate ? new Date(d.lastVisitDate).toLocaleDateString(t('locale')) : '-',
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(data);
