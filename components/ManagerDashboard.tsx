@@ -211,10 +211,6 @@ const ManagerDashboard: React.FC = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  useEffect(() => {
-    fetchInitialData();
-  }, [activeTab, fetchInitialData]);
-
   // When switching tabs, clear specific states if needed
   useEffect(() => {
       if (activeTab !== 'clients') {
