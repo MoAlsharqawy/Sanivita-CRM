@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { User, Doctor, Pharmacy, Region } from '../types';
 import { useLanguage } from '../hooks/useLanguage';
@@ -60,7 +61,9 @@ const RepClientManager: React.FC<RepClientManagerProps> = ({
     if (!clientToDelete) return;
     setIsDeleting(true);
     try {
-      if ('specialization' in clientToDelete) {
+      // Robust check: if property 'specialization' exists, treat as doctor. 
+      // Or rely on activeTab if the modal is strictly tied to the current view (which it is for delete logic).
+      if (activeTab === 'doctors') {
         await api.deleteDoctor(clientToDelete.id);
       } else {
         await api.deletePharmacy(clientToDelete.id);
@@ -208,7 +211,7 @@ const RepClientManager: React.FC<RepClientManagerProps> = ({
           repId={rep.id}
           regions={regions}
           clientToEdit={clientToEdit}
-          initialType={activeTab} // Pre-select current tab type for new entries
+          initialType={activeTab === 'doctors' ? 'doctor' : 'pharmacy'} 
         />
       )}
 

@@ -68,7 +68,6 @@ const ManagerDashboard: React.FC = () => {
   const [viewingPlanRepId, setViewingPlanRepId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    // Only fetch data once on mount, removed activeTab dependency logic previously
     setLoading(true);
     try {
       const [usersData, reportsData, plansData, settingsData, absencesData, regionsData, doctorsData, pharmaciesData] = await Promise.all([
@@ -167,11 +166,6 @@ const ManagerDashboard: React.FC = () => {
             const isWeekend = systemSettings.weekends.includes(dayIndex);
             const isHoliday = systemSettings.holidays.includes(dateStr);
             const approvedAbsence = approvedAbsenceMap.get(rep.id)?.get(dateStr);
-
-            // Priority: 
-            // 1. Approved Absence Record exists -> Mark Absent
-            // 2. Weekend/Holiday -> Skip
-            // 3. Regular working day -> Check visits
 
             // Custom Rule: Thursday (4) is Meeting Day, Friday (5) is Holiday.
             // Exclude them from auto-absence calculation.

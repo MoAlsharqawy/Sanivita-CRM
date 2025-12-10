@@ -216,8 +216,6 @@ const RepDashboard: React.FC = () => {
       // Iterate through all history to find last visit dates
       recentVisits.forEach(visit => {
           if (visit.type === 'DOCTOR_VISIT') {
-              // Assuming recentVisits comes sorted by date desc, the first one found is the latest.
-              // If not sorted, we check dates.
               if (!lastVisitDates.has(visit.targetName)) {
                   lastVisitDates.set(visit.targetName, visit.date);
               } else {

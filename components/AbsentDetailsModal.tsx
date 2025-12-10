@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Modal from './Modal';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
-import { TrashIcon, CheckIcon } from './icons';
+import { TrashIcon } from './icons';
 import { UserRole } from '../types';
 
 interface AbsentDetailsModalProps {
@@ -32,6 +32,9 @@ const AbsentDetailsModal: React.FC<AbsentDetailsModalProps> = ({ isOpen, onClose
           setDeletingId(null);
       }
   };
+
+  // Helper to check if user is manager (case-insensitive)
+  const isManager = String(currentUserRole).toUpperCase() === 'MANAGER';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('absent_details_title', repName)}>
@@ -64,7 +67,7 @@ const AbsentDetailsModal: React.FC<AbsentDetailsModalProps> = ({ isOpen, onClose
                          </span>
                       </td>
                       <td className="px-6 py-3 text-center">
-                          {currentUserRole === UserRole.Manager && detail.isManual && detail.id && (
+                          {isManager && detail.isManual && detail.id && (
                               <button 
                                 onClick={() => handleDelete(detail.id!)}
                                 disabled={deletingId === detail.id}

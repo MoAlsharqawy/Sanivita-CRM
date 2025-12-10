@@ -1,6 +1,4 @@
 
-
-
 import React from 'react';
 import Modal from './Modal';
 import { useLanguage } from '../hooks/useLanguage';

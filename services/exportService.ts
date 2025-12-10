@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 import { VisitReport, Doctor, Pharmacy, Region, User, Specialization } from "../types";
 import { TranslationFunction } from "../hooks/useLanguage";
 
@@ -93,8 +86,8 @@ export const exportDoctorsListToExcel = (doctors: { name: string; region: string
     [t('name')]: d.name,
     [t('specialization')]: t(d.specialization),
     [t('region')]: d.region,
-    [t('visit_count')]: d.visits,
     [t('last_visit_date')]: d.lastVisitDate ? new Date(d.lastVisitDate).toLocaleDateString(t('locale')) : '-',
+    [t('visit_count')]: d.visits,
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(data);
