@@ -328,13 +328,15 @@ const ManagerDashboard: React.FC = () => {
           <div className="flex flex-wrap gap-2 p-1 bg-white/50 rounded-xl shadow-sm border border-slate-200">
               {[
                 { id: 'overview', icon: ChartBarIcon, label: t('analytics_overview') },
-                { id: 'users', icon: UserGroupIcon, label: t('user_management') },
+                { id: 'users', icon: UserGroupIcon, label: t('user_management'), restricted: true }, // Restricted
                 { id: 'plans', icon: CalendarIcon, label: t('plan_approvals'), badge: pendingPlans.length },
                 { id: 'reports', icon: ClipboardCheckIcon, label: t('reports') },
                 { id: 'vacations', icon: SunIcon, label: t('vacations') },
-                { id: 'import', icon: DownloadIcon, label: t('data_import') },
-                { id: 'settings', icon: CogIcon, label: t('system_settings') },
-              ].map(tab => (
+                { id: 'import', icon: DownloadIcon, label: t('data_import'), restricted: true }, // Restricted
+                { id: 'settings', icon: CogIcon, label: t('system_settings'), restricted: true }, // Restricted
+              ]
+              .filter(tab => !tab.restricted || user.role === UserRole.Manager)
+              .map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setView(tab.id as any)}
@@ -395,8 +397,8 @@ const ManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* VIEW: USERS */}
-      {view === 'users' && (
+      {/* VIEW: USERS (Protected) */}
+      {view === 'users' && user.role === UserRole.Manager && (
         <div className="space-y-6 animate-fade-in">
              <div className="flex justify-between items-center bg-white/40 p-4 rounded-xl">
                  <h3 className="text-xl font-bold text-slate-700">{t('reps_list')}</h3>
@@ -663,8 +665,8 @@ const ManagerDashboard: React.FC = () => {
          </div>
       )}
 
-      {/* VIEW: SETTINGS */}
-      {view === 'settings' && systemSettings && (
+      {/* VIEW: SETTINGS (Protected) */}
+      {view === 'settings' && user.role === UserRole.Manager && systemSettings && (
           <div className="space-y-6 animate-fade-in">
               <div className="bg-white/60 p-6 rounded-2xl shadow-sm border border-slate-200">
                   <h3 className="text-xl font-bold text-slate-700 mb-4">{t('holidays_settings')}</h3>
@@ -684,8 +686,8 @@ const ManagerDashboard: React.FC = () => {
           </div>
       )}
 
-      {/* VIEW: IMPORT */}
-      {view === 'import' && (
+      {/* VIEW: IMPORT (Protected) */}
+      {view === 'import' && user.role === UserRole.Manager && (
           <div className="animate-fade-in">
               <DataImport />
           </div>
