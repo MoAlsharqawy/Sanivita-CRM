@@ -1,8 +1,4 @@
 
-
-
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -52,7 +48,7 @@ const RepDashboard: React.FC = () => {
   const [isFrequencyDetailModalOpen, setIsFrequencyDetailModalOpen] = useState(false);
   const [selectedFrequencyDetails, setSelectedFrequencyDetails] = useState<{
       title: string;
-      doctors: { name: string; region: string; specialization: string; visits: number }[];
+      doctors: { name: string; region: string; specialization: string; visits: number; lastVisitDate?: string | null }[];
       repName: string;
       frequencyLabel: string;
   } | null>(null);
@@ -214,8 +210,27 @@ const RepDashboard: React.FC = () => {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       
       const visitCounts: Record<string, { count: number, region: string, specialization: string }> = {};
+      // Calculate last visit dates
+      const lastVisitDates = new Map<string, string>();
 
-      // Filter reports for this month & doctors only
+      // Iterate through all history to find last visit dates
+      recentVisits.forEach(visit => {
+          if (visit.type === 'DOCTOR_VISIT') {
+              // Assuming recentVisits comes sorted by date desc, the first one found is the latest.
+              // If not sorted, we check dates.
+              if (!lastVisitDates.has(visit.targetName)) {
+                  lastVisitDates.set(visit.targetName, visit.date);
+              } else {
+                  const existing = new Date(lastVisitDates.get(visit.targetName)!);
+                  const current = new Date(visit.date);
+                  if (current > existing) {
+                      lastVisitDates.set(visit.targetName, visit.date);
+                  }
+              }
+          }
+      });
+
+      // Filter reports for this month & doctors only for COUNTS
       const reports = recentVisits.filter(visit => {
           const visitDate = new Date(visit.date);
           return visitDate >= startOfMonth && visitDate <= today && visit.type === 'DOCTOR_VISIT';
@@ -245,7 +260,8 @@ const RepDashboard: React.FC = () => {
               name: doc.name,
               region: regionName,
               specialization: doc.specialization,
-              visits: visitedData ? visitedData.count : 0
+              visits: visitedData ? visitedData.count : 0,
+              lastVisitDate: lastVisitDates.get(doc.name) || null
           };
       });
 
