@@ -9,7 +9,7 @@ import {
     UserGroupIcon, ChartBarIcon, ClipboardCheckIcon, CogIcon, 
     CalendarIcon, DownloadIcon, PlusIcon, TrashIcon, EditIcon, 
     MapPinIcon, SearchIcon, CheckCircleIcon, XIcon, WarningIcon,
-    SunIcon, CheckIcon
+    SunIcon, CheckIcon, PresentationChartBarIcon, GraphIcon
 } from './icons';
 import AnalyticsCharts from './AnalyticsCharts';
 import UserEditModal from './UserEditModal';
@@ -42,7 +42,7 @@ const ManagerDashboard: React.FC = () => {
 
   // UI States
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'overview' | 'users' | 'plans' | 'reports' | 'vacations' | 'settings' | 'import'>('overview');
+  const [view, setView] = useState<'overview' | 'performance' | 'users' | 'plans' | 'reports' | 'vacations' | 'settings' | 'import'>('overview');
   const [selectedRepId, setSelectedRepId] = useState<string | 'all'>('all');
   
   // Modals
@@ -116,6 +116,64 @@ const ManagerDashboard: React.FC = () => {
     const repName = users.find(u => u.id === selectedRepId)?.name;
     return reports.filter(r => r.repName === repName);
   }, [reports, selectedRepId, users]);
+
+  // --- Performance Stats Calculation ---
+  const performanceStats = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // 1. Identify Target Reps
+    const targetReps = selectedRepId === 'all' ? reps : reps.filter(r => r.id === selectedRepId);
+    const targetRepIds = new Set(targetReps.map(r => r.id));
+
+    // 2. Filter Visits (Current Month) & Only for target Reps
+    const monthlyVisits = reports.filter(r => {
+        const d = new Date(r.date);
+        const rep = users.find(u => u.name === r.repName);
+        return d >= startOfMonth && rep && targetRepIds.has(rep.id);
+    });
+
+    // 3. Total Clients for selected rep(s)
+    const targetDoctors = doctors.filter(d => targetRepIds.has(d.repId));
+    const targetPharmacies = pharmacies.filter(p => targetRepIds.has(p.repId));
+    const totalClients = targetDoctors.length + targetPharmacies.length;
+
+    // 4. Unique Visited Clients
+    const uniqueVisited = new Set(monthlyVisits.map(v => v.targetName)).size;
+
+    // 5. Coverage Percentage
+    const coverage = totalClients > 0 ? (uniqueVisited / totalClients) * 100 : 0;
+
+    // 6. Avg Visits / Day (Based on unique dates worked in this month)
+    const uniqueDaysWorked = new Set(monthlyVisits.map(v => v.date.split('T')[0])).size;
+    const avgPerDay = uniqueDaysWorked > 0 ? monthlyVisits.length / uniqueDaysWorked : 0;
+
+    // 7. Frequency Distribution
+    // Map client name -> visit count
+    const visitCounts: Record<string, number> = {};
+    monthlyVisits.forEach(v => visitCounts[v.targetName] = (visitCounts[v.targetName] || 0) + 1);
+    
+    let f0=0, f1=0, f2=0, f3=0;
+    
+    // We iterate over ALL assigned clients to find 0 visits correctly
+    [...targetDoctors, ...targetPharmacies].forEach(c => {
+        const count = visitCounts[c.name] || 0;
+        if(count === 0) f0++;
+        else if(count === 1) f1++;
+        else if(count === 2) f2++;
+        else f3++;
+    });
+
+    return {
+        visits: monthlyVisits.length,
+        totalClients,
+        coverage,
+        avgPerDay,
+        f0, f1, f2, f3
+    };
+
+  }, [selectedRepId, reps, reports, users, doctors, pharmacies]);
+
 
   // --- Vacation Stats Calculation ---
   const vacationStats = useMemo(() => {
@@ -328,6 +386,7 @@ const ManagerDashboard: React.FC = () => {
           <div className="flex flex-wrap gap-2 p-1 bg-white/50 rounded-xl shadow-sm border border-slate-200">
               {[
                 { id: 'overview', icon: ChartBarIcon, label: t('analytics_overview') },
+                { id: 'performance', icon: PresentationChartBarIcon, label: t('rep_performance_view') },
                 { id: 'users', icon: UserGroupIcon, label: t('user_management'), restricted: true }, // Restricted
                 { id: 'plans', icon: CalendarIcon, label: t('plan_approvals'), badge: pendingPlans.length },
                 { id: 'reports', icon: ClipboardCheckIcon, label: t('reports') },
@@ -395,6 +454,106 @@ const ManagerDashboard: React.FC = () => {
               </button>
            </div>
         </div>
+      )}
+
+      {/* VIEW: PERFORMANCE */}
+      {view === 'performance' && (
+         <div className="space-y-6 animate-fade-in">
+             <div className="flex flex-col sm:flex-row justify-between items-center bg-white/40 p-4 rounded-xl gap-4">
+                 <h3 className="text-xl font-bold text-slate-700">{t('rep_performance_view')}</h3>
+                 
+                 <div className="w-full sm:w-auto flex items-center gap-2">
+                     <label className="text-sm font-bold text-slate-700 whitespace-nowrap">{t('select_rep_to_view')}:</label>
+                     <select 
+                        value={selectedRepId} 
+                        onChange={(e) => setSelectedRepId(e.target.value)}
+                        className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-blue-500 w-full sm:w-64"
+                    >
+                        <option value="all">{t('all_reps')}</option>
+                        {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                 </div>
+             </div>
+
+             {/* Performance Cards */}
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Visits Card */}
+                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
+                    <div className="flex items-center mb-3">
+                        <div className="bg-blue-100 p-2 rounded-lg text-blue-600 me-3">
+                            <CalendarIcon className="w-6 h-6"/>
+                        </div>
+                        <h4 className="text-slate-600 font-medium">{t('visits_this_month')}</h4>
+                    </div>
+                    <p className="text-3xl font-bold text-slate-800">{performanceStats.visits}</p>
+                </div>
+
+                {/* Total Clients Card */}
+                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
+                    <div className="flex items-center mb-3">
+                        <div className="bg-orange-100 p-2 rounded-lg text-orange-600 me-3">
+                            <UserGroupIcon className="w-6 h-6"/>
+                        </div>
+                        <h4 className="text-slate-600 font-medium">{t('total_clients')}</h4>
+                    </div>
+                    <p className="text-3xl font-bold text-slate-800">{performanceStats.totalClients}</p>
+                </div>
+
+                {/* Coverage Card */}
+                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
+                    <div className="flex items-center mb-3">
+                        <div className="bg-green-100 p-2 rounded-lg text-green-600 me-3">
+                            <PresentationChartBarIcon className="w-6 h-6"/>
+                        </div>
+                        <h4 className="text-slate-600 font-medium">{t('coverage_percentage')}</h4>
+                    </div>
+                    <p className="text-3xl font-bold text-slate-800">{performanceStats.coverage.toFixed(1)}%</p>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+                        <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.min(performanceStats.coverage, 100)}%` }}></div>
+                    </div>
+                </div>
+
+                 {/* Avg Visits Per Day Card */}
+                 <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
+                    <div className="flex items-center mb-3">
+                        <div className="bg-purple-100 p-2 rounded-lg text-purple-600 me-3">
+                            <ChartBarIcon className="w-6 h-6"/>
+                        </div>
+                        <h4 className="text-slate-600 font-medium">{t('avg_per_day')}</h4>
+                    </div>
+                    <p className="text-3xl font-bold text-slate-800">{performanceStats.avgPerDay.toFixed(1)}</p>
+                </div>
+             </div>
+
+             {/* Frequency Card (Full Width) */}
+             <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
+                <div className="flex items-center mb-6">
+                    <div className="bg-indigo-100 text-indigo-700 p-3 rounded-full me-3">
+                        <GraphIcon className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-700">{t('visit_frequency_monthly')}</h3>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="p-4 bg-red-50 rounded-xl border border-red-100">
+                         <p className="text-3xl font-bold text-red-700">{performanceStats.f0}</p>
+                         <p className="text-xs font-bold text-red-600 mt-1 uppercase">{t('freq_0_mo')}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                         <p className="text-3xl font-bold text-slate-700">{performanceStats.f1}</p>
+                         <p className="text-xs font-bold text-slate-600 mt-1 uppercase">{t('freq_1_mo')}</p>
+                    </div>
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                         <p className="text-3xl font-bold text-blue-700">{performanceStats.f2}</p>
+                         <p className="text-xs font-bold text-blue-600 mt-1 uppercase">{t('freq_2_mo')}</p>
+                    </div>
+                    <div className="p-4 bg-green-50 rounded-xl border border-green-100">
+                         <p className="text-3xl font-bold text-green-700">{performanceStats.f3}</p>
+                         <p className="text-xs font-bold text-green-600 mt-1 uppercase">{t('freq_3_mo')}</p>
+                    </div>
+                </div>
+             </div>
+         </div>
       )}
 
       {/* VIEW: USERS (Protected) */}
