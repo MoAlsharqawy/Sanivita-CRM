@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
@@ -67,6 +68,7 @@ const ManagerDashboard: React.FC = () => {
   const [viewingPlanRepId, setViewingPlanRepId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    // Only fetch data once on mount, removed activeTab dependency logic previously
     setLoading(true);
     try {
       const [usersData, reportsData, plansData, settingsData, absencesData, regionsData, doctorsData, pharmaciesData] = await Promise.all([
@@ -146,12 +148,6 @@ const ManagerDashboard: React.FC = () => {
     reports.forEach(r => {
         const d = new Date(r.date);
         const dateStr = toYYYYMMDD(d);
-        // Find rep ID by name (inefficient but reports only have repName usually, assuming we mapped it or rely on name match)
-        // Ideally reports should have repId. Assuming they might not, let's try to match by name from Users.
-        // Actually, reports are fetched via getAllVisitReports which might return repName.
-        // Let's assume consistent naming or better yet, if reports have repId use it. 
-        // The type VisitReport currently only has repName. We'll match by name for now or fetch repId in reports if possible.
-        // For accurate mapping, we'll try to match name.
         const rep = users.find(u => u.name === r.repName);
         if (rep) {
             workMap.add(`${rep.id}-${dateStr}`);
@@ -244,7 +240,6 @@ const ManagerDashboard: React.FC = () => {
           fetchData();
         } catch (e) {
           console.error(e);
-          // Error handling is inside Modal via generic error if needed, or simple alert
           alert(t('error_permission_denied_delete_user'));
         }
       }
@@ -737,7 +732,8 @@ const ManagerDashboard: React.FC = () => {
              onClose={() => setAbsentDetailsModalUser(null)}
              repName={absentDetailsModalUser.name}
              absentDetails={absentDetailsModalUser.details}
-             onUpdate={fetchData} // Allow refreshing data if manual absences are deleted
+             currentUserRole={user.role} // Pass the current user role to control delete permission
+             onUpdate={fetchData} 
           />
       )}
 

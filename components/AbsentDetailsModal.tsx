@@ -4,16 +4,18 @@ import Modal from './Modal';
 import { useLanguage } from '../hooks/useLanguage';
 import { api } from '../services/api';
 import { TrashIcon, CheckIcon } from './icons';
+import { UserRole } from '../types';
 
 interface AbsentDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   repName: string;
   absentDetails: { id?: number; date: string; reason: string; isManual: boolean }[];
+  currentUserRole: UserRole;
   onUpdate?: () => void; // Callback to refresh data after deletion
 }
 
-const AbsentDetailsModal: React.FC<AbsentDetailsModalProps> = ({ isOpen, onClose, repName, absentDetails, onUpdate }) => {
+const AbsentDetailsModal: React.FC<AbsentDetailsModalProps> = ({ isOpen, onClose, repName, absentDetails, currentUserRole, onUpdate }) => {
   const { t } = useLanguage();
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -62,7 +64,7 @@ const AbsentDetailsModal: React.FC<AbsentDetailsModalProps> = ({ isOpen, onClose
                          </span>
                       </td>
                       <td className="px-6 py-3 text-center">
-                          {detail.isManual && detail.id && (
+                          {currentUserRole === UserRole.Manager && detail.isManual && detail.id && (
                               <button 
                                 onClick={() => handleDelete(detail.id!)}
                                 disabled={deletingId === detail.id}
