@@ -20,6 +20,7 @@ import Modal from './Modal';
 import DataImport from './DataImport';
 import { exportVacationStatsToExcel, exportToExcel, exportUsersToExcel, exportMultipleRepClientsToExcel } from '../services/exportService';
 import WeeklyView from './WeeklyView';
+import FrequencyDetailModal from './FrequencyDetailModal';
 
 // Helper to format date
 const toYYYYMMDD = (date: Date): string => {
@@ -52,6 +53,15 @@ const ManagerDashboard: React.FC = () => {
   const [userForRegions, setUserForRegions] = useState<User | null>(null);
   const [isDailyVisitsModalOpen, setIsDailyVisitsModalOpen] = useState(false);
   
+  // Frequency Detail Modal
+  const [isFrequencyDetailModalOpen, setIsFrequencyDetailModalOpen] = useState(false);
+  const [selectedFrequencyDetails, setSelectedFrequencyDetails] = useState<{
+      title: string;
+      doctors: { name: string; region: string; specialization: string; visits: number; lastVisitDate?: string | null }[];
+      repName: string;
+      frequencyLabel: string;
+  } | null>(null);
+
   // Vacation Stats State
   const [vacationMonth, setVacationMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [absentDetailsModalUser, setAbsentDetailsModalUser] = useState<{name: string, details: any[]} | null>(null);
@@ -368,6 +378,81 @@ const ManagerDashboard: React.FC = () => {
           }
       }
   };
+  
+  const handleFrequencyClick = (freqType: 'f0' | 'f1' | 'f2' | 'f3') => {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      // Target Reps
+      const targetReps = selectedRepId === 'all' ? reps : reps.filter(r => r.id === selectedRepId);
+      const targetRepIds = new Set(targetReps.map(r => r.id));
+      const targetRepNames = new Set(targetReps.map(r => r.name));
+
+      // Filter reports for current month & selected reps
+      const monthlyVisits = reports.filter(r => {
+           const d = new Date(r.date);
+           return d >= startOfMonth && targetRepNames.has(r.repName);
+      });
+      
+      const visitCounts: Record<string, number> = {};
+      monthlyVisits.forEach(v => {
+          visitCounts[v.targetName] = (visitCounts[v.targetName] || 0) + 1;
+      });
+
+      // Target Clients (Doctors + Pharmacies) for the selected reps
+      const targetDoctors = doctors.filter(d => targetRepIds.has(d.repId));
+      const targetPharmacies = pharmacies.filter(p => targetRepIds.has(p.repId));
+      const allTargets = [...targetDoctors, ...targetPharmacies];
+
+      // Calculate last visit dates for these clients (based on full history of the rep)
+      const lastVisitDates: Record<string, string> = {};
+      
+      // Iterate reports to find last visit per client for the selected reps
+      reports.forEach(r => {
+           if (targetRepNames.has(r.repName)) {
+               const current = lastVisitDates[r.targetName];
+               if (!current || new Date(r.date) > new Date(current)) {
+                   lastVisitDates[r.targetName] = r.date;
+               }
+           }
+      });
+
+      // Filter clients based on frequency type
+      const filteredClients = allTargets.filter(c => {
+           const count = visitCounts[c.name] || 0;
+           if (freqType === 'f0') return count === 0;
+           if (freqType === 'f1') return count === 1;
+           if (freqType === 'f2') return count === 2;
+           if (freqType === 'f3') return count >= 3;
+           return false;
+      }).map(c => {
+           const regionName = regions.find(r => r.id === c.regionId)?.name || '';
+           const spec = 'specialization' in c ? c.specialization : 'Pharmacy';
+           return {
+               name: c.name,
+               region: regionName,
+               specialization: spec,
+               visits: visitCounts[c.name] || 0,
+               lastVisitDate: lastVisitDates[c.name] || null
+           };
+      });
+
+      let freqLabel = '';
+      if (freqType === 'f0') freqLabel = t('freq_0_mo');
+      else if (freqType === 'f1') freqLabel = t('freq_1_mo');
+      else if (freqType === 'f2') freqLabel = t('freq_2_mo');
+      else freqLabel = t('freq_3_mo');
+      
+      const displayRepName = selectedRepId === 'all' ? t('all_reps') : (targetReps[0]?.name || '');
+
+      setSelectedFrequencyDetails({
+          title: t('frequency_details_title', displayRepName, freqLabel),
+          doctors: filteredClients,
+          repName: displayRepName,
+          frequencyLabel: freqLabel
+      });
+      setIsFrequencyDetailModalOpen(true);
+  };
 
   if (loading) return <Spinner />;
   if (!user) return null;
@@ -535,22 +620,22 @@ const ManagerDashboard: React.FC = () => {
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                    <div className="p-4 bg-red-50 rounded-xl border border-red-100">
-                         <p className="text-3xl font-bold text-red-700">{performanceStats.f0}</p>
+                    <button onClick={() => handleFrequencyClick('f0')} className="p-4 bg-red-50 rounded-xl border border-red-100 hover:bg-red-100 transition-colors cursor-pointer w-full text-center group">
+                         <p className="text-3xl font-bold text-red-700 group-hover:scale-110 transition-transform">{performanceStats.f0}</p>
                          <p className="text-xs font-bold text-red-600 mt-1 uppercase">{t('freq_0_mo')}</p>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                         <p className="text-3xl font-bold text-slate-700">{performanceStats.f1}</p>
+                    </button>
+                    <button onClick={() => handleFrequencyClick('f1')} className="p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer w-full text-center group">
+                         <p className="text-3xl font-bold text-slate-700 group-hover:scale-110 transition-transform">{performanceStats.f1}</p>
                          <p className="text-xs font-bold text-slate-600 mt-1 uppercase">{t('freq_1_mo')}</p>
-                    </div>
-                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                         <p className="text-3xl font-bold text-blue-700">{performanceStats.f2}</p>
+                    </button>
+                    <button onClick={() => handleFrequencyClick('f2')} className="p-4 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors cursor-pointer w-full text-center group">
+                         <p className="text-3xl font-bold text-blue-700 group-hover:scale-110 transition-transform">{performanceStats.f2}</p>
                          <p className="text-xs font-bold text-blue-600 mt-1 uppercase">{t('freq_2_mo')}</p>
-                    </div>
-                    <div className="p-4 bg-green-50 rounded-xl border border-green-100">
-                         <p className="text-3xl font-bold text-green-700">{performanceStats.f3}</p>
+                    </button>
+                    <button onClick={() => handleFrequencyClick('f3')} className="p-4 bg-green-50 rounded-xl border border-green-100 hover:bg-green-100 transition-colors cursor-pointer w-full text-center group">
+                         <p className="text-3xl font-bold text-green-700 group-hover:scale-110 transition-transform">{performanceStats.f3}</p>
                          <p className="text-xs font-bold text-green-600 mt-1 uppercase">{t('freq_3_mo')}</p>
-                    </div>
+                    </button>
                 </div>
              </div>
          </div>
@@ -890,6 +975,18 @@ const ManagerDashboard: React.FC = () => {
              currentUserRole={user.role} // Pass the current user role to control delete permission
              onUpdate={fetchData} 
           />
+      )}
+      
+      {/* Frequency Detail Modal */}
+      {selectedFrequencyDetails && (
+        <FrequencyDetailModal
+          isOpen={isFrequencyDetailModalOpen}
+          onClose={() => setIsFrequencyDetailModalOpen(false)}
+          title={selectedFrequencyDetails.title}
+          doctors={selectedFrequencyDetails.doctors}
+          repName={selectedFrequencyDetails.repName}
+          frequencyLabel={selectedFrequencyDetails.frequencyLabel}
+        />
       )}
 
       {confirmAction.isOpen && (
