@@ -1,3 +1,4 @@
+
 import React, { ReactNode, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -33,10 +34,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
       onClick={onClose}
     >
       <div
-        className="bg-white/60 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-lg relative border border-white/50 flex flex-col max-h-[90vh]"
+        className="bg-white/60 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-lg relative border border-white/50 flex flex-col max-h-[90vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-5 border-b border-slate-300/50 rounded-t-2xl flex-shrink-0">
+        <div className="flex justify-between items-center p-5 border-b border-slate-300/50 flex-shrink-0 bg-white/40">
           <h3 className="text-xl font-semibold text-blue-800">{title}</h3>
           <button
             type="button"

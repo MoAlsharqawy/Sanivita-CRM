@@ -40,8 +40,8 @@ const AbsentDetailsModal: React.FC<AbsentDetailsModalProps> = ({ isOpen, onClose
     <Modal isOpen={isOpen} onClose={onClose} title={t('absent_details_title', repName)}>
       <div className="space-y-4">
         {sortedDetails.length > 0 ? (
-          <div className="max-h-96 overflow-y-auto border border-slate-200 rounded-lg">
-            <table className="w-full text-sm text-start text-slate-600">
+          <div className="max-h-96 overflow-y-auto overflow-x-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-sm text-start text-slate-600 whitespace-nowrap">
               <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                 <tr>
                   <th className="px-6 py-3">{t('date')}</th>

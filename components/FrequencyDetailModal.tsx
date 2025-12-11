@@ -43,8 +43,8 @@ const FrequencyDetailModal: React.FC<FrequencyDetailModalProps> = ({
         </div>
 
         {doctors.length > 0 ? (
-          <div className="max-h-96 overflow-y-auto border border-slate-200 rounded-lg">
-            <table className="w-full text-sm text-start text-slate-600">
+          <div className="max-h-96 overflow-y-auto overflow-x-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-sm text-start text-slate-600 whitespace-nowrap">
               <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                 <tr>
                   <th className="px-4 py-3">{t('name')}</th>
