@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Doctor, Pharmacy, User, Product, Region } from '../types';
 import { api } from '../services/api';
@@ -364,7 +365,8 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
 
       {error && <p className="text-red-500 text-sm text-center bg-red-100 p-2 rounded-lg">{error}</p>}
       
-      <div className="flex items-center justify-end space-x-2 space-x-reverse pt-4 border-t border-slate-300/50">
+      {/* Footer Actions - Sticky Bottom */}
+      <div className="sticky -bottom-6 -mx-6 px-6 py-4 bg-white/90 backdrop-blur-md border-t border-slate-200 mt-6 flex items-center justify-end space-x-2 space-x-reverse z-10 rounded-b-2xl">
         <button
           type="button"
           onClick={onCancel}
@@ -375,7 +377,7 @@ const VisitForm: React.FC<VisitFormProps> = ({ user, products, doctors, pharmaci
         <button
           type="submit"
           disabled={submitting || (visitTargetType === 'doctor' && !targetId)}
-          className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 transition-colors"
+          className="text-white bg-blue-600 hover:bg-orange-500 focus:ring-4 focus:outline-none focus:ring-orange-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center disabled:bg-blue-300 transition-colors min-w-[100px]"
         >
           {submitting ? t('saving') : t('save')}
         </button>
