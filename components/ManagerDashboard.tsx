@@ -386,6 +386,16 @@ const ManagerDashboard: React.FC = () => {
           }
       }
   };
+
+  const handleAbsenceAction = async (id: number, status: 'APPROVED' | 'REJECTED') => {
+      try {
+          await api.updateRepAbsenceStatus(id, status);
+          fetchData();
+      } catch (e) {
+          console.error(e);
+          alert(t('status_update_error'));
+      }
+  };
   
   const handleFrequencyClick = (freqType: 'f0' | 'f1' | 'f2' | 'f3') => {
       const now = new Date();
@@ -879,6 +889,46 @@ const ManagerDashboard: React.FC = () => {
                  </button>
              </div>
              
+             {/* Pending Requests Section */}
+             {absences.filter(a => a.status === 'PENDING').length > 0 && (
+                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-2 animate-fade-in">
+                     <h3 className="font-bold text-yellow-800 mb-3 flex items-center gap-2">
+                         <SunIcon className="w-5 h-5"/>
+                         {t('pending_leave_requests')} ({absences.filter(a => a.status === 'PENDING').length})
+                     </h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                         {absences.filter(a => a.status === 'PENDING').map(abs => {
+                             const rep = users.find(u => u.id === abs.repId);
+                             return (
+                                 <div key={abs.id} className="bg-white p-3 rounded-lg shadow-sm border border-yellow-100 flex flex-col gap-2">
+                                     <div className="flex justify-between">
+                                         <span className="font-bold text-slate-700">{rep?.name || t('unknown')}</span>
+                                         <span className="text-xs bg-slate-100 px-2 py-1 rounded font-mono text-slate-600">{abs.date}</span>
+                                     </div>
+                                     <p className="text-sm text-slate-600 flex items-center gap-1">
+                                         <span className="font-semibold text-slate-500">{t('reason')}:</span> {abs.reason}
+                                     </p>
+                                     <div className="flex justify-end gap-2 mt-1 pt-2 border-t border-slate-100">
+                                         <button 
+                                            onClick={() => handleAbsenceAction(abs.id, 'APPROVED')} 
+                                            className="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-colors"
+                                         >
+                                             <CheckIcon className="w-3 h-3"/> {t('approve')}
+                                         </button>
+                                         <button 
+                                            onClick={() => handleAbsenceAction(abs.id, 'REJECTED')} 
+                                            className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-colors"
+                                         >
+                                             <XIcon className="w-3 h-3"/> {t('reject')}
+                                         </button>
+                                     </div>
+                                 </div>
+                             )
+                         })}
+                     </div>
+                 </div>
+             )}
+
              <p className="text-sm text-slate-600 bg-blue-50 p-3 rounded-lg border border-blue-100">
                  <WarningIcon className="w-4 h-4 inline me-2"/>
                  {t('vacation_stats_info')}
