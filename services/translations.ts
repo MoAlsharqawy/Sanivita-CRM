@@ -1,4 +1,5 @@
 
+
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -322,6 +323,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'weekend_settings': 'إعدادات العطلة الأسبوعية',
     'holidays_settings': 'إعدادات العطلات الرسمية',
     'add_holiday': 'إضافة عطلة',
+    'select_date': 'اختر التاريخ',
+    'holiday_already_exists': 'هذا التاريخ مضاف بالفعل',
     'no_holidays_added': 'لم يتم إضافة عطلات بعد',
     'saving_settings': 'جاري حفظ الإعدادات...',
     'settings_saved_success': 'تم حفظ الإعدادات بنجاح',
@@ -694,6 +697,8 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'weekend_settings': 'Weekend Settings',
     'holidays_settings': 'Holidays Settings',
     'add_holiday': 'Add Holiday',
+    'select_date': 'Select Date',
+    'holiday_already_exists': 'This date is already added',
     'no_holidays_added': 'No holidays added yet',
     'saving_settings': 'Saving settings...',
     'settings_saved_success': 'Settings saved successfully',

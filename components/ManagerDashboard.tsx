@@ -65,6 +65,9 @@ const ManagerDashboard: React.FC = () => {
   // Vacation Stats State
   const [vacationMonth, setVacationMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [absentDetailsModalUser, setAbsentDetailsModalUser] = useState<{name: string, details: any[]} | null>(null);
+  
+  // Settings State
+  const [newHolidayDate, setNewHolidayDate] = useState('');
 
   // Confirmation States
   const [confirmAction, setConfirmAction] = useState<{
@@ -353,16 +356,21 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const handleAddHoliday = async () => {
-      const dateStr = prompt(t('add_holiday') + " (YYYY-MM-DD):");
-      if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr) && systemSettings) {
-          const newHolidays = [...systemSettings.holidays, dateStr];
-          try {
-              await api.updateSystemSettings({ ...systemSettings, holidays: newHolidays });
-              setSystemSettings({ ...systemSettings, holidays: newHolidays });
-          } catch (e) {
-              console.error(e);
-              alert(t('settings_saved_error'));
-          }
+      if (!newHolidayDate || !systemSettings) return;
+
+      if (systemSettings.holidays.includes(newHolidayDate)) {
+          alert(t('holiday_already_exists'));
+          return;
+      }
+
+      const newHolidays = [...systemSettings.holidays, newHolidayDate].sort();
+      try {
+          await api.updateSystemSettings({ ...systemSettings, holidays: newHolidays });
+          setSystemSettings({ ...systemSettings, holidays: newHolidays });
+          setNewHolidayDate('');
+      } catch (e) {
+          console.error(e);
+          alert(t('settings_saved_error'));
       }
   };
   
@@ -914,18 +922,43 @@ const ManagerDashboard: React.FC = () => {
           <div className="space-y-6 animate-fade-in">
               <div className="bg-white/60 p-6 rounded-2xl shadow-sm border border-slate-200">
                   <h3 className="text-xl font-bold text-slate-700 mb-4">{t('holidays_settings')}</h3>
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  
+                  {/* Add Holiday Form */}
+                  <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-center mb-6 bg-white/50 p-4 rounded-xl border border-slate-200/50">
+                      <div className="w-full sm:w-auto">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">{t('select_date')}</label>
+                          <input 
+                              type="date" 
+                              value={newHolidayDate}
+                              onChange={(e) => setNewHolidayDate(e.target.value)}
+                              className="w-full p-2 border border-slate-300/50 rounded-lg focus:ring-purple-500 focus:border-purple-500 bg-white"
+                          />
+                      </div>
+                      <button 
+                          onClick={handleAddHoliday}
+                          disabled={!newHolidayDate} 
+                          className="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center gap-2 h-[42px] disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                      >
+                          <PlusIcon className="w-4 h-4"/> {t('add_holiday')}
+                      </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
                       {systemSettings.holidays.map(date => (
-                          <div key={date} className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                          <div key={date} className="bg-white text-purple-800 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 border border-purple-100 shadow-sm hover:shadow-md transition-all">
+                              <CalendarIcon className="w-4 h-4 text-purple-500" />
                               {date}
-                              <button onClick={() => handleRemoveHoliday(date)} className="text-purple-400 hover:text-red-500"><XIcon className="w-4 h-4"/></button>
+                              <button 
+                                onClick={() => handleRemoveHoliday(date)} 
+                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 transition-colors"
+                                title={t('delete')}
+                              >
+                                  <XIcon className="w-4 h-4"/>
+                              </button>
                           </div>
                       ))}
-                      {systemSettings.holidays.length === 0 && <span className="text-slate-500 italic">{t('no_holidays_added')}</span>}
+                      {systemSettings.holidays.length === 0 && <span className="text-slate-500 italic py-2">{t('no_holidays_added')}</span>}
                   </div>
-                  <button onClick={handleAddHoliday} className="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors text-sm">
-                      <PlusIcon className="w-4 h-4 inline me-1"/> {t('add_holiday')}
-                  </button>
               </div>
           </div>
       )}
