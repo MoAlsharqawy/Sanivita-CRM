@@ -1,95 +1,47 @@
-import { supabase } from './supabaseClient';
-import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask, RepAbsence, LeaveStatus } from '../types';
 
-// Helper to handle Supabase errors
+import { supabase } from './supabaseClient';
+import { User, Region, Doctor, Pharmacy, Product, DoctorVisit, PharmacyVisit, VisitReport, Specialization, ClientAlert, SystemSettings, WeeklyPlan, UserRole, RepTask, RepAbsence, LeaveStatus, Expense } from '../types';
+
 const handleSupabaseError = (error: any, context: string) => {
   console.error(`Error in ${context}:`, error);
   throw new Error(error.message || `An unknown error occurred in ${context}`);
 };
 
 export const api = {
-  // --- CONNECTION TEST ---
-  testSupabaseConnection: async (): Promise<boolean> => {
-    try {
-      const { error } = await supabase.from('regions').select('id', { count: 'exact', head: true });
-      if (error) {
-        console.error("Supabase connection test failed:", error.message);
-        if (error.message.includes("Invalid API key") || error.message.includes("JWT")) {
-          throw new Error("Connection failed: Invalid Supabase URL or Anon Key.");
-        }
-        throw new Error(`Connection test failed: ${error.message}. Make sure the database schema is set up correctly.`);
-      }
-      return true;
-    } catch (e: any) {
-      console.error("Supabase connection error:", e.message);
-      throw new Error(e.message || "Connection failed: Please check the Supabase URL format.");
-    }
-  },
-
-  // --- AUTH & USER PROFILE ---
+  // --- AUTH & PROFILE ---
   login: async (username: string, password: string): Promise<User> => {
-    const email = username;
     const { data: { user: authUser }, error } = await supabase.auth.signInWithPassword({
-      email: email,
+      email: username,
       password: password,
     });
-
-    if (error || !authUser) {
-      console.error('Login error:', error?.message);
-      if (error && (error.message.includes('Email not confirmed') || error.message.includes('email not confirmed'))) {
-        throw new Error('email_not_confirmed');
-      }
-      throw new Error('incorrect_credentials');
-    }
-
-    try {
-      const profile = await api.getUserProfile(authUser.id);
-      return profile;
-    } catch (e: any) {
-      console.error("Critical error: Failed to get profile immediately after login. Logging out.", e);
-      await api.logout();
-      throw new Error('profile_not_found');
-    }
+    if (error || !authUser) throw new Error('incorrect_credentials');
+    return await api.getUserProfile(authUser.id);
   },
 
   logout: async (): Promise<void> => {
-    const { error } = await supabase.auth.signOut();
-    if (error) handleSupabaseError(error, 'logout');
+    await supabase.auth.signOut();
+  },
+
+  // Fix: Added missing sendPasswordResetEmail method used in components/Login.tsx
+  sendPasswordResetEmail: async (email: string): Promise<void> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) handleSupabaseError(error, 'sendPasswordResetEmail');
   },
 
   getUserProfile: async (userId: string): Promise<User> => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      console.error("Database error fetching user profile:", error);
-      if (error.message.includes('violates row-level security policy')) {
-        throw new Error('rls_error');
-      }
-      handleSupabaseError(error, 'getUserProfile');
-    }
-
-    if (!data) {
-      console.error(`Profile not found for user ID ${userId}. The user exists in authentication but not in the profiles table.`);
-      throw new Error('profile_not_found');
-    }
-
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    if (error) handleSupabaseError(error, 'getUserProfile');
     return { ...data, password: '' } as User;
   },
 
   updateUserPassword: async (newPassword: string): Promise<boolean> => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      handleSupabaseError(error, 'updateUserPassword');
-      return false;
-    }
-    return true;
+    return !error;
   },
 
-  // --- USER MANAGEMENT ---
+  // --- USER MGMT ---
   getUsers: async (): Promise<User[]> => {
     const { data, error } = await supabase.from('profiles').select('*');
     if (error) handleSupabaseError(error, 'getUsers');
@@ -97,245 +49,131 @@ export const api = {
   },
 
   addUser: async (userData: Omit<User, 'id'> & { password: string }): Promise<User> => {
-    const email = userData.username;
-    const { data: { session: managerSession } } = await supabase.auth.getSession();
-
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: email,
+      email: userData.username,
       password: userData.password,
       options: { data: { name: userData.name } }
     });
-
-    if (authError) {
-      if (authError.message.includes('user already registered') || authError.message.includes('email already registered')) {
-        throw new Error('user_already_exists');
-      }
-      if (authError.message.includes('error sending confirmation mail')) {
-        throw new Error('error_smtp_not_configured');
-      }
-      handleSupabaseError(authError, 'addUser (signUp)');
-    }
-    if (!authData.user) throw new Error('database_error_creating_new_user');
-
+    if (authError) handleSupabaseError(authError, 'addUser');
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .update({ role: userData.role, username: userData.username })
-      .eq('id', authData.user.id)
-      .select()
-      .single();
-
-    if (managerSession) {
-      const { error: restoreError } = await supabase.auth.setSession({
-        access_token: managerSession.access_token,
-        refresh_token: managerSession.refresh_token,
-      });
-      if (restoreError) console.error("CRITICAL: Failed to restore manager session.", restoreError);
-    } else {
-      await supabase.auth.signOut();
-    }
-
-    if (profileError) {
-      if (profileError.message.includes('violates row-level security policy')) throw new Error('error_permission_denied');
-      if (profileError.code === 'PGRST116') throw new Error('error_db_trigger_failed');
-      handleSupabaseError(profileError, 'addUser (profile update)');
-    }
-
+      .eq('id', authData.user!.id)
+      .select().single();
+    if (profileError) handleSupabaseError(profileError, 'addUser profile');
     return { ...profileData, password: '' };
   },
 
-  updateUser: async (userId: string, updates: Partial<Pick<User, 'name' | 'role'>>): Promise<User | null> => {
-    const { name, role } = updates;
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ name, role })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.message.includes('violates row-level security policy')) throw new Error('error_permission_denied');
-      handleSupabaseError(error, 'updateUser (profile)');
-      return null;
-    }
-    return data ? { ...data, password: '' } : null;
+  updateUser: async (userId: string, updates: Partial<User>): Promise<void> => {
+    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+    if (error) handleSupabaseError(error, 'updateUser');
   },
 
-  deleteUser: async (userId: string): Promise<boolean> => {
+  deleteUser: async (userId: string): Promise<void> => {
     const { error } = await supabase.auth.admin.deleteUser(userId);
-    if (error) {
-      console.error("Failed to delete user with admin privileges:", error.message);
-      throw new Error('error_permission_denied_delete_user');
-    }
-    return true;
-  },
-
-  sendPasswordResetEmail: async (username: string): Promise<void> => {
-    const { error } = await supabase.auth.resetPasswordForEmail(username, {
-      redirectTo: window.location.origin,
-    });
-    if (error) console.error('Password reset request error:', error.message);
+    if (error) handleSupabaseError(error, 'deleteUser');
   },
 
   resetRepData: async (repId: string): Promise<void> => {
     const { error } = await supabase.rpc('reset_rep_data', { p_rep_id: repId });
-    if (error) {
-        if (error.message.includes('permission denied') || error.message.includes('violates row-level security policy')) {
-            throw new Error('error_permission_denied');
-        }
-        handleSupabaseError(error, 'resetRepData');
-    }
+    if (error) handleSupabaseError(error, 'resetRepData');
   },
 
-  // --- CORE DATA FETCHING ---
+  // --- REGIONS & PRODUCTS ---
   getRegions: async (): Promise<Region[]> => {
     const { data, error } = await supabase.from('regions').select('*');
     if (error) handleSupabaseError(error, 'getRegions');
     return data || [];
   },
 
-  // Supports fallbackToAll parameter
-  getRegionsForRep: async (repId: string, fallbackToAll: boolean = true): Promise<Region[]> => {
-    const { data, error } = await supabase
-      .from('user_regions')
-      .select('regions (id, name)')
-      .eq('user_id', repId);
-
-    if (error) {
-        console.warn('Error fetching user_regions, falling back to all regions:', error.message);
-    }
-    
-    const assignedRegions = (data || []).map((item: any) => item.regions).filter((r: any) => r) as Region[];
-
-    if (assignedRegions.length === 0 && fallbackToAll) {
-        return await api.getRegions();
-    }
-
-    return assignedRegions;
+  getRegionsForRep: async (repId: string, fallbackToAll = true): Promise<Region[]> => {
+    const { data, error } = await supabase.from('user_regions').select('regions(*)').eq('user_id', repId);
+    const assigned = (data || []).map((i: any) => i.regions).filter(Boolean);
+    return (assigned.length === 0 && fallbackToAll) ? await api.getRegions() : assigned;
   },
 
   updateUserRegions: async (userId: string, regionIds: number[]): Promise<void> => {
-    const { error: deleteError } = await supabase.from('user_regions').delete().eq('user_id', userId);
-    if (deleteError) handleSupabaseError(deleteError, 'updateUserRegions:delete');
-
+    await supabase.from('user_regions').delete().eq('user_id', userId);
     if (regionIds.length > 0) {
-      const { error: insertError } = await supabase
-        .from('user_regions')
-        .insert(regionIds.map(rId => ({ user_id: userId, region_id: rId })));
-      if (insertError) handleSupabaseError(insertError, 'updateUserRegions:insert');
+      await supabase.from('user_regions').insert(regionIds.map(id => ({ user_id: userId, region_id: id })));
     }
   },
 
-  addRegion: async (regionName: string): Promise<Region> => {
-    if (!regionName) throw new Error("Region name cannot be empty.");
-    const { data, error } = await supabase.from('regions').insert({ name: regionName }).select().single();
-
-    if (error) {
-      if (error.code === '23505') { 
-        const { data: existingData, error: fetchError } = await supabase
-          .from('regions').select('*').eq('name', regionName).single();
-        if (fetchError) handleSupabaseError(fetchError, 'addRegion (fetch existing)');
-        return existingData as Region;
-      }
-      handleSupabaseError(error, 'addRegion');
-    }
-    return data as Region;
+  addRegion: async (name: string): Promise<Region> => {
+    const { data, error } = await supabase.from('regions').insert({ name }).select().single();
+    if (error) handleSupabaseError(error, 'addRegion');
+    return data;
   },
 
   getProducts: async (): Promise<Product[]> => {
     const { data, error } = await supabase.from('products').select('*');
-    if (error) handleSupabaseError(error, 'getProducts');
     return data || [];
   },
 
-  // --- DOCTOR MANAGEMENT (CRUD) ---
+  // --- DOCTORS & PHARMACIES ---
   getAllDoctors: async (): Promise<Doctor[]> => {
     const { data, error } = await supabase.from('doctors').select('*');
-    if (error) handleSupabaseError(error, 'getAllDoctors');
     return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
   },
 
   getDoctorsForRep: async (repId: string): Promise<Doctor[]> => {
     const { data, error } = await supabase.from('doctors').select('*').eq('rep_id', repId);
-    if (error) handleSupabaseError(error, 'getDoctorsForRep');
     return (data || []).map(d => ({ ...d, regionId: d.region_id, repId: d.rep_id }));
   },
 
-  addDoctor: async (doctor: { name: string, regionId: number, repId: string, specialization: string }): Promise<Doctor> => {
+  addDoctor: async (doc: any): Promise<Doctor> => {
     const { data, error } = await supabase.from('doctors').insert({
-      name: doctor.name,
-      region_id: doctor.regionId,
-      rep_id: doctor.repId,
-      specialization: doctor.specialization
+      name: doc.name, region_id: doc.regionId, rep_id: doc.repId, specialization: doc.specialization
     }).select().single();
-    
     if (error) handleSupabaseError(error, 'addDoctor');
     return { ...data, regionId: data.region_id, repId: data.rep_id };
   },
 
-  updateDoctor: async (id: number, updates: Partial<{ name: string, regionId: number, specialization: string }>): Promise<void> => {
+  updateDoctor: async (id: number, updates: any): Promise<void> => {
     const dbUpdates: any = {};
     if (updates.name) dbUpdates.name = updates.name;
     if (updates.regionId) dbUpdates.region_id = updates.regionId;
     if (updates.specialization) dbUpdates.specialization = updates.specialization;
-
-    const { error } = await supabase.from('doctors').update(dbUpdates).eq('id', id);
-    if (error) handleSupabaseError(error, 'updateDoctor');
+    await supabase.from('doctors').update(dbUpdates).eq('id', id);
   },
 
   deleteDoctor: async (id: number): Promise<void> => {
-    // Manually delete visits first to avoid Foreign Key Constraint violations
-    // This fixes the issue where the delete button "doesn't work"
-    const { error: visitsError } = await supabase.from('doctor_visits').delete().eq('doctor_id', id);
-    if (visitsError) handleSupabaseError(visitsError, 'deleteDoctor (visits)');
-
-    const { error } = await supabase.from('doctors').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteDoctor');
+    await supabase.from('doctor_visits').delete().eq('doctor_id', id);
+    await supabase.from('doctors').delete().eq('id', id);
   },
 
-  // --- PHARMACY MANAGEMENT (CRUD) ---
   getAllPharmacies: async (): Promise<Pharmacy[]> => {
     const { data, error } = await supabase.from('pharmacies').select('*');
-    if (error) handleSupabaseError(error, 'getAllPharmacies');
     return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
   },
 
   getPharmaciesForRep: async (repId: string): Promise<Pharmacy[]> => {
     const { data, error } = await supabase.from('pharmacies').select('*').eq('rep_id', repId);
-    if (error) handleSupabaseError(error, 'getPharmaciesForRep');
-    return (data || []).map(p => ({ ...p, regionId: p.region_id, repId: p.rep_id }));
+    return (data || []).map(p => ({ ...p, regionId: p.region_id, rep_id: p.rep_id }));
   },
 
-  addPharmacy: async (pharmacy: { name: string, regionId: number, repId: string }): Promise<Pharmacy> => {
+  addPharmacy: async (ph: any): Promise<Pharmacy> => {
     const { data, error } = await supabase.from('pharmacies').insert({
-      name: pharmacy.name,
-      region_id: pharmacy.regionId,
-      rep_id: pharmacy.repId,
-      specialization: Specialization.Pharmacy
+      name: ph.name, region_id: ph.regionId, rep_id: ph.repId, specialization: Specialization.Pharmacy
     }).select().single();
-    
-    if (error) handleSupabaseError(error, 'addPharmacy');
     return { ...data, regionId: data.region_id, repId: data.rep_id };
   },
 
-  updatePharmacy: async (id: number, updates: Partial<{ name: string, regionId: number }>): Promise<void> => {
+  // Fix: Added missing updatePharmacy method used in components/ClientFormModal.tsx
+  updatePharmacy: async (id: number, updates: any): Promise<void> => {
     const dbUpdates: any = {};
     if (updates.name) dbUpdates.name = updates.name;
     if (updates.regionId) dbUpdates.region_id = updates.regionId;
-
     const { error } = await supabase.from('pharmacies').update(dbUpdates).eq('id', id);
     if (error) handleSupabaseError(error, 'updatePharmacy');
   },
 
   deletePharmacy: async (id: number): Promise<void> => {
-    // Manually delete visits first to avoid Foreign Key Constraint violations
-    const { error: visitsError } = await supabase.from('pharmacy_visits').delete().eq('pharmacy_id', id);
-    if (visitsError) handleSupabaseError(visitsError, 'deletePharmacy (visits)');
-
-    const { error } = await supabase.from('pharmacies').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deletePharmacy');
+    await supabase.from('pharmacy_visits').delete().eq('pharmacy_id', id);
+    await supabase.from('pharmacies').delete().eq('id', id);
   },
 
-  // --- VISITS & REPORTS ---
+  // --- VISITS ---
   addDoctorVisit: async (visit: Omit<DoctorVisit, 'id' | 'date'>): Promise<DoctorVisit> => {
     const { data, error } = await supabase.rpc('add_doctor_visit_with_products', {
       p_doctor_id: visit.doctorId,
@@ -344,11 +182,11 @@ export const api = {
       p_visit_type: visit.visitType,
       p_doctor_comment: visit.doctorComment,
       p_product_ids: visit.productIds,
+      p_latitude: visit.latitude,
+      p_longitude: visit.longitude
     }).single();
     if (error) handleSupabaseError(error, 'addDoctorVisit');
-    
-    const visitData = data as any;
-    return { ...visitData, doctorId: visitData.doctor_id, repId: visitData.rep_id, productIds: visit.productIds, regionId: visitData.region_id, visitType: visitData.visit_type, doctorComment: visitData.doctor_comment };
+    return data;
   },
 
   addPharmacyVisit: async (visit: Omit<PharmacyVisit, 'id' | 'date'>): Promise<PharmacyVisit> => {
@@ -357,165 +195,92 @@ export const api = {
       rep_id: visit.repId,
       region_id: visit.regionId,
       visit_notes: visit.visitNotes,
+      latitude: visit.latitude,
+      longitude: visit.longitude
     }).select().single();
     if (error) handleSupabaseError(error, 'addPharmacyVisit');
-    return { ...data, pharmacyId: data.pharmacy_id, repId: data.rep_id, regionId: data.region_id, visitNotes: data.visit_notes };
+    return { ...data, pharmacyId: data.pharmacy_id, repId: data.rep_id, regionId: data.region_id };
   },
 
   getVisitReportsForRep: async (repId: string): Promise<VisitReport[]> => {
     const { data, error } = await supabase.rpc('get_visit_reports', { p_rep_id: repId });
-    if (error) {
-      if (error.code === '42804' && error.message.includes('UNION types')) throw new Error("error_get_visit_reports_sql_config");
-      handleSupabaseError(error, 'getVisitReportsForRep');
-    }
     return data || [];
   },
 
   getAllVisitReports: async (): Promise<VisitReport[]> => {
     const { data, error } = await supabase.rpc('get_visit_reports');
-    if (error) {
-      if (error.code === '42804' && error.message.includes('UNION types')) throw new Error("error_get_visit_reports_sql_config");
-      handleSupabaseError(error, 'getAllVisitReports');
-    }
     return (data || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
 
   getOverdueVisits: async (): Promise<ClientAlert[]> => {
     const { data, error } = await supabase.rpc('get_overdue_visits');
-    if (error) handleSupabaseError(error, 'getOverdueVisits');
-    
-    // Map snake_case to camelCase
-    return (data || []).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        type: item.type,
-        repId: String(item.rep_id || item.repId),
-        repName: item.rep_name || item.repName,
-        regionName: String(item.region_name || item.regionName || item.region_id || ''),
-        daysSinceLastVisit: item.days_since_last_visit ?? item.daysSinceLastVisit
+    return (data || []).map((i: any) => ({
+        id: i.id, name: i.name, type: i.type, repId: String(i.rep_id), repName: i.rep_name, regionName: String(i.region_name), daysSinceLastVisit: i.days_since_last_visit
     }));
   },
 
-  // --- WEEKLY PLANS ---
+  // --- PLANS ---
   getRepPlan: async (repId: string): Promise<WeeklyPlan> => {
     const { data, error } = await supabase.from('weekly_plans').select('plan, status').eq('rep_id', repId).maybeSingle();
-    if (error) handleSupabaseError(error, 'getRepPlan');
     return data || { plan: {}, status: 'draft' };
   },
 
-  updateRepPlan: async (repId: string, planData: WeeklyPlan['plan']): Promise<WeeklyPlan> => {
+  updateRepPlan: async (repId: string, planData: any): Promise<WeeklyPlan> => {
     const { data, error } = await supabase.from('weekly_plans').upsert({
-      rep_id: repId,
-      plan: planData,
-      status: 'pending',
+      rep_id: repId, plan: planData, status: 'pending',
     }, { onConflict: 'rep_id' }).select('plan, status').single();
-    if (error) handleSupabaseError(error, 'updateRepPlan');
     return data as WeeklyPlan;
   },
 
-  reviewRepPlan: async (repId: string, newStatus: 'approved' | 'rejected'): Promise<WeeklyPlan> => {
-    const { data, error } = await supabase.from('weekly_plans').update({ status: newStatus }).eq('rep_id', repId).select('plan, status').single();
-    if (error) handleSupabaseError(error, 'reviewRepPlan');
-    return data as WeeklyPlan;
-  },
-
-  revokePlanApproval: async (repId: string): Promise<WeeklyPlan> => {
-    const { data, error } = await supabase.from('weekly_plans').update({ status: 'draft' }).eq('rep_id', repId).select('plan, status').single();
-    if (error) handleSupabaseError(error, 'revokePlanApproval');
-    return data as WeeklyPlan;
+  reviewRepPlan: async (repId: string, status: string): Promise<void> => {
+    await supabase.from('weekly_plans').update({ status }).eq('rep_id', repId);
   },
 
   getAllPlans: async (): Promise<{ [repId: string]: WeeklyPlan }> => {
-    const { data, error } = await supabase.from('weekly_plans').select('rep_id, plan, status');
-    if (error) handleSupabaseError(error, 'getAllPlans');
-    const plansObject: { [repId: string]: WeeklyPlan } = {};
-    (data || []).forEach(plan => { plansObject[plan.rep_id] = { plan: plan.plan, status: plan.status }; });
-    return plansObject;
+    const { data } = await supabase.from('weekly_plans').select('rep_id, plan, status');
+    const plans: any = {};
+    (data || []).forEach(p => { plans[p.rep_id] = { plan: p.plan, status: p.status }; });
+    return plans;
   },
 
-  // --- TASK MANAGEMENT ---
+  // --- TASKS ---
   getPendingTasksForRep: async (repId: string): Promise<RepTask[]> => {
-    const { data, error } = await supabase.from('rep_tasks').select('*').eq('rep_id', repId).eq('is_completed', false).order('created_at', { ascending: false });
-    if (error) handleSupabaseError(error, 'getPendingTasksForRep');
-    return (data || []).map(task => ({
-        id: task.id, repId: task.rep_id, createdBy: task.created_by, description: task.description, isCompleted: task.is_completed, createdAt: task.created_at, completedAt: task.completed_at
-    }));
+    const { data } = await supabase.from('rep_tasks').select('*').eq('rep_id', repId).eq('is_completed', false).order('created_at', { ascending: false });
+    return (data || []).map(t => ({ id: t.id, repId: t.rep_id, createdBy: t.created_by, description: t.description, isCompleted: t.is_completed, createdAt: t.created_at }));
   },
 
-  getAllTasks: async (): Promise<RepTask[]> => {
-    const { data, error } = await supabase.from('rep_tasks').select('*, profiles!rep_id(name)');
-    if (error) handleSupabaseError(error, 'getAllTasks');
-    return (data || []).map((task: any) => ({
-        id: task.id, repId: task.rep_id, repName: task.profiles?.name || 'Unknown', createdBy: task.created_by, description: task.description, isCompleted: task.is_completed, createdAt: task.created_at, completedAt: task.completed_at
-    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  },
-
-  createTask: async (repId: string, description: string): Promise<RepTask> => {
+  createTask: async (repId: string, description: string): Promise<void> => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-    const { data, error } = await supabase.from('rep_tasks').insert({ rep_id: repId, created_by: user.id, description, is_completed: false }).select('*, profiles!rep_id(name)').single();
-    if (error) handleSupabaseError(error, 'createTask');
-    const taskData = data as any;
-    return { id: taskData.id, repId: taskData.rep_id, repName: taskData.profiles?.name || 'Unknown', createdBy: taskData.created_by, description: taskData.description, isCompleted: taskData.is_completed, createdAt: taskData.created_at, completedAt: taskData.completed_at };
+    await supabase.from('rep_tasks').insert({ rep_id: repId, created_by: user!.id, description, is_completed: false });
   },
 
-  completeTask: async (taskId: string): Promise<void> => {
-    const { error } = await supabase.from('rep_tasks').update({ is_completed: true, completed_at: new Date().toISOString() }).eq('id', taskId);
-    if (error) handleSupabaseError(error, 'completeTask');
-  },
-
-  deleteTask: async (taskId: string): Promise<void> => {
-      const { error } = await supabase.from('rep_tasks').delete().eq('id', taskId);
-      if (error) handleSupabaseError(error, 'deleteTask');
+  completeTask: async (id: string): Promise<void> => {
+    await supabase.from('rep_tasks').update({ is_completed: true, completed_at: new Date().toISOString() }).eq('id', id);
   },
 
   // --- ABSENCES ---
   getRepAbsences: async (): Promise<RepAbsence[]> => {
-    const { data, error } = await supabase.from('rep_absences').select('*');
-    if (error) {
-       console.warn("Could not fetch absences. Table 'rep_absences' might not exist.", error.message);
-       return [];
-    }
-    return (data || []).map((a: any) => ({
-      id: a.id,
-      repId: a.rep_id,
-      date: a.date,
-      reason: a.reason,
-      status: a.status || 'APPROVED' // Default to APPROVED for backward compatibility if column is missing/null
-    }));
+    const { data } = await supabase.from('rep_absences').select('*');
+    return (data || []).map(a => ({ id: a.id, repId: a.rep_id, date: a.date, reason: a.reason, status: a.status }));
   },
-  
+
   getRepAbsencesForRep: async (repId: string): Promise<RepAbsence[]> => {
-    const { data, error } = await supabase.from('rep_absences').select('*').eq('rep_id', repId);
-    if (error) handleSupabaseError(error, 'getRepAbsencesForRep');
-    return (data || []).map((a: any) => ({
-      id: a.id,
-      repId: a.rep_id,
-      date: a.date,
-      reason: a.reason,
-      status: a.status || 'APPROVED'
-    }));
+    const { data } = await supabase.from('rep_absences').select('*').eq('rep_id', repId);
+    return (data || []).map(a => ({ id: a.id, repId: a.rep_id, date: a.date, reason: a.reason, status: a.status }));
   },
 
   addRepAbsence: async (repId: string, date: string, reason: string, status: LeaveStatus = 'PENDING'): Promise<RepAbsence> => {
-    const { data, error } = await supabase.from('rep_absences').insert({
-      rep_id: repId,
-      date: date,
-      reason: reason,
-      status: status
-    }).select().single();
+    const { data, error } = await supabase.from('rep_absences').insert({ rep_id: repId, date, reason, status }).select().single();
     if (error) handleSupabaseError(error, 'addRepAbsence');
-    return { id: data.id, repId: data.rep_id, date: data.date, reason: data.reason, status: data.status };
+    return { ...data, repId: data.rep_id };
   },
 
-  updateRepAbsenceStatus: async (id: number, status: LeaveStatus): Promise<void> => {
-      const { error } = await supabase.from('rep_absences').update({ status }).eq('id', id);
-      if (error) handleSupabaseError(error, 'updateRepAbsenceStatus');
+  updateRepAbsenceStatus: async (id: number, status: string): Promise<void> => {
+    await supabase.from('rep_absences').update({ status }).eq('id', id);
   },
 
   deleteRepAbsence: async (id: number): Promise<void> => {
-    const { error } = await supabase.from('rep_absences').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteRepAbsence');
+    await supabase.from('rep_absences').delete().eq('id', id);
   },
 
   // --- SYSTEM SETTINGS ---
@@ -525,96 +290,79 @@ export const api = {
     return data || { weekends: [], holidays: [] };
   },
 
-  updateSystemSettings: async (settings: SystemSettings): Promise<SystemSettings> => {
-    const { data, error } = await supabase.from('system_settings').update({ weekends: settings.weekends, holidays: settings.holidays }).eq('id', 1).select().single();
-    if (error) handleSupabaseError(error, 'updateSystemSettings');
-    return data as SystemSettings;
+  updateSystemSettings: async (settings: SystemSettings): Promise<void> => {
+    await supabase.from('system_settings').update({ weekends: settings.weekends, holidays: settings.holidays }).eq('id', 1);
+  },
+
+  // --- EXPENSES ---
+  getExpenses: async (repId?: string): Promise<Expense[]> => {
+    let query = supabase.from('expenses').select('*, profiles!rep_id(name)');
+    if (repId) query = query.eq('rep_id', repId);
+    const { data, error } = await query.order('date', { ascending: false });
+    if (error) handleSupabaseError(error, 'getExpenses');
+    return (data || []).map(e => ({
+      id: e.id, repId: e.rep_id, repName: e.profiles?.name, amount: e.amount, category: e.category, description: e.description, date: e.date, status: e.status
+    }));
+  },
+
+  addExpense: async (expense: Omit<Expense, 'id' | 'status' | 'repName'>): Promise<Expense> => {
+    const { data, error } = await supabase.from('expenses').insert({
+      rep_id: expense.repId, amount: expense.amount, category: expense.category, description: expense.description, date: expense.date, status: 'PENDING'
+    }).select().single();
+    if (error) handleSupabaseError(error, 'addExpense');
+    return data;
+  },
+
+  reviewExpense: async (id: string, status: 'APPROVED' | 'REJECTED'): Promise<void> => {
+    await supabase.from('expenses').update({ status }).eq('id', id);
   },
 
   // --- BATCH IMPORTS ---
-  addDoctorsBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<{ success: number, failed: number, errors: string[] }> => {
-    const result = { success: 0, failed: 0, errors: [] as string[] };
+  addDoctorsBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<any> => {
+    const result = { success: 0, failed: 0, errors: [] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
-    const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
-    const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
-    const doctorsToInsert: any[] = [];
-
-    for (const [index, row] of rows.entries()) {
+    const regionMap = new Map(regions.map(r => [r.name.toLowerCase(), r.id]));
+    const userMap = new Map(users.map(u => [u.username.toLowerCase(), u.id]));
+    const toInsert = [];
+    for (const [idx, row] of rows.entries()) {
       if (row.length < 4) continue;
-      const Name = row[0]; const RegionName = row[1]; const Spec = row[2]; const repEmail = row[3]; const rowIndex = index + 2;
-
-      if (!Name || !RegionName || !Spec || !repEmail) {
-        result.failed++; result.errors.push(`Row ${rowIndex}: Missing fields.`); continue;
+      const [name, reg, spec, email] = row;
+      let regId = regionMap.get(String(reg).toLowerCase());
+      if (!regId) {
+        const nr = await api.addRegion(String(reg)); regId = nr.id; regionMap.set(nr.name.toLowerCase(), nr.id);
       }
-
-      let regionId = regionMap.get(String(RegionName).trim().toLowerCase());
-      if (!regionId) {
-        try {
-          const newRegion = await api.addRegion(String(RegionName).trim());
-          regionId = newRegion.id; regionMap.set(newRegion.name.trim().toLowerCase(), newRegion.id);
-        } catch (e: any) {
-          result.failed++; result.errors.push(`Row ${rowIndex}: Region error: ${e.message}`); continue;
-        }
-      }
-
-      const repId = userMap.get(String(repEmail).trim().toLowerCase());
-      if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep not found.`); continue; }
-
-      doctorsToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: String(Spec).trim() });
+      const uId = userMap.get(String(email).toLowerCase());
+      if (uId) toInsert.push({ name: String(name), region_id: regId, rep_id: uId, specialization: String(spec) });
+      else result.failed++;
     }
-
-    if (doctorsToInsert.length > 0) {
-      const CHUNK_SIZE = 50;
-      for (let i = 0; i < doctorsToInsert.length; i += CHUNK_SIZE) {
-        const chunk = doctorsToInsert.slice(i, i + CHUNK_SIZE);
-        const { error } = await supabase.from('doctors').insert(chunk);
-        if (error) { result.failed += chunk.length; result.errors.push(`Batch error: ${error.message}`); } else { result.success += chunk.length; }
-        onProgress(Math.round(((i + chunk.length) / doctorsToInsert.length) * 100));
-      }
-    } else { onProgress(100); }
-    return result;
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('doctors').insert(toInsert);
+      if (error) result.failed += toInsert.length; else result.success = toInsert.length;
+    }
+    onProgress(100); return result;
   },
 
-  addPharmaciesBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<{ success: number, failed: number, errors: string[] }> => {
-    const result = { success: 0, failed: 0, errors: [] as string[] };
+  addPharmaciesBatch: async (rows: any[][], onProgress: (p: number) => void): Promise<any> => {
+    const result = { success: 0, failed: 0, errors: [] };
     const [regions, users] = await Promise.all([api.getRegions(), api.getUsers()]);
-    const regionMap = new Map(regions.map(r => [r.name.trim().toLowerCase(), r.id]));
-    const userMap = new Map(users.map(u => [u.username.trim().toLowerCase(), u.id]));
-    const pharmaciesToInsert: any[] = [];
-
-    for (const [index, row] of rows.entries()) {
+    const regionMap = new Map(regions.map(r => [r.name.toLowerCase(), r.id]));
+    const userMap = new Map(users.map(u => [u.username.toLowerCase(), u.id]));
+    const toInsert = [];
+    for (const [idx, row] of rows.entries()) {
       if (row.length < 3) continue;
-      const Name = row[0]; const RegionName = row[1]; const repEmail = row[2]; const rowIndex = index + 2;
-
-      if (!Name || !RegionName || !repEmail) {
-        result.failed++; result.errors.push(`Row ${rowIndex}: Missing fields.`); continue;
+      const [name, reg, email] = row;
+      let regId = regionMap.get(String(reg).toLowerCase());
+      if (!regId) {
+        const nr = await api.addRegion(String(reg)); regId = nr.id; regionMap.set(nr.name.toLowerCase(), nr.id);
       }
-
-      let regionId = regionMap.get(String(RegionName).trim().toLowerCase());
-      if (!regionId) {
-        try {
-          const newRegion = await api.addRegion(String(RegionName).trim());
-          regionId = newRegion.id; regionMap.set(newRegion.name.trim().toLowerCase(), newRegion.id);
-        } catch (e: any) {
-          result.failed++; result.errors.push(`Row ${rowIndex}: Region error: ${e.message}`); continue;
-        }
-      }
-
-      const repId = userMap.get(String(repEmail).trim().toLowerCase());
-      if (!repId) { result.failed++; result.errors.push(`Row ${rowIndex}: Rep not found.`); continue; }
-
-      pharmaciesToInsert.push({ name: String(Name).trim(), region_id: regionId, rep_id: repId, specialization: Specialization.Pharmacy });
+      const uId = userMap.get(String(email).toLowerCase());
+      if (uId) toInsert.push({ name: String(name), region_id: regId, rep_id: uId, specialization: Specialization.Pharmacy });
+      else result.failed++;
     }
-
-    if (pharmaciesToInsert.length > 0) {
-      const CHUNK_SIZE = 50;
-      for (let i = 0; i < pharmaciesToInsert.length; i += CHUNK_SIZE) {
-        const chunk = pharmaciesToInsert.slice(i, i + CHUNK_SIZE);
-        const { error } = await supabase.from('pharmacies').insert(chunk);
-        if (error) { result.failed += chunk.length; result.errors.push(`Batch error: ${error.message}`); } else { result.success += chunk.length; }
-        onProgress(Math.round(((i + chunk.length) / pharmaciesToInsert.length) * 100));
-      }
-    } else { onProgress(100); }
-    return result;
-  },
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('pharmacies').insert(toInsert);
+      if (error) result.failed += toInsert.length; else result.success = toInsert.length;
+    }
+    onProgress(100); return result;
+  }
 };

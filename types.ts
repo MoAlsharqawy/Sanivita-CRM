@@ -1,5 +1,4 @@
 
-
 export enum UserRole {
   Manager = 'MANAGER',
   Supervisor = 'SUPERVISOR',
@@ -13,10 +12,10 @@ export enum Specialization {
 }
 
 export interface User {
-  id: string; // Changed from number for UUID
+  id: string;
   name: string;
   username: string;
-  password?: string; // Should not be passed to frontend in a real app
+  password?: string;
   role: UserRole;
 }
 
@@ -29,15 +28,15 @@ export interface Doctor {
   id: number;
   name: string;
   regionId: number;
-  repId: string; // Changed from number for UUID
-  specialization: string; // Changed to string to allow dynamic specializations from import
+  repId: string;
+  specialization: string;
 }
 
 export interface Pharmacy {
   id: number;
   name: string;
   regionId: number;
-  repId: string; // Changed from number for UUID
+  repId: string;
   specialization: Specialization.Pharmacy;
 }
 
@@ -49,21 +48,25 @@ export interface Product {
 export interface DoctorVisit {
   id: number;
   doctorId: number;
-  repId: string; // Changed from number for UUID
+  repId: string;
   productIds: number[];
   regionId: number;
   visitType: 'Coaching' | 'Single';
   doctorComment: string;
   date: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface PharmacyVisit {
   id: number;
   pharmacyId: number;
-  repId: string; // Changed from number for UUID
+  repId: string;
   regionId: number;
   visitNotes: string;
   date: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export type Visit = (DoctorVisit & { type: 'doctor' }) | (PharmacyVisit & { type: 'pharmacy' });
@@ -74,21 +77,23 @@ export type VisitReport = {
     repName: string;
     regionName: string;
     targetName: string;
-    targetSpecialization?: string; // Changed to string to match Doctor specialization
+    targetSpecialization?: string;
     productName?: string;
     visitType?: 'Coaching' | 'Single';
     notes: string;
     date: string;
+    latitude?: number;
+    longitude?: number;
 };
 
 export interface ClientAlert {
-  id: string; // e.g., 'doctor-1'
+  id: string;
   name: string;
   type: 'doctor' | 'pharmacy';
-  repId: string; // Changed from number for UUID
+  repId: string;
   repName: string;
   regionName: string;
-  daysSinceLastVisit: number | null; // null if never visited
+  daysSinceLastVisit: number | null;
 }
 
 export interface SystemSettings {
@@ -96,10 +101,9 @@ export interface SystemSettings {
   holidays: string[]; // YYYY-MM-DD
 }
 
-// New interface for the details of a day's plan
 export interface DayPlanDetails {
   regionId: number;
-  doctorIds: number[]; // Array of Doctor IDs
+  doctorIds: number[];
 }
 
 export interface WeeklyPlan {
@@ -112,7 +116,7 @@ export interface WeeklyPlan {
 export interface RepTask {
   id: string;
   repId: string;
-  repName?: string; // Populated on fetch for manager view
+  repName?: string;
   createdBy: string;
   description: string;
   isCompleted: boolean;
@@ -125,7 +129,18 @@ export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export interface RepAbsence {
   id: number;
   repId: string;
-  date: string; // YYYY-MM-DD
-  reason?: string; // Will store Leave Type (Casual, Regular, Sick)
+  date: string;
+  reason?: string;
   status: LeaveStatus;
+}
+
+export interface Expense {
+  id: string;
+  repId: string;
+  repName?: string;
+  amount: number;
+  category: 'Fuel' | 'Meals' | 'Samples' | 'Other';
+  description: string;
+  date: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
