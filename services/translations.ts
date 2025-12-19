@@ -1,5 +1,4 @@
 
-
 export const translations: { [lang: string]: { [key: string]: string } } = {
   ar: {
     // General
@@ -163,6 +162,15 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'فشل تحديث كلمة المرور',
     'error_reauthentication_needed': 'يجب تسجيل الدخول مجدداً لتغيير كلمة المرور',
     'error_unexpected': 'حدث خطأ غير متوقع',
+    // New Performance Specific
+    'doctor_visits_label': 'زيارات الأطباء',
+    'pharmacy_visits_label': 'زيارات الصيدليات',
+    'doctor_clients_label': 'أطباء',
+    'pharmacy_clients_label': 'صيدليات',
+    'doctor_coverage_label': 'تغطية الأطباء',
+    'pharmacy_coverage_label': 'تغطية الصيدليات',
+    'doctor_avg_label': 'متوسط الأطباء',
+    'pharmacy_avg_label': 'متوسط الصيدليات',
     // Tasks
     'tasks_tab': 'المهام',
     'assign_new_task': 'إسناد مهمة جديدة',
@@ -538,6 +546,15 @@ export const translations: { [lang: string]: { [key: string]: string } } = {
     'error_password_update_failed': 'Failed to update password',
     'error_reauthentication_needed': 'You must log in again to change password',
     'error_unexpected': 'An unexpected error occurred',
+    // New Performance Specific
+    'doctor_visits_label': 'Doctor Visits',
+    'pharmacy_visits_label': 'Pharmacy Visits',
+    'doctor_clients_label': 'Doctors',
+    'pharmacy_clients_label': 'Pharmacies',
+    'doctor_coverage_label': 'Doctor Coverage',
+    'pharmacy_coverage_label': 'Pharmacy Coverage',
+    'doctor_avg_label': 'Dr. Average',
+    'pharmacy_avg_label': 'Ph. Average',
     // Tasks
     'tasks_tab': 'Tasks',
     'assign_new_task': 'Assign New Task',

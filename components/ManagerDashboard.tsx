@@ -9,7 +9,8 @@ import {
     UserGroupIcon, ChartBarIcon, ClipboardCheckIcon, CogIcon, 
     CalendarIcon, DownloadIcon, PlusIcon, TrashIcon, EditIcon, 
     MapPinIcon, SearchIcon, CheckCircleIcon, XIcon, WarningIcon,
-    SunIcon, CheckIcon, PresentationChartBarIcon, GraphIcon
+    SunIcon, CheckIcon, PresentationChartBarIcon, GraphIcon,
+    DoctorIcon, PharmacyIcon
 } from './icons';
 import AnalyticsCharts from './AnalyticsCharts';
 import UserEditModal from './UserEditModal';
@@ -130,7 +131,7 @@ const ManagerDashboard: React.FC = () => {
     return reports.filter(r => r.repName === repName);
   }, [reports, selectedRepId, users]);
 
-  // --- Performance Stats Calculation ---
+  // --- Performance Stats Calculation (Split Doctors/Pharmacies) ---
   const performanceStats = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -146,30 +147,35 @@ const ManagerDashboard: React.FC = () => {
         return d >= startOfMonth && rep && targetRepIds.has(rep.id);
     });
 
+    const docMonthlyVisits = monthlyVisits.filter(v => v.type === 'DOCTOR_VISIT');
+    const phMonthlyVisits = monthlyVisits.filter(v => v.type === 'PHARMACY_VISIT');
+
     // 3. Total Clients for selected rep(s)
     const targetDoctors = doctors.filter(d => targetRepIds.has(d.repId));
     const targetPharmacies = pharmacies.filter(p => targetRepIds.has(p.repId));
-    const totalClients = targetDoctors.length + targetPharmacies.length;
 
     // 4. Unique Visited Clients
-    const uniqueVisited = new Set(monthlyVisits.map(v => v.targetName)).size;
+    const uniqueDocVisited = new Set(docMonthlyVisits.map(v => v.targetName)).size;
+    const uniquePhVisited = new Set(phMonthlyVisits.map(v => v.targetName)).size;
 
     // 5. Coverage Percentage
-    const coverage = totalClients > 0 ? (uniqueVisited / totalClients) * 100 : 0;
+    const docCoverage = targetDoctors.length > 0 ? (uniqueDocVisited / targetDoctors.length) * 100 : 0;
+    const phCoverage = targetPharmacies.length > 0 ? (uniquePhVisited / targetPharmacies.length) * 100 : 0;
 
     // 6. Avg Visits / Day (Based on unique dates worked in this month)
-    const uniqueDaysWorked = new Set(monthlyVisits.map(v => v.date.split('T')[0])).size;
-    const avgPerDay = uniqueDaysWorked > 0 ? monthlyVisits.length / uniqueDaysWorked : 0;
+    const uniqueDaysWorkedDoc = new Set(docMonthlyVisits.map(v => v.date.split('T')[0])).size;
+    const uniqueDaysWorkedPh = new Set(phMonthlyVisits.map(v => v.date.split('T')[0])).size;
+    const uniqueDaysWorkedTotal = new Set(monthlyVisits.map(v => v.date.split('T')[0])).size;
+
+    const docAvgPerDay = uniqueDaysWorkedTotal > 0 ? docMonthlyVisits.length / uniqueDaysWorkedTotal : 0;
+    const phAvgPerDay = uniqueDaysWorkedTotal > 0 ? phMonthlyVisits.length / uniqueDaysWorkedTotal : 0;
 
     // 7. Frequency Distribution
-    // Map client name -> visit count
     const visitCounts: Record<string, number> = {};
-    monthlyVisits.forEach(v => visitCounts[v.targetName] = (visitCounts[v.targetName] || 0) + 1);
+    docMonthlyVisits.forEach(v => visitCounts[v.targetName] = (visitCounts[v.targetName] || 0) + 1);
     
     let f0=0, f1=0, f2=0, f3=0;
-    
-    // We iterate over ALL assigned clients to find 0 visits correctly
-    [...targetDoctors, ...targetPharmacies].forEach(c => {
+    targetDoctors.forEach(c => {
         const count = visitCounts[c.name] || 0;
         if(count === 0) f0++;
         else if(count === 1) f1++;
@@ -178,10 +184,10 @@ const ManagerDashboard: React.FC = () => {
     });
 
     return {
-        visits: monthlyVisits.length,
-        totalClients,
-        coverage,
-        avgPerDay,
+        visits: { total: monthlyVisits.length, doctor: docMonthlyVisits.length, pharmacy: phMonthlyVisits.length },
+        clients: { total: targetDoctors.length + targetPharmacies.length, doctor: targetDoctors.length, pharmacy: targetPharmacies.length },
+        coverage: { total: (uniqueDocVisited + uniquePhVisited) / (targetDoctors.length + targetPharmacies.length) * 100 || 0, doctor: docCoverage, pharmacy: phCoverage },
+        avgPerDay: { total: docAvgPerDay + phAvgPerDay, doctor: docAvgPerDay, pharmacy: phAvgPerDay },
         f0, f1, f2, f3
     };
 
@@ -578,53 +584,119 @@ const ManagerDashboard: React.FC = () => {
                  </div>
              </div>
 
-             {/* Performance Cards */}
+             {/* Performance Cards (Split Doctor/Pharmacy) */}
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Visits Card */}
-                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
-                    <div className="flex items-center mb-3">
-                        <div className="bg-blue-100 p-2 rounded-lg text-blue-600 me-3">
-                            <CalendarIcon className="w-6 h-6"/>
+                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center mb-3">
+                            <div className="bg-blue-100 p-2 rounded-lg text-blue-600 me-3">
+                                <CalendarIcon className="w-6 h-6"/>
+                            </div>
+                            <h4 className="text-slate-600 font-bold">{t('visits_this_month')}</h4>
                         </div>
-                        <h4 className="text-slate-600 font-medium">{t('visits_this_month')}</h4>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                            <div>
+                                <p className="text-2xl font-bold text-blue-700">{performanceStats.visits.doctor}</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <DoctorIcon className="w-3 h-3"/> {t('doctor_clients_label')}
+                                </p>
+                            </div>
+                            <div className="border-s border-slate-200">
+                                <p className="text-2xl font-bold text-orange-700">{performanceStats.visits.pharmacy}</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <PharmacyIcon className="w-3 h-3"/> {t('pharmacy_clients_label')}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <p className="text-3xl font-bold text-slate-800">{performanceStats.visits}</p>
+                    <p className="mt-3 text-sm font-bold text-slate-700 text-center bg-slate-100 py-1 rounded-full">{t('total')}: {performanceStats.visits.total}</p>
                 </div>
 
                 {/* Total Clients Card */}
-                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
-                    <div className="flex items-center mb-3">
-                        <div className="bg-orange-100 p-2 rounded-lg text-orange-600 me-3">
-                            <UserGroupIcon className="w-6 h-6"/>
+                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center mb-3">
+                            <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600 me-3">
+                                <UserGroupIcon className="w-6 h-6"/>
+                            </div>
+                            <h4 className="text-slate-600 font-bold">{t('total_clients')}</h4>
                         </div>
-                        <h4 className="text-slate-600 font-medium">{t('total_clients')}</h4>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                            <div>
+                                <p className="text-2xl font-bold text-blue-700">{performanceStats.clients.doctor}</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <DoctorIcon className="w-3 h-3"/> {t('doctor_clients_label')}
+                                </p>
+                            </div>
+                            <div className="border-s border-slate-200">
+                                <p className="text-2xl font-bold text-orange-700">{performanceStats.clients.pharmacy}</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <PharmacyIcon className="w-3 h-3"/> {t('pharmacy_clients_label')}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <p className="text-3xl font-bold text-slate-800">{performanceStats.totalClients}</p>
+                    <p className="mt-3 text-sm font-bold text-slate-700 text-center bg-slate-100 py-1 rounded-full">{t('total')}: {performanceStats.clients.total}</p>
                 </div>
 
                 {/* Coverage Card */}
-                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
-                    <div className="flex items-center mb-3">
-                        <div className="bg-green-100 p-2 rounded-lg text-green-600 me-3">
-                            <PresentationChartBarIcon className="w-6 h-6"/>
+                <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center mb-3">
+                            <div className="bg-purple-100 p-2 rounded-lg text-purple-600 me-3">
+                                <PresentationChartBarIcon className="w-6 h-6"/>
+                            </div>
+                            <h4 className="text-slate-600 font-bold">{t('coverage_percentage')}</h4>
                         </div>
-                        <h4 className="text-slate-600 font-medium">{t('coverage_percentage')}</h4>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                            <div>
+                                <p className="text-2xl font-bold text-blue-700">{performanceStats.coverage.doctor.toFixed(1)}%</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <DoctorIcon className="w-3 h-3"/> {t('doctors')}
+                                </p>
+                            </div>
+                            <div className="border-s border-slate-200">
+                                <p className="text-2xl font-bold text-orange-700">{performanceStats.coverage.pharmacy.toFixed(1)}%</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <PharmacyIcon className="w-3 h-3"/> {t('pharmacies')}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <p className="text-3xl font-bold text-slate-800">{performanceStats.coverage.toFixed(1)}%</p>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
-                        <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${Math.min(performanceStats.coverage, 100)}%` }}></div>
+                    <div className="mt-3">
+                         <div className="w-full bg-slate-200 rounded-full h-1.5">
+                            <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min(performanceStats.coverage.total, 100)}%` }}></div>
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-700 text-center mt-1">{t('total')}: {performanceStats.coverage.total.toFixed(1)}%</p>
                     </div>
                 </div>
 
                  {/* Avg Visits Per Day Card */}
-                 <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200">
-                    <div className="flex items-center mb-3">
-                        <div className="bg-purple-100 p-2 rounded-lg text-purple-600 me-3">
-                            <ChartBarIcon className="w-6 h-6"/>
+                 <div className="bg-white/60 p-6 rounded-2xl shadow-md border border-slate-200 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center mb-3">
+                            <div className="bg-orange-100 p-2 rounded-lg text-orange-600 me-3">
+                                <ChartBarIcon className="w-6 h-6"/>
+                            </div>
+                            <h4 className="text-slate-600 font-bold">{t('avg_per_day')}</h4>
                         </div>
-                        <h4 className="text-slate-600 font-medium">{t('avg_per_day')}</h4>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                            <div>
+                                <p className="text-2xl font-bold text-blue-700">{performanceStats.avgPerDay.doctor.toFixed(1)}</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <DoctorIcon className="w-3 h-3"/> {t('doctor_avg_label')}
+                                </p>
+                            </div>
+                            <div className="border-s border-slate-200">
+                                <p className="text-2xl font-bold text-orange-700">{performanceStats.avgPerDay.pharmacy.toFixed(1)}</p>
+                                <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                                    <PharmacyIcon className="w-3 h-3"/> {t('pharmacy_avg_label')}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <p className="text-3xl font-bold text-slate-800">{performanceStats.avgPerDay.toFixed(1)}</p>
+                    <p className="mt-3 text-sm font-bold text-slate-700 text-center bg-slate-100 py-1 rounded-full">{t('total')}: {performanceStats.avgPerDay.total.toFixed(1)}</p>
                 </div>
              </div>
 
