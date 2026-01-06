@@ -134,7 +134,8 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ user, visits, settings, plan, r
           const dayIndex = date.getDay();
           const isWeekend = settings?.weekends.includes(dayIndex) ?? false;
           const isHoliday = settings?.holidays.includes(dateStr) ?? false;
-          const isOffDay = isWeekend || isHoliday;
+          // Updated: Thursday (4) and Friday (5) are always holidays
+          const isOffDay = isWeekend || isHoliday || dayIndex === 4 || dayIndex === 5;
           
           const dayName = WEEK_DAYS[dayIndex];
           const isToday = toYYYYMMDD(new Date()) === dateStr;

@@ -244,31 +244,33 @@ const ManagerDashboard: React.FC = () => {
             const isHoliday = systemSettings.holidays.includes(dateStr);
             const approvedAbsence = approvedAbsenceMap.get(rep.id)?.get(dateStr);
 
-            // Custom Rule: Thursday (4) is Meeting Day, Friday (5) is Holiday.
-            // Exclude them from auto-absence calculation.
-            const isExcludedDay = dayIndex === 4 || dayIndex === 5;
+            // Custom Rule: Thursday (4) and Friday (5) are always holidays.
+            const isFixedHoliday = dayIndex === 4 || dayIndex === 5;
 
-            if (approvedAbsence) {
-                // Approved absence counts as an absence record regardless of work day status
-                absentDetails.push({ 
-                    id: approvedAbsence.id,
-                    date: dateStr, 
-                    reason: approvedAbsence.reason || t('manual_absence'),
-                    isManual: true
-                });
-            } else if (!isWeekend && !isHoliday && !isExcludedDay) {
-                totalWorkingDaysPassed++;
-                
-                const hasReport = workMap.has(`${rep.id}-${dateStr}`);
-                if (hasReport) {
-                    daysWorked++;
-                } else {
-                    // Mark as auto absent
-                    absentDetails.push({
-                        date: dateStr,
-                        reason: t('auto_absence'),
-                        isManual: false
+            // Calculate ONLY if it's a valid working day (Not Weekend, Not Holiday, Not Fixed Holiday)
+            if (!isWeekend && !isHoliday && !isFixedHoliday) {
+                if (approvedAbsence) {
+                    // Approved absence counts as an absence record ONLY on working days
+                    absentDetails.push({ 
+                        id: approvedAbsence.id,
+                        date: dateStr, 
+                        reason: approvedAbsence.reason || t('manual_absence'),
+                        isManual: true
                     });
+                } else {
+                    totalWorkingDaysPassed++;
+                    
+                    const hasReport = workMap.has(`${rep.id}-${dateStr}`);
+                    if (hasReport) {
+                        daysWorked++;
+                    } else {
+                        // Mark as auto absent
+                        absentDetails.push({
+                            date: dateStr,
+                            reason: t('auto_absence'),
+                            isManual: false
+                        });
+                    }
                 }
             }
 
